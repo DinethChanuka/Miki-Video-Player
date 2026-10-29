@@ -62,6 +62,7 @@ export interface PlayerStoreState {
   currentMediaId: string | null;
   currentUri: string | null;
   currentTitle: string;
+  isLooping: boolean;
 
   // Real-Time Playback Telemetry
   positionMs: number;
@@ -69,7 +70,7 @@ export interface PlayerStoreState {
   bufferedMs: number;
   isPaused: boolean;
   isBuffering: boolean;
-  volume: number;
+  volume: number; // 0 to 200 (%)
   isMuted: boolean;
   playbackRate: number;
   audioTracks: TrackInfo[];
@@ -93,11 +94,15 @@ export interface PlayerStoreState {
   // Actions
   bootEngine: (preferred?: EngineType, videoEl?: HTMLVideoElement) => Promise<void>;
   openMedia: (uri: string, title?: string, autoResume?: boolean) => Promise<void>;
+  closeMedia: () => Promise<void>;
   togglePlay: () => Promise<void>;
   seek: (timestampMs: number, exact?: boolean) => Promise<void>;
   setVolume: (volume: number) => Promise<void>;
   setPlaybackRate: (rate: number) => Promise<void>;
   setEqualizer: (gainsDb: number[], nightMode: boolean) => Promise<void>;
+  updateShaderConfig: (config: Partial<VideoShaderConfig>) => Promise<void>;
+  toggleLoop: () => void;
+  takeSnapshot: () => void;
   addBookmark: (label: string) => Promise<void>;
   refreshRecentMedia: () => Promise<void>;
   dismissError: () => void;
@@ -113,13 +118,14 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
   currentMediaId: null,
   currentUri: null,
   currentTitle: '',
+  isLooping: false,
 
   positionMs: 0,
   durationMs: 0,
   bufferedMs: 0,
   isPaused: true,
   isBuffering: false,
-  volume: 100,
+  volume: 100, // Default 100%, can boost up to 200%
   isMuted: false,
   playbackRate: 1.0,
   audioTracks: [],
@@ -130,9 +136,11 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
   nightModeEnabled: false,
   shaderConfig: {
     ambientGlowEnabled: true,
-    sharpness: 0.2,
+    brightness: 0,
     contrast: 1.0,
     saturation: 1.0,
+    sharpness: 0.2,
+    aspectRatio: 'auto',
     upscaleMode: 'none',
   },
 
@@ -167,6 +175,12 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
         subtitleTracks: telemetry.subtitleTracks,
         chapters: telemetry.chapters,
       });
+
+      // Handle video loop completion
+      if (get().isLooping && telemetry.durationMs > 0 && telemetry.positionMs >= telemetry.durationMs - 200) {
+        get().seek(0);
+        get().engine?.play();
+      }
 
       // Throttled SQLite checkpoint every 2,000ms during active playback
       const now = Date.now();
@@ -211,7 +225,6 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     } catch (err) {
       const parsed = parsePlayerError(err);
       if (targetType === 'tauri-mpv') {
-        // Automatic fallback to WebMediaEngine if libmpv fails to initialize
         await get().bootEngine('web-media', videoEl);
       } else {
         set({ lastError: parsed });
@@ -264,9 +277,26 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
       }
     }
 
-    // Browser-only fallback path
+    // Web / Standalone mode
     set({ currentUri: uri, currentTitle: resolvedTitle, retryCount: 0 });
     await get().engine?.load(uri, startPos);
+    await get().engine?.play();
+  },
+
+  closeMedia: async () => {
+    const engine = get().engine;
+    if (engine) {
+      await engine.pause();
+    }
+    set({
+      currentUri: null,
+      currentTitle: '',
+      currentMediaId: null,
+      positionMs: 0,
+      durationMs: 0,
+      isPaused: true,
+      resumeBannerPositionMs: null,
+    });
   },
 
   togglePlay: async () => {
@@ -290,13 +320,15 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
   },
 
   seek: async (timestampMs, exact = false) => {
-    set({ positionMs: timestampMs }); // Optimistic UI update
+    set({ positionMs: timestampMs });
     await get().engine?.seek(timestampMs, exact);
   },
 
   setVolume: async (volume) => {
-    set({ volume });
-    await get().engine?.setVolume(volume);
+    // Allows 0% to 200% VLC overdrive
+    const clamped = Math.max(0, Math.min(200, volume));
+    set({ volume: clamped, isMuted: clamped === 0 });
+    await get().engine?.setVolume(clamped);
   },
 
   setPlaybackRate: async (rate) => {
@@ -324,6 +356,29 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
           nightModeEnabled: nightMode,
         },
       }).catch(() => {});
+    }
+  },
+
+  updateShaderConfig: async (partial) => {
+    const updated = { ...get().shaderConfig, ...partial };
+    set({ shaderConfig: updated });
+    await get().engine?.applyVideoFilter(updated);
+  },
+
+  toggleLoop: () => {
+    set((s) => ({ isLooping: !s.isLooping }));
+  },
+
+  takeSnapshot: () => {
+    const engine = get().engine;
+    if (engine?.captureSnapshot) {
+      const dataUrl = engine.captureSnapshot();
+      if (dataUrl) {
+        const a = document.createElement('a');
+        a.href = dataUrl;
+        a.download = `aether-snapshot-${Date.now()}.png`;
+        a.click();
+      }
     }
   },
 

@@ -51,9 +51,11 @@ export interface ChapterInfo {
 
 export interface VideoShaderConfig {
   ambientGlowEnabled: boolean;
-  sharpness: number; // 0.0 to 1.0
+  brightness: number; // -50 to 50 (%)
   contrast: number; // 0.5 to 1.5
   saturation: number; // 0.0 to 2.0
+  sharpness: number; // 0.0 to 1.0
+  aspectRatio: 'auto' | '16:9' | '4:3' | '21:9' | '1:1' | 'fill';
   upscaleMode: 'none' | 'anime4k-fast' | 'anime4k-hq';
 }
 
@@ -64,7 +66,7 @@ export interface PlaybackTelemetry {
   isPaused: boolean;
   isBuffering: boolean;
   playbackRate: number;
-  volume: number;
+  volume: number; // 0 to 200 (%)
   isMuted: boolean;
   audioTracks: TrackInfo[];
   subtitleTracks: TrackInfo[];
@@ -85,14 +87,12 @@ export interface IPlayerEngine {
   setSubtitleTrack(trackId: string | null): Promise<void>;
   setEqualizer(gainsDb: number[], nightMode: boolean): Promise<void>;
   applyVideoFilter(config: VideoShaderConfig): Promise<void>;
+  captureSnapshot?(): string | null;
   onTelemetry(callback: (telemetry: PlaybackTelemetry) => void): () => void;
   onError(callback: (error: PlayerErrorEnvelope) => void): () => void;
   destroy(): Promise<void>;
 }
 
-/**
- * Normalizes any thrown Tauri IPC error or JS Error into a structured PlayerErrorEnvelope
- */
 export function parsePlayerError(err: unknown): PlayerErrorEnvelope {
   if (typeof err === 'object' && err !== null && 'code' in err && 'recovery' in err) {
     return err as PlayerErrorEnvelope;
@@ -153,7 +153,8 @@ export class TauriMpvEngine implements IPlayerEngine {
   }
 
   async setVolume(volume: number): Promise<void> {
-    await invoke('player_set_volume', { volume: Math.max(0, Math.min(100, volume)) });
+    // Allows volume boost up to 200%
+    await invoke('player_set_volume', { volume: Math.max(0, Math.min(200, volume)) });
   }
 
   async setMuted(muted: boolean): Promise<void> {
@@ -206,16 +207,18 @@ export class TauriMpvEngine implements IPlayerEngine {
 }
 
 /**
- * 2. Web & Cloud Streaming Engine (HTML5 Video + HLS.js + WebAudio 10-Band EQ)
+ * 2. Web & Cloud Streaming Engine (HTML5 Video + HLS.js + WebAudio 10-Band EQ + 200% VLC Overdrive)
  */
 export class WebMediaEngine implements IPlayerEngine {
   public readonly engineType: EngineType = 'web-media';
   private videoEl: HTMLVideoElement | null = null;
   private hls: Hls | null = null;
   private audioCtx: AudioContext | null = null;
+  private gainNode: GainNode | null = null;
   private eqBands: BiquadFilterNode[] = [];
   private compressorNode: DynamicsCompressorNode | null = null;
   private rafId: number | null = null;
+  private currentVolumePercent: number = 100;
 
   private telemetryListeners = new Set<(t: PlaybackTelemetry) => void>();
   private errorListeners = new Set<(e: PlayerErrorEnvelope) => void>();
@@ -226,6 +229,23 @@ export class WebMediaEngine implements IPlayerEngine {
     this.videoEl = container ?? document.createElement('video');
     this.videoEl.crossOrigin = 'anonymous';
     this.videoEl.playsInline = true;
+    this.videoEl.preload = 'auto';
+
+    // Hook critical HTML5 video events
+    this.videoEl.addEventListener('play', () => this.notifyTelemetry());
+    this.videoEl.addEventListener('pause', () => this.notifyTelemetry());
+    this.videoEl.addEventListener('ended', () => this.notifyTelemetry());
+    this.videoEl.addEventListener('error', () => {
+      const err = this.videoEl?.error;
+      this.emitError({
+        code: 'CODEC_UNSUPPORTED',
+        message: err?.message || 'Media playback error encountered in video element.',
+        severity: 'recoverable',
+        recovery: 'retry_with_backoff',
+        timestampMs: Date.now(),
+      });
+    });
+
     this.setupWebAudioGraph();
     this.startTelemetryLoop();
   }
@@ -233,7 +253,9 @@ export class WebMediaEngine implements IPlayerEngine {
   private setupWebAudioGraph(): void {
     if (!this.videoEl || this.audioCtx) return;
     try {
-      const AudioCtxClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const AudioCtxClass =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       if (!AudioCtxClass) return;
       this.audioCtx = new AudioCtxClass();
       const source = this.audioCtx.createMediaElementSource(this.videoEl);
@@ -252,14 +274,19 @@ export class WebMediaEngine implements IPlayerEngine {
       this.compressorNode.knee.value = 30;
       this.compressorNode.ratio.value = 1; // 1 = bypass unless Night Mode is active
 
-      // Connect chain: source -> 10 EQ bands -> DRC compressor -> destination
+      // Overdrive GainNode: supports volume boost up to 200% (gain = 2.0) like VLC Player!
+      this.gainNode = this.audioCtx.createGain();
+      this.gainNode.gain.value = this.currentVolumePercent / 100;
+
+      // Connect chain: source -> 10 EQ bands -> compressor -> gainNode -> destination
       let currentNode: AudioNode = source;
       for (const band of this.eqBands) {
         currentNode.connect(band);
         currentNode = band;
       }
       currentNode.connect(this.compressorNode);
-      this.compressorNode.connect(this.audioCtx.destination);
+      this.compressorNode.connect(this.gainNode);
+      this.gainNode.connect(this.audioCtx.destination);
     } catch {
       // AudioContext may be restricted by autoplay policy until user gesture
     }
@@ -286,6 +313,7 @@ export class WebMediaEngine implements IPlayerEngine {
         if (startPositionMs > 0 && this.videoEl) {
           this.videoEl.currentTime = startPositionMs / 1000;
         }
+        this.play().catch(() => {});
       });
       this.hls.on(Hls.Events.ERROR, (_event, data) => {
         if (data.fatal) {
@@ -300,15 +328,30 @@ export class WebMediaEngine implements IPlayerEngine {
       });
     } else {
       this.videoEl.src = uri;
-      this.videoEl.currentTime = startPositionMs / 1000;
+      this.videoEl.load();
+
+      const onCanPlay = () => {
+        if (startPositionMs > 0 && this.videoEl) {
+          this.videoEl.currentTime = startPositionMs / 1000;
+        }
+        this.videoEl?.removeEventListener('canplay', onCanPlay);
+        this.play().catch(() => {});
+      };
+      this.videoEl.addEventListener('canplay', onCanPlay);
     }
   }
 
   async play(): Promise<void> {
-    if (this.audioCtx?.state === 'suspended') {
+    if (this.audioCtx && this.audioCtx.state === 'suspended') {
       await this.audioCtx.resume().catch(() => {});
     }
-    await this.videoEl?.play();
+    if (this.videoEl) {
+      try {
+        await this.videoEl.play();
+      } catch (err) {
+        logWarn('Autoplay or play promise rejected: ' + String(err));
+      }
+    }
   }
 
   async pause(): Promise<void> {
@@ -322,8 +365,18 @@ export class WebMediaEngine implements IPlayerEngine {
   }
 
   async setVolume(volume: number): Promise<void> {
+    // VLC Overdrive range: 0% to 200%
+    const clamped = Math.max(0, Math.min(200, volume));
+    this.currentVolumePercent = clamped;
+
     if (this.videoEl) {
-      this.videoEl.volume = Math.max(0, Math.min(1, volume / 100));
+      // HTML5 video element standard volume only supports 0 to 1 (0% to 100%)
+      this.videoEl.volume = Math.min(1, clamped / 100);
+    }
+
+    if (this.gainNode) {
+      // Gain node delivers the amplified 101% - 200% volume boost
+      this.gainNode.gain.value = clamped / 100;
     }
   }
 
@@ -363,33 +416,75 @@ export class WebMediaEngine implements IPlayerEngine {
 
   async applyVideoFilter(config: VideoShaderConfig): Promise<void> {
     if (!this.videoEl) return;
-    this.videoEl.style.filter = `contrast(${config.contrast}) saturate(${config.saturation})`;
+    const brightnessVal = 100 + (config.brightness || 0); // e.g. 100% standard
+    this.videoEl.style.filter = `brightness(${brightnessVal}%) contrast(${config.contrast}) saturate(${config.saturation})`;
+
+    // Aspect ratio application
+    switch (config.aspectRatio) {
+      case '16:9':
+        this.videoEl.style.aspectRatio = '16/9';
+        this.videoEl.style.objectFit = 'contain';
+        break;
+      case '4:3':
+        this.videoEl.style.aspectRatio = '4/3';
+        this.videoEl.style.objectFit = 'contain';
+        break;
+      case '21:9':
+        this.videoEl.style.aspectRatio = '21/9';
+        this.videoEl.style.objectFit = 'contain';
+        break;
+      case '1:1':
+        this.videoEl.style.aspectRatio = '1/1';
+        this.videoEl.style.objectFit = 'contain';
+        break;
+      case 'fill':
+        this.videoEl.style.aspectRatio = 'auto';
+        this.videoEl.style.objectFit = 'fill';
+        break;
+      default:
+        this.videoEl.style.aspectRatio = 'auto';
+        this.videoEl.style.objectFit = 'contain';
+    }
+  }
+
+  captureSnapshot(): string | null {
+    if (!this.videoEl || this.videoEl.videoWidth === 0) return null;
+    const canvas = document.createElement('canvas');
+    canvas.width = this.videoEl.videoWidth;
+    canvas.height = this.videoEl.videoHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.drawImage(this.videoEl, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL('image/png');
+  }
+
+  private notifyTelemetry(): void {
+    if (!this.videoEl) return;
+    const bufferedEnd =
+      this.videoEl.buffered.length > 0
+        ? this.videoEl.buffered.end(this.videoEl.buffered.length - 1) * 1000
+        : 0;
+
+    const telemetry: PlaybackTelemetry = {
+      positionMs: Math.round(this.videoEl.currentTime * 1000),
+      durationMs: Math.round((this.videoEl.duration || 0) * 1000),
+      bufferedMs: Math.round(bufferedEnd),
+      isPaused: this.videoEl.paused,
+      isBuffering: this.videoEl.readyState < 3,
+      playbackRate: this.videoEl.playbackRate,
+      volume: this.currentVolumePercent,
+      isMuted: this.videoEl.muted,
+      audioTracks: [],
+      subtitleTracks: [],
+      chapters: [],
+    };
+
+    this.telemetryListeners.forEach((cb) => cb(telemetry));
   }
 
   private startTelemetryLoop(): void {
     const tick = () => {
-      if (this.videoEl) {
-        const bufferedEnd =
-          this.videoEl.buffered.length > 0
-            ? this.videoEl.buffered.end(this.videoEl.buffered.length - 1) * 1000
-            : 0;
-
-        this.telemetryListeners.forEach((cb) =>
-          cb({
-            positionMs: Math.round(this.videoEl!.currentTime * 1000),
-            durationMs: Math.round((this.videoEl!.duration || 0) * 1000),
-            bufferedMs: Math.round(bufferedEnd),
-            isPaused: this.videoEl!.paused,
-            isBuffering: this.videoEl!.readyState < 3,
-            playbackRate: this.videoEl!.playbackRate,
-            volume: Math.round(this.videoEl!.volume * 100),
-            isMuted: this.videoEl!.muted,
-            audioTracks: [],
-            subtitleTracks: [],
-            chapters: [],
-          })
-        );
-      }
+      this.notifyTelemetry();
       this.rafId = requestAnimationFrame(tick);
     };
     this.rafId = requestAnimationFrame(tick);
@@ -415,5 +510,11 @@ export class WebMediaEngine implements IPlayerEngine {
     await this.audioCtx?.close().catch(() => {});
     this.telemetryListeners.clear();
     this.errorListeners.clear();
+  }
+}
+
+function logWarn(msg: string) {
+  if (typeof console !== 'undefined') {
+    console.warn('[AetherPlayer]', msg);
   }
 }

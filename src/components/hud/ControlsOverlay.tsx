@@ -8,23 +8,35 @@ import {
   RotateCw,
   Volume2,
   VolumeX,
+  Volume1,
   Sliders,
   Bookmark,
   Subtitles,
   Maximize,
   Minimize,
   FastForward,
+  ArrowLeft,
+  Settings,
+  FolderOpen,
+  Repeat,
 } from 'lucide-react';
 
 interface ControlsOverlayProps {
   onOpenEq: () => void;
+  onOpenSettings: () => void;
+  onOpenFileBrowser: () => void;
   containerRef: React.RefObject<HTMLDivElement | null>;
 }
 
-export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({ onOpenEq, containerRef }) => {
+export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
+  onOpenEq,
+  onOpenSettings,
+  onOpenFileBrowser,
+  containerRef,
+}) => {
   const isPaused = usePlayerStore((s) => s.isPaused);
   const togglePlay = usePlayerStore((s) => s.togglePlay);
-  const volume = usePlayerStore((s) => s.volume);
+  const volume = usePlayerStore((s) => s.volume); // 0 to 200
   const setVolume = usePlayerStore((s) => s.setVolume);
   const isMuted = usePlayerStore((s) => s.isMuted);
   const playbackRate = usePlayerStore((s) => s.playbackRate);
@@ -33,9 +45,12 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({ onOpenEq, cont
   const durationMs = usePlayerStore((s) => s.durationMs);
   const seek = usePlayerStore((s) => s.seek);
   const addBookmark = usePlayerStore((s) => s.addBookmark);
+  const closeMedia = usePlayerStore((s) => s.closeMedia);
   const currentTitle = usePlayerStore((s) => s.currentTitle);
   const audioTracks = usePlayerStore((s) => s.audioTracks);
   const subtitleTracks = usePlayerStore((s) => s.subtitleTracks);
+  const isLooping = usePlayerStore((s) => s.isLooping);
+  const toggleLoop = usePlayerStore((s) => s.toggleLoop);
 
   const [isVisible, setIsVisible] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -50,7 +65,7 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({ onOpenEq, cont
     if (!isPaused) {
       hideTimerRef.current = window.setTimeout(() => {
         setIsVisible(false);
-      }, 3000);
+      }, 3500);
     }
   };
 
@@ -97,17 +112,48 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({ onOpenEq, cont
     >
       {/* Top Header Bar */}
       <div className="flex items-center justify-between pointer-events-auto">
-        <div className="flex items-center gap-3 glass-panel px-4 py-2 rounded-2xl">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          <h1 className="text-sm font-semibold text-white/90 truncate max-w-md">
-            {currentTitle || 'AetherPlayer'}
-          </h1>
+        <div className="flex items-center gap-3">
+          {/* Prominent Go Back Button */}
+          <button
+            onClick={closeMedia}
+            className="flex items-center gap-2 glass-panel hover:bg-white/15 px-3.5 py-2 rounded-2xl text-white font-medium text-xs transition-all shadow-lg border border-white/20 active:scale-95"
+            title="Return to Library / Home"
+          >
+            <ArrowLeft className="w-4 h-4 text-sky-400" />
+            <span>Back</span>
+          </button>
+
+          {/* Media Title Pill */}
+          <div className="flex items-center gap-2.5 glass-panel px-4 py-2 rounded-2xl border border-white/10 max-w-md">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <h1 className="text-xs font-semibold text-white/90 truncate">
+              {currentTitle || 'AetherPlayer'}
+            </h1>
+          </div>
         </div>
 
+        {/* Top Right Quick Actions */}
         <div className="flex items-center gap-2">
           <button
+            onClick={onOpenFileBrowser}
+            className="glass-pill px-3 py-2 rounded-xl text-xs font-medium text-white/80 hover:text-white flex items-center gap-1.5 transition-colors"
+            title="Open File Browser"
+          >
+            <FolderOpen className="w-4 h-4 text-sky-400" />
+            <span>Library</span>
+          </button>
+
+          <button
+            onClick={onOpenSettings}
+            className="glass-pill p-2 rounded-xl text-white/80 hover:text-white transition-colors"
+            title="Video & Shaders Settings"
+          >
+            <Settings className="w-4 h-4 text-indigo-300" />
+          </button>
+
+          <button
             onClick={() => addBookmark(`Bookmark at ${formatTime(positionMs)}`)}
-            className="glass-pill p-2.5 rounded-xl text-white/80 hover:text-white transition-colors"
+            className="glass-pill p-2 rounded-xl text-white/80 hover:text-white transition-colors"
             title="Add Bookmark"
           >
             <Bookmark className="w-4 h-4" />
@@ -134,7 +180,7 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({ onOpenEq, cont
 
         {/* Action Controls */}
         <div className="flex items-center justify-between pt-1">
-          {/* Left Controls: Play/Pause, Seek, Volume, Timestamps */}
+          {/* Left Controls: Play/Pause, Seek, VLC 200% Volume, Timestamps */}
           <div className="flex items-center gap-4">
             <button
               onClick={togglePlay}
@@ -159,25 +205,46 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({ onOpenEq, cont
               <RotateCw className="w-4 h-4" />
             </button>
 
-            <div className="flex items-center gap-2 group">
+            {/* VLC-Style 200% Overdrive Volume Slider */}
+            <div className="flex items-center gap-2 group relative">
               <button
                 onClick={() => setVolume(volume === 0 ? 100 : 0)}
                 className="p-2 text-white/70 hover:text-white transition-colors"
+                title={volume > 100 ? `VLC Boost (${volume}%)` : `Volume (${volume}%)`}
               >
                 {volume === 0 || isMuted ? (
                   <VolumeX className="w-4 h-4 text-rose-400" />
+                ) : volume > 100 ? (
+                  <Volume2 className="w-4 h-4 text-amber-400" />
+                ) : volume > 50 ? (
+                  <Volume2 className="w-4 h-4 text-sky-400" />
                 ) : (
-                  <Volume2 className="w-4 h-4" />
+                  <Volume1 className="w-4 h-4 text-white/70" />
                 )}
               </button>
-              <input
-                type="range"
-                min={0}
-                max={100}
-                value={volume}
-                onChange={(e) => setVolume(parseInt(e.target.value, 10))}
-                className="w-20 h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-sky-400"
-              />
+
+              <div className="flex flex-col gap-0.5">
+                <input
+                  type="range"
+                  min={0}
+                  max={200}
+                  step={1}
+                  value={volume}
+                  onChange={(e) => setVolume(parseInt(e.target.value, 10))}
+                  className="w-24 h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-sky-400"
+                />
+              </div>
+
+              {/* Volume Percentage Badge */}
+              <span
+                className={`text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-md ${
+                  volume > 100
+                    ? 'text-amber-400 bg-amber-400/20 border border-amber-400/30'
+                    : 'text-white/60'
+                }`}
+              >
+                {volume}%
+              </span>
             </div>
 
             <div className="font-mono text-xs text-white/60">
@@ -185,8 +252,19 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({ onOpenEq, cont
             </div>
           </div>
 
-          {/* Right Controls: Speed, EQ, Tracks, Fullscreen */}
+          {/* Right Controls: Loop, Speed, EQ, Tracks, Settings, Fullscreen */}
           <div className="flex items-center gap-2">
+            {/* Loop Toggle */}
+            <button
+              onClick={toggleLoop}
+              className={`p-2 rounded-xl transition-colors ${
+                isLooping ? 'bg-sky-500/20 text-sky-300 border border-sky-400/40' : 'glass-pill text-white/60 hover:text-white'
+              }`}
+              title={isLooping ? 'Looping Enabled' : 'Loop Off'}
+            >
+              <Repeat className="w-4 h-4" />
+            </button>
+
             {/* Speed Selector */}
             <div className="relative">
               <button
@@ -198,7 +276,7 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({ onOpenEq, cont
               </button>
               {showSpeedMenu && (
                 <div className="absolute bottom-10 right-0 glass-panel p-2 rounded-xl flex flex-col gap-1 min-w-24 z-50">
-                  {[0.5, 0.75, 1.0, 1.25, 1.5, 2.0].map((r) => (
+                  {[0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0].map((r) => (
                     <button
                       key={r}
                       onClick={() => {
@@ -261,9 +339,18 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({ onOpenEq, cont
             <button
               onClick={onOpenEq}
               className="glass-pill p-2 rounded-xl text-white/80 hover:text-white transition-colors"
-              title="Equalizer & DSP"
+              title="Equalizer & Audio DSP"
             >
-              <Sliders className="w-4 h-4" />
+              <Sliders className="w-4 h-4 text-emerald-400" />
+            </button>
+
+            {/* Video & Shaders Settings Button */}
+            <button
+              onClick={onOpenSettings}
+              className="glass-pill p-2 rounded-xl text-white/80 hover:text-white transition-colors"
+              title="Video Settings & Shaders"
+            >
+              <Settings className="w-4 h-4 text-indigo-400" />
             </button>
 
             {/* Fullscreen Toggle */}

@@ -37,11 +37,12 @@ impl MpvController {
             ));
         }
 
-        // Configure hardware acceleration and modern GPU video output
+        // Configure hardware acceleration, 200% volume max, and modern GPU video output
         let options = [
             ("vo", "gpu-next"),
             ("hwdec", "auto-safe"),
             ("wid", &surface_id.to_string()),
+            ("volume-max", "200"),
             ("keep-open", "yes"),
             ("idle", "yes"),
             ("ytdl", "no"),

@@ -15,8 +15,10 @@ declare module 'lucide-react' {
   export const RotateCcw: LucideIcon;
   export const RotateCw: LucideIcon;
   export const Volume2: LucideIcon;
+  export const Volume1: LucideIcon;
   export const VolumeX: LucideIcon;
   export const Sliders: LucideIcon;
+  export const SlidersHorizontal: LucideIcon;
   export const Bookmark: LucideIcon;
   export const Subtitles: LucideIcon;
   export const Maximize: LucideIcon;
@@ -29,4 +31,15 @@ declare module 'lucide-react' {
   export const FolderOpen: LucideIcon;
   export const Film: LucideIcon;
   export const Clock: LucideIcon;
+  export const ArrowLeft: LucideIcon;
+  export const Settings: LucideIcon;
+  export const Sparkles: LucideIcon;
+  export const Link: LucideIcon;
+  export const Search: LucideIcon;
+  export const Camera: LucideIcon;
+  export const Repeat: LucideIcon;
+  export const Tv: LucideIcon;
+  export const Sun: LucideIcon;
+  export const Contrast: LucideIcon;
+  export const Ratio: LucideIcon;
 }
