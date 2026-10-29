@@ -108,7 +108,9 @@ export const TimelineScrubber: React.FC = () => {
 
       {/* Scrubber Thumb Knob */}
       <div
-        className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-3.5 bg-white rounded-full shadow-lg scale-0 group-hover:scale-100 transition-transform duration-150 border border-sky-400"
+        className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-3.5 bg-white rounded-full shadow-lg transition-transform duration-150 border border-sky-400 ${
+          isScrubbing ? 'scale-125' : 'scale-0 group-hover:scale-100'
+        }`}
         style={{ left: `${progressPct}%` }}
       />
 

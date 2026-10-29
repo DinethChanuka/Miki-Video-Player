@@ -230,8 +230,19 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({ onOpenEq, cont
                   <span className="text-[11px] font-semibold text-white/50 uppercase tracking-wider">
                     Audio & Subtitles
                   </span>
+                  {audioTracks.length > 0 && (
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[10px] text-sky-400 font-semibold uppercase">Audio</span>
+                      {audioTracks.map((t) => (
+                        <span key={t.id} className="text-xs text-white/80">
+                          {t.label}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                   {subtitleTracks.length > 0 && (
                     <div className="flex flex-col gap-1">
+                      <span className="text-[10px] text-sky-400 font-semibold uppercase">Subtitles</span>
                       {subtitleTracks.map((t) => (
                         <span key={t.id} className="text-xs text-white/80">
                           {t.label}
@@ -239,7 +250,7 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({ onOpenEq, cont
                       ))}
                     </div>
                   )}
-                  {subtitleTracks.length === 0 && (
+                  {audioTracks.length === 0 && subtitleTracks.length === 0 && (
                     <span className="text-xs text-white/40 italic">Embedded tracks auto-syncing</span>
                   )}
                 </div>
