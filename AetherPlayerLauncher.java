@@ -1,4 +1,5 @@
 import java.awt.*;
+import java.io.File;
 import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URI;
@@ -10,18 +11,8 @@ public class AetherPlayerLauncher {
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
-            // Set undecorated window (removes native OS titlebar, close, minimize, maximize buttons)
-            JFrame frame = new JFrame("AetherPlayer Undecorated");
-            frame.setUndecorated(true);
-            frame.setSize(1280, 720);
-            frame.setLocationRelativeTo(null); // Center on screen
-            frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-
-            // Verify server status and launch standalone player
-            new Thread(() -> {
-                ensureServerActive();
-                launchStandaloneWindow();
-            }).start();
+            ensureServerActive();
+            launchStandaloneWindow();
         });
     }
 
@@ -32,10 +23,10 @@ public class AetherPlayerLauncher {
             conn.setConnectTimeout(1000);
             conn.connect();
             if (conn.getResponseCode() == 200) {
-                System.out.println("AetherPlayer dev server is active at " + APP_URL);
+                System.out.println("[Miki Player] Dev server is active at " + APP_URL);
             }
         } catch (IOException e) {
-            System.out.println("Starting Vite dev server from Java...");
+            System.out.println("[Miki Player] Starting Vite dev server...");
             try {
                 new ProcessBuilder("npm", "run", "dev").start();
                 Thread.sleep(2000);
@@ -47,14 +38,14 @@ public class AetherPlayerLauncher {
 
     private static void launchStandaloneWindow() {
         try {
-            ProcessBuilder pb = new ProcessBuilder(
-                "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-                "--app=" + APP_URL,
-                "--window-size=1280,720",
-                "--user-data-dir=/tmp/aether-java-profile"
-            );
-            pb.start();
-            System.out.println("AetherPlayer launched successfully with Java launcher.");
+            File nativeBinary = new File("./MikiPlayer");
+            if (nativeBinary.exists() && nativeBinary.canExecute()) {
+                System.out.println("[Miki Player] Launching native borderless MikiPlayer binary...");
+                new ProcessBuilder("./MikiPlayer").start();
+            } else {
+                System.out.println("[Miki Player] Launching run-desktop.sh...");
+                new ProcessBuilder("./run-desktop.sh").start();
+            }
             System.exit(0);
         } catch (IOException e) {
             e.printStackTrace();

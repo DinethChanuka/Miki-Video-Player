@@ -28,6 +28,9 @@ pnpm-debug.log*
 # Java bytecode
 *.class
 
+# Native binaries
+MikiPlayer
+
 # Superpowers agent scratch
 .superpowers/sdd/
 

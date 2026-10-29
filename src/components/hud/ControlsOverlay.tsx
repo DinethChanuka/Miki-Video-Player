@@ -15,7 +15,6 @@ import {
   Maximize,
   Minimize,
   FastForward,
-  ArrowLeft,
   Settings,
   FolderOpen,
   Repeat,
@@ -45,8 +44,6 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
   const durationMs = usePlayerStore((s) => s.durationMs);
   const seek = usePlayerStore((s) => s.seek);
   const addBookmark = usePlayerStore((s) => s.addBookmark);
-  const closeMedia = usePlayerStore((s) => s.closeMedia);
-  const currentTitle = usePlayerStore((s) => s.currentTitle);
   const audioTracks = usePlayerStore((s) => s.audioTracks);
   const subtitleTracks = usePlayerStore((s) => s.subtitleTracks);
   const isLooping = usePlayerStore((s) => s.isLooping);
@@ -106,64 +103,13 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
   return (
     <div
       onMouseMove={resetHideTimer}
-      className={`absolute inset-0 z-40 flex flex-col justify-between p-6 transition-opacity duration-300 pointer-events-none select-none ${
+      className={`absolute inset-0 z-40 flex flex-col justify-end p-6 transition-opacity duration-300 pointer-events-none select-none ${
         isVisible ? 'opacity-100' : 'opacity-0'
       }`}
     >
-      {/* Top Header Bar */}
-      <div className="flex items-center justify-between pointer-events-auto">
-        <div className="flex items-center gap-3">
-          {/* Prominent Go Back Button */}
-          <button
-            onClick={closeMedia}
-            className="flex items-center gap-2 glass-panel hover:bg-white/15 px-3.5 py-2 rounded-2xl text-white font-medium text-xs transition-all shadow-lg border border-white/20 active:scale-95"
-            title="Return to Library / Home"
-          >
-            <ArrowLeft className="w-4 h-4 text-sky-400" />
-            <span>Back</span>
-          </button>
-
-          {/* Media Title Pill */}
-          <div className="flex items-center gap-2.5 glass-panel px-4 py-2 rounded-2xl border border-white/10 max-w-md">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <h1 className="text-xs font-semibold text-white/90 truncate">
-              {currentTitle || 'AetherPlayer'}
-            </h1>
-          </div>
-        </div>
-
-        {/* Top Right Quick Actions */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={onOpenFileBrowser}
-            className="glass-pill px-3 py-2 rounded-xl text-xs font-medium text-white/80 hover:text-white flex items-center gap-1.5 transition-colors"
-            title="Open File Browser"
-          >
-            <FolderOpen className="w-4 h-4 text-sky-400" />
-            <span>Library</span>
-          </button>
-
-          <button
-            onClick={onOpenSettings}
-            className="glass-pill p-2 rounded-xl text-white/80 hover:text-white transition-colors"
-            title="Video & Shaders Settings"
-          >
-            <Settings className="w-4 h-4 text-indigo-300" />
-          </button>
-
-          <button
-            onClick={() => addBookmark(`Bookmark at ${formatTime(positionMs)}`)}
-            className="glass-pill p-2 rounded-xl text-white/80 hover:text-white transition-colors"
-            title="Add Bookmark"
-          >
-            <Bookmark className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
-
       {/* Center Big Play Trigger Area */}
       <div
-        className="flex-1 flex items-center justify-center cursor-pointer pointer-events-auto"
+        className="absolute inset-0 flex items-center justify-center cursor-pointer pointer-events-auto"
         onClick={togglePlay}
       >
         {isPaused && (
@@ -174,7 +120,7 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
       </div>
 
       {/* Bottom Floating Glass HUD */}
-      <div className="glass-panel p-4 rounded-3xl flex flex-col gap-3 pointer-events-auto shadow-2xl border border-white/15">
+      <div className="glass-panel p-4 rounded-3xl flex flex-col gap-3 pointer-events-auto shadow-2xl border border-white/15 z-10">
         {/* Magnetic Timeline */}
         <TimelineScrubber />
 
@@ -334,6 +280,24 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
                 </div>
               )}
             </div>
+
+            {/* Bookmark button */}
+            <button
+              onClick={() => addBookmark(`Bookmark at ${formatTime(positionMs)}`)}
+              className="glass-pill p-2 rounded-xl text-white/80 hover:text-white transition-colors"
+              title="Add Bookmark"
+            >
+              <Bookmark className="w-4 h-4 text-amber-400" />
+            </button>
+
+            {/* Media Explorer / Library Button */}
+            <button
+              onClick={onOpenFileBrowser}
+              className="glass-pill p-2 rounded-xl text-white/80 hover:text-white transition-colors"
+              title="Open Media Library"
+            >
+              <FolderOpen className="w-4 h-4 text-sky-400" />
+            </button>
 
             {/* Parametric Equalizer Button */}
             <button

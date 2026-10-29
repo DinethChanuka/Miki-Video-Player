@@ -225,16 +225,39 @@ export class WebMediaEngine implements IPlayerEngine {
 
   private static readonly EQ_FREQUENCIES = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
 
+  private getVideoEl(): HTMLVideoElement | null {
+    if (this.videoEl && document.contains(this.videoEl)) {
+      return this.videoEl;
+    }
+    const dom = document.getElementById('aether-video-viewport') as HTMLVideoElement | null;
+    if (dom) {
+      this.bindVideoElement(dom);
+      return dom;
+    }
+    return this.videoEl;
+  }
+
   async initialize(container?: HTMLVideoElement): Promise<void> {
-    this.videoEl = container ?? (document.getElementById('aether-video-viewport') as HTMLVideoElement) ?? document.createElement('video');
+    const el = container ?? (document.getElementById('aether-video-viewport') as HTMLVideoElement) ?? document.createElement('video');
+    this.bindVideoElement(el);
+    this.startTelemetryLoop();
+  }
+
+  public bindVideoElement(el: HTMLVideoElement): void {
+    if (this.videoEl === el) return;
+    this.videoEl = el;
     this.videoEl.playsInline = true;
     this.videoEl.preload = 'auto';
 
     // Hook critical HTML5 video events
-    this.videoEl.addEventListener('play', () => this.notifyTelemetry());
-    this.videoEl.addEventListener('pause', () => this.notifyTelemetry());
-    this.videoEl.addEventListener('ended', () => this.notifyTelemetry());
-    this.videoEl.addEventListener('error', () => {
+    this.videoEl.onplay = () => this.notifyTelemetry();
+    this.videoEl.onpause = () => this.notifyTelemetry();
+    this.videoEl.onended = () => this.notifyTelemetry();
+    this.videoEl.ontimeupdate = () => this.notifyTelemetry();
+    this.videoEl.onerror = () => {
+      const src = this.videoEl?.src || '';
+      // Completely ignore video errors for YouTube links or blank sources
+      if (!src || src.includes('youtube.com') || src.includes('youtu.be')) return;
       const err = this.videoEl?.error;
       this.emitError({
         code: 'CODEC_UNSUPPORTED',
@@ -243,21 +266,12 @@ export class WebMediaEngine implements IPlayerEngine {
         recovery: 'retry_with_backoff',
         timestampMs: Date.now(),
       });
-    });
-
-    this.setupWebAudioGraph();
-    this.startTelemetryLoop();
-  }
-
-  public bindVideoElement(el: HTMLVideoElement): void {
-    if (this.videoEl !== el) {
-      this.videoEl = el;
-      this.setupWebAudioGraph();
-    }
+    };
   }
 
   private setupWebAudioGraph(): void {
-    if (!this.videoEl || this.audioCtx) return;
+    const el = this.getVideoEl();
+    if (!el || this.audioCtx) return;
     try {
       const AudioCtxClass =
         window.AudioContext ||
@@ -266,7 +280,7 @@ export class WebMediaEngine implements IPlayerEngine {
       this.audioCtx = new AudioCtxClass();
 
       // Only attempt media element source if crossOrigin is supported or local
-      const source = this.audioCtx.createMediaElementSource(this.videoEl);
+      const source = this.audioCtx.createMediaElementSource(el);
 
       this.eqBands = WebMediaEngine.EQ_FREQUENCIES.map((freq) => {
         const filter = this.audioCtx!.createBiquadFilter();
@@ -299,9 +313,19 @@ export class WebMediaEngine implements IPlayerEngine {
   }
 
   async load(uri: string, startPositionMs = 0): Promise<void> {
-    if (!this.videoEl) {
-      this.videoEl = (document.getElementById('aether-video-viewport') as HTMLVideoElement) ?? document.createElement('video');
+    // If YouTube URL, never pass to <video> src
+    if (/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)/.test(uri)) {
+      const el = this.getVideoEl();
+      if (el) {
+        el.pause();
+        el.removeAttribute('src');
+        el.load();
+      }
+      return;
     }
+
+    const el = this.getVideoEl();
+    if (!el) return;
 
     if (this.hls) {
       this.hls.destroy();
@@ -324,10 +348,10 @@ export class WebMediaEngine implements IPlayerEngine {
         manifestLoadingTimeOut: 10000,
       });
       this.hls.loadSource(uri);
-      this.hls.attachMedia(this.videoEl);
+      this.hls.attachMedia(el);
       this.hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        if (startPositionMs > 0 && this.videoEl) {
-          this.videoEl.currentTime = startPositionMs / 1000;
+        if (startPositionMs > 0) {
+          el.currentTime = startPositionMs / 1000;
         }
         this.play().catch(() => {});
       });
@@ -343,40 +367,51 @@ export class WebMediaEngine implements IPlayerEngine {
         }
       });
     } else {
-      this.videoEl.src = uri;
-      this.videoEl.load();
+      el.src = uri;
+      el.load();
 
       const onCanPlay = () => {
-        if (startPositionMs > 0 && this.videoEl) {
-          this.videoEl.currentTime = startPositionMs / 1000;
+        if (startPositionMs > 0) {
+          el.currentTime = startPositionMs / 1000;
         }
-        this.videoEl?.removeEventListener('canplay', onCanPlay);
+        el.removeEventListener('canplay', onCanPlay);
         this.play().catch(() => {});
       };
-      this.videoEl.addEventListener('canplay', onCanPlay);
+      el.addEventListener('canplay', onCanPlay);
     }
   }
 
   async play(): Promise<void> {
+    const el = this.getVideoEl();
     if (this.audioCtx && this.audioCtx.state === 'suspended') {
       await this.audioCtx.resume().catch(() => {});
     }
-    if (this.videoEl) {
+    if (el) {
       try {
-        await this.videoEl.play();
-      } catch (err) {
-        logWarn('Autoplay or play promise rejected: ' + String(err));
+        await el.play();
+      } catch (err: unknown) {
+        const error = err as Error;
+        logWarn('Autoplay or play promise rejected: ' + error.message);
+        if (error.name === 'NotAllowedError') {
+          el.muted = true;
+          await el.play().catch(() => {});
+        }
       }
     }
+    this.notifyTelemetry();
   }
 
   async pause(): Promise<void> {
-    this.videoEl?.pause();
+    const el = this.getVideoEl();
+    el?.pause();
+    this.notifyTelemetry();
   }
 
   async seek(timestampMs: number): Promise<void> {
-    if (this.videoEl) {
-      this.videoEl.currentTime = Math.max(0, timestampMs / 1000);
+    const el = this.getVideoEl();
+    if (el) {
+      el.currentTime = Math.max(0, timestampMs / 1000);
+      this.notifyTelemetry();
     }
   }
 
@@ -384,6 +419,10 @@ export class WebMediaEngine implements IPlayerEngine {
     // VLC Overdrive range: 0% to 200%
     const clamped = Math.max(0, Math.min(200, volume));
     this.currentVolumePercent = clamped;
+
+    if (clamped > 100) {
+      this.setupWebAudioGraph();
+    }
 
     if (this.videoEl) {
       // HTML5 video element standard volume only supports 0 to 1 (0% to 100%)
@@ -531,6 +570,6 @@ export class WebMediaEngine implements IPlayerEngine {
 
 function logWarn(msg: string) {
   if (typeof console !== 'undefined') {
-    console.warn('[AetherPlayer]', msg);
+    console.warn('[MikiPlayer]', msg);
   }
 }

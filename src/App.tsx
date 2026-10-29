@@ -7,7 +7,7 @@ import { VideoSettingsModal } from './components/hud/VideoSettingsModal';
 import { FileBrowserModal } from './components/hud/FileBrowserModal';
 import { ErrorToast } from './components/hud/ErrorToast';
 import { usePlayerGestures } from './hooks/usePlayerGestures';
-import { FolderOpen, Film, Clock, Sparkles, Settings, ArrowLeft } from 'lucide-react';
+import { FolderOpen, Clock, Sparkles, Settings, ArrowLeft } from 'lucide-react';
 
 export function parseYouTubeId(url: string | null): string | null {
   if (!url) return null;
@@ -16,6 +16,32 @@ export function parseYouTubeId(url: string | null): string | null {
   );
   return match ? match[1] : null;
 }
+
+const handleWindowMinimize = () => {
+  if (typeof window !== 'undefined' && (window as unknown as { webkit?: { messageHandlers?: { windowAction?: { postMessage: (a: string) => void } } } }).webkit?.messageHandlers?.windowAction) {
+    (window as unknown as { webkit: { messageHandlers: { windowAction: { postMessage: (a: string) => void } } } }).webkit.messageHandlers.windowAction.postMessage('minimize');
+  } else if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
+    import('@tauri-apps/api/window').then(({ getCurrentWindow }) => getCurrentWindow().minimize()).catch(() => {});
+  }
+};
+
+const handleWindowMaximize = () => {
+  if (typeof window !== 'undefined' && (window as unknown as { webkit?: { messageHandlers?: { windowAction?: { postMessage: (a: string) => void } } } }).webkit?.messageHandlers?.windowAction) {
+    (window as unknown as { webkit: { messageHandlers: { windowAction: { postMessage: (a: string) => void } } } }).webkit.messageHandlers.windowAction.postMessage('maximize');
+  } else if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
+    import('@tauri-apps/api/window').then(({ getCurrentWindow }) => getCurrentWindow().toggleMaximize()).catch(() => {});
+  }
+};
+
+const handleWindowClose = () => {
+  if (typeof window !== 'undefined' && (window as unknown as { webkit?: { messageHandlers?: { windowAction?: { postMessage: (a: string) => void } } } }).webkit?.messageHandlers?.windowAction) {
+    (window as unknown as { webkit: { messageHandlers: { windowAction: { postMessage: (a: string) => void } } } }).webkit.messageHandlers.windowAction.postMessage('close');
+  } else if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
+    import('@tauri-apps/api/window').then(({ getCurrentWindow }) => getCurrentWindow().close()).catch(() => {});
+  } else {
+    window.close();
+  }
+};
 
 export const App: React.FC = () => {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -95,7 +121,7 @@ export const App: React.FC = () => {
     >
       {/* Sleek, Clean Frameless Titlebar - No duplicate traffic lights */}
       <div
-        className="w-full h-9 z-50 flex items-center justify-between px-4 bg-black/60 backdrop-blur-md border-b border-white/5 select-none"
+        className="w-full h-10 z-50 flex items-center justify-between px-4 bg-black/70 backdrop-blur-md border-b border-white/10 select-none"
         style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
       >
         {/* Left Branding & Return Button */}
@@ -113,21 +139,34 @@ export const App: React.FC = () => {
               <span>Back</span>
             </button>
           ) : (
-            <div className="flex items-center gap-2 text-xs font-bold text-white tracking-wide">
-              <Film className="w-4 h-4 text-sky-400" />
-              <span>AetherPlayer</span>
+            <div className="flex items-center gap-2.5 text-xs font-bold text-white tracking-wide">
+              <img
+                src="/logo.png"
+                alt="Miki Player"
+                className="w-5 h-5 rounded-md object-contain bg-white/10 p-0.5"
+              />
+              <span className="bg-gradient-to-r from-sky-400 via-indigo-300 to-purple-400 bg-clip-text text-transparent font-extrabold text-sm tracking-tight">
+                Miki Player
+              </span>
             </div>
           )}
 
           {currentUri && (
-            <span className="text-xs text-white/70 font-medium truncate max-w-sm">
-              {currentTitle}
-            </span>
+            <div className="flex items-center gap-2">
+              <img
+                src="/logo.png"
+                alt="Miki Player"
+                className="w-4 h-4 rounded-md object-contain bg-white/10 p-0.5"
+              />
+              <span className="text-xs text-white/80 font-medium truncate max-w-sm">
+                {currentTitle}
+              </span>
+            </div>
           )}
         </div>
 
         {/* Center Engine Indicator */}
-        <div className="hidden sm:flex items-center gap-2 text-[10px] font-mono tracking-wider uppercase text-sky-400/70 bg-white/5 px-2.5 py-0.5 rounded-full border border-white/5">
+        <div className="hidden sm:flex items-center gap-2 text-[10px] font-mono tracking-wider uppercase text-sky-400/80 bg-white/5 px-3 py-1 rounded-full border border-white/10">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
           <span>
             {youtubeId
@@ -138,25 +177,50 @@ export const App: React.FC = () => {
           </span>
         </div>
 
-        {/* Right Navigation & Tools */}
+        {/* Right Navigation & Window Controls */}
         <div
           className="flex items-center gap-2"
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
           <button
             onClick={() => setIsFileBrowserOpen(true)}
-            className="text-xs text-white/70 hover:text-white glass-pill px-3 py-1 rounded-xl transition-colors font-medium flex items-center gap-1.5"
+            className="text-xs text-white/80 hover:text-white glass-pill px-3 py-1 rounded-xl transition-colors font-medium flex items-center gap-1.5"
           >
             <FolderOpen className="w-3.5 h-3.5 text-sky-400" />
             <span>Library</span>
           </button>
           <button
             onClick={() => setIsSettingsOpen(true)}
-            className="text-xs text-white/70 hover:text-white glass-pill p-1.5 rounded-xl transition-colors"
+            className="text-xs text-white/80 hover:text-white glass-pill p-1.5 rounded-xl transition-colors"
             title="Video & Shaders Settings"
           >
             <Settings className="w-3.5 h-3.5 text-indigo-300" />
           </button>
+
+          {/* Custom Window Controls (Pure Undecorated Frame) */}
+          <div className="flex items-center gap-1 ml-1 pl-2 border-l border-white/10">
+            <button
+              onClick={handleWindowMinimize}
+              className="w-6 h-6 rounded-lg hover:bg-white/10 text-white/70 hover:text-white flex items-center justify-center transition-colors text-xs font-bold"
+              title="Minimize"
+            >
+              ─
+            </button>
+            <button
+              onClick={handleWindowMaximize}
+              className="w-6 h-6 rounded-lg hover:bg-white/10 text-white/70 hover:text-white flex items-center justify-center transition-colors text-xs"
+              title="Maximize"
+            >
+              □
+            </button>
+            <button
+              onClick={handleWindowClose}
+              className="w-6 h-6 rounded-lg hover:bg-rose-500/40 text-white/70 hover:text-rose-200 flex items-center justify-center transition-colors text-xs"
+              title="Close"
+            >
+              ✕
+            </button>
+          </div>
         </div>
       </div>
 
@@ -180,9 +244,20 @@ export const App: React.FC = () => {
           <video
             id="aether-video-viewport"
             ref={videoRef}
-            className="w-full h-full object-contain z-10"
+            className="w-full h-full object-contain z-10 cursor-pointer"
             playsInline
             preload="auto"
+            onClick={() => usePlayerStore.getState().togglePlay()}
+            onPlay={() => usePlayerStore.setState({ isPaused: false })}
+            onPause={() => usePlayerStore.setState({ isPaused: true })}
+            onEnded={() => usePlayerStore.setState({ isPaused: true })}
+            onTimeUpdate={(e) => {
+              const v = e.currentTarget;
+              usePlayerStore.setState({
+                positionMs: Math.round(v.currentTime * 1000),
+                durationMs: Math.round((v.duration || 0) * 1000),
+              });
+            }}
           />
         ) : (
           <div className="w-full h-full pointer-events-none z-10" />
@@ -192,11 +267,15 @@ export const App: React.FC = () => {
         {!currentUri && (
           <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-6 p-8 pointer-events-auto bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
             <div className="p-8 rounded-3xl glass-panel flex flex-col items-center gap-5 text-center max-w-lg border border-white/15 shadow-2xl">
-              <div className="p-4 rounded-3xl bg-gradient-to-br from-sky-500/20 to-indigo-500/20 border border-sky-400/30 text-sky-400 shadow-xl shadow-sky-500/10">
-                <Film className="w-12 h-12" />
+              <div className="p-3 rounded-3xl bg-white/5 border border-white/15 shadow-2xl shadow-sky-500/10">
+                <img
+                  src="/logo.png"
+                  alt="Miki Player"
+                  className="w-20 h-20 rounded-2xl object-contain shadow-md"
+                />
               </div>
               <div>
-                <h1 className="text-3xl font-extrabold tracking-tight text-white">AetherPlayer</h1>
+                <h1 className="text-3xl font-extrabold tracking-tight text-white">Miki Player</h1>
                 <p className="text-sm text-white/60 mt-1.5 leading-relaxed">
                   Ultra-modern, cross-platform multimedia player with 200% VLC overdrive, real-time ambient glow, and YouTube stream optimizer.
                 </p>
