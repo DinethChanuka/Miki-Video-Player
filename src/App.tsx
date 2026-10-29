@@ -6,6 +6,7 @@ import { EqualizerModal } from './components/hud/EqualizerModal';
 import { VideoSettingsModal } from './components/hud/VideoSettingsModal';
 import { FileBrowserModal } from './components/hud/FileBrowserModal';
 import { ErrorToast } from './components/hud/ErrorToast';
+import { SplashScreen } from './components/splash/SplashScreen';
 import { usePlayerGestures } from './hooks/usePlayerGestures';
 import { FolderOpen, Clock, Sparkles, Settings, ArrowLeft } from 'lucide-react';
 
@@ -60,6 +61,7 @@ export const App: React.FC = () => {
   const [isEqOpen, setIsEqOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isFileBrowserOpen, setIsFileBrowserOpen] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
 
   const { handleTouchStart, handleTouchEnd } = usePlayerGestures(containerRef);
 
@@ -367,6 +369,9 @@ export const App: React.FC = () => {
       />
       <FileBrowserModal isOpen={isFileBrowserOpen} onClose={() => setIsFileBrowserOpen(false)} />
       <ErrorToast />
+
+      {/* Cinematic Startup Video Splash Loader */}
+      {showSplash && <SplashScreen onComplete={() => setShowSplash(false)} />}
     </div>
   );
 };
