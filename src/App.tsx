@@ -9,6 +9,14 @@ import { ErrorToast } from './components/hud/ErrorToast';
 import { usePlayerGestures } from './hooks/usePlayerGestures';
 import { FolderOpen, Film, Clock, Sparkles, Settings, ArrowLeft } from 'lucide-react';
 
+export function parseYouTubeId(url: string | null): string | null {
+  if (!url) return null;
+  const match = url.match(
+    /(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/
+  );
+  return match ? match[1] : null;
+}
+
 export const App: React.FC = () => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -29,16 +37,29 @@ export const App: React.FC = () => {
 
   const { handleTouchStart, handleTouchEnd } = usePlayerGestures(containerRef);
 
+  const youtubeId = parseYouTubeId(currentUri);
+
   // Initialize playback engine on mount
   useEffect(() => {
     bootEngine(undefined, videoRef.current ?? undefined);
   }, [bootEngine]);
 
+  // Ensure DOM element is always attached
+  useEffect(() => {
+    if (videoRef.current) {
+      const engine = usePlayerStore.getState().engine;
+      if (engine && 'bindVideoElement' in engine) {
+        (engine as { bindVideoElement: (el: HTMLVideoElement) => void }).bindVideoElement(
+          videoRef.current
+        );
+      }
+    }
+  }, [videoRef]);
+
   const handleFileDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const file = e.dataTransfer.files[0];
-      // Always create a direct, unconstrained blob URL for the video element
       const uri = URL.createObjectURL(file);
       openMedia(uri, file.name);
     }
@@ -72,101 +93,102 @@ export const App: React.FC = () => {
       onTouchEnd={handleTouchEnd}
       className="relative w-screen h-screen overflow-hidden bg-slate-950 select-none flex flex-col font-sans"
     >
-      {/* Standalone Window Frameless Chrome / Header Drag Region */}
+      {/* Sleek, Clean Frameless Titlebar - No duplicate traffic lights */}
       <div
-        className="w-full h-8 z-50 flex items-center justify-between px-3 bg-black/40 backdrop-blur-md border-b border-white/5"
+        className="w-full h-9 z-50 flex items-center justify-between px-4 bg-black/60 backdrop-blur-md border-b border-white/5 select-none"
         style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
       >
-        {/* macOS Traffic Lights Simulation */}
+        {/* Left Branding & Return Button */}
         <div
-          className="flex items-center gap-2"
+          className="flex items-center gap-3"
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
-          <button
-            onClick={() => window.close()}
-            className="w-3 h-3 rounded-full bg-rose-500 hover:opacity-80 transition-opacity"
-            title="Close"
-          />
-          <button
-            onClick={() => {
-              if (document.fullscreenElement) {
-                document.exitFullscreen().catch(() => {});
-              }
-            }}
-            className="w-3 h-3 rounded-full bg-amber-500 hover:opacity-80 transition-opacity"
-            title="Minimize"
-          />
-          <button
-            onClick={() => {
-              if (!document.fullscreenElement) {
-                containerRef.current?.requestFullscreen().catch(() => {});
-              } else {
-                document.exitFullscreen().catch(() => {});
-              }
-            }}
-            className="w-3 h-3 rounded-full bg-emerald-500 hover:opacity-80 transition-opacity"
-            title="Maximize"
-          />
+          {currentUri ? (
+            <button
+              onClick={closeMedia}
+              className="flex items-center gap-1.5 glass-pill px-3 py-1 rounded-xl text-xs font-semibold text-white/90 hover:text-white transition-all active:scale-95 shadow-sm"
+              title="Return to Library / Home"
+            >
+              <ArrowLeft className="w-3.5 h-3.5 text-sky-400" />
+              <span>Back</span>
+            </button>
+          ) : (
+            <div className="flex items-center gap-2 text-xs font-bold text-white tracking-wide">
+              <Film className="w-4 h-4 text-sky-400" />
+              <span>AetherPlayer</span>
+            </div>
+          )}
+
+          {currentUri && (
+            <span className="text-xs text-white/70 font-medium truncate max-w-sm">
+              {currentTitle}
+            </span>
+          )}
         </div>
 
-        {/* Window Title & Engine Status */}
-        <div className="flex items-center gap-2 text-xs text-white/60">
-          <Film className="w-3.5 h-3.5 text-sky-400" />
-          <span className="font-semibold text-white/80">AetherPlayer</span>
-          <span>•</span>
-          <span className="text-[10px] font-mono uppercase tracking-wider text-sky-400/80">
-            {activeEngineType === 'tauri-mpv' ? 'Native libmpv' : 'Web Media Engine'}
+        {/* Center Engine Indicator */}
+        <div className="hidden sm:flex items-center gap-2 text-[10px] font-mono tracking-wider uppercase text-sky-400/70 bg-white/5 px-2.5 py-0.5 rounded-full border border-white/5">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          <span>
+            {youtubeId
+              ? 'YouTube Stream Optimizer'
+              : activeEngineType === 'tauri-mpv'
+                ? 'Native Hardware GPU'
+                : 'Web Media Engine'}
           </span>
         </div>
 
-        {/* Quick Header Buttons */}
+        {/* Right Navigation & Tools */}
         <div
           className="flex items-center gap-2"
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
-          {currentUri && (
-            <button
-              onClick={closeMedia}
-              className="flex items-center gap-1 text-[11px] text-white/70 hover:text-white px-2 py-0.5 rounded-lg hover:bg-white/10 transition-colors"
-              title="Close Video and Go Back"
-            >
-              <ArrowLeft className="w-3 h-3 text-sky-400" />
-              <span>Back</span>
-            </button>
-          )}
           <button
             onClick={() => setIsFileBrowserOpen(true)}
-            className="text-[11px] text-white/70 hover:text-white px-2 py-0.5 rounded-lg hover:bg-white/10 transition-colors"
+            className="text-xs text-white/70 hover:text-white glass-pill px-3 py-1 rounded-xl transition-colors font-medium flex items-center gap-1.5"
           >
-            Library
+            <FolderOpen className="w-3.5 h-3.5 text-sky-400" />
+            <span>Library</span>
           </button>
           <button
             onClick={() => setIsSettingsOpen(true)}
-            className="text-[11px] text-white/70 hover:text-white px-2 py-0.5 rounded-lg hover:bg-white/10 transition-colors"
+            className="text-xs text-white/70 hover:text-white glass-pill p-1.5 rounded-xl transition-colors"
+            title="Video & Shaders Settings"
           >
-            <Settings className="w-3 h-3" />
+            <Settings className="w-3.5 h-3.5 text-indigo-300" />
           </button>
         </div>
       </div>
 
-      {/* Main Player Viewport Area */}
+      {/* Main Viewport Area */}
       <div className="relative flex-1 w-full h-full overflow-hidden flex items-center justify-center">
         {/* Ambient Lighting Canvas Layer */}
-        <AmbientCanvas videoRef={videoRef} />
+        {!youtubeId && <AmbientCanvas videoRef={videoRef} />}
 
-        {/* Video Viewport Layer */}
-        {activeEngineType === 'web-media' ? (
+        {/* YouTube Video Stream or Standard Video */}
+        {youtubeId ? (
+          <div className="w-full h-full z-10 bg-black flex items-center justify-center">
+            <iframe
+              src={`https://www.youtube-nocookie.com/embed/${youtubeId}?autoplay=1&enablejsapi=1&rel=0&modestbranding=1`}
+              title="YouTube video player"
+              className="w-full h-full border-0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+            />
+          </div>
+        ) : activeEngineType === 'web-media' ? (
           <video
+            id="aether-video-viewport"
             ref={videoRef}
             className="w-full h-full object-contain z-10"
             playsInline
+            preload="auto"
           />
         ) : (
-          /* Native Engine mode: Video renders into transparent native child surface behind WebView */
           <div className="w-full h-full pointer-events-none z-10" />
         )}
 
-        {/* Empty State / Welcome Home Screen & Built-in Explorer Trigger */}
+        {/* Empty State / Welcome Screen */}
         {!currentUri && (
           <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-6 p-8 pointer-events-auto bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
             <div className="p-8 rounded-3xl glass-panel flex flex-col items-center gap-5 text-center max-w-lg border border-white/15 shadow-2xl">
@@ -176,12 +198,11 @@ export const App: React.FC = () => {
               <div>
                 <h1 className="text-3xl font-extrabold tracking-tight text-white">AetherPlayer</h1>
                 <p className="text-sm text-white/60 mt-1.5 leading-relaxed">
-                  Ultra-modern, cross-platform multimedia player with 200% VLC overdrive, real-time ambient glow, and 10-band audio DSP.
+                  Ultra-modern, cross-platform multimedia player with 200% VLC overdrive, real-time ambient glow, and YouTube stream optimizer.
                 </p>
               </div>
 
               <div className="flex flex-col sm:flex-row items-center gap-3 w-full mt-2">
-                {/* Native OS File Chooser */}
                 <label className="flex-1 w-full flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs cursor-pointer transition-all shadow-xl shadow-sky-500/25 active:scale-95">
                   <FolderOpen className="w-4 h-4" />
                   Browse Local Files
@@ -193,7 +214,6 @@ export const App: React.FC = () => {
                   />
                 </label>
 
-                {/* Built-in Media Library & Test Streams */}
                 <button
                   onClick={() => setIsFileBrowserOpen(true)}
                   className="flex-1 w-full flex items-center justify-center gap-2 px-5 py-3 rounded-2xl glass-pill font-bold text-xs text-white/90 hover:text-white transition-all shadow-lg active:scale-95"
@@ -203,7 +223,6 @@ export const App: React.FC = () => {
                 </button>
               </div>
 
-              {/* Quick History Bar */}
               {recentMedia.length > 0 && (
                 <div className="w-full pt-4 border-t border-white/10 flex items-center justify-between text-xs text-white/60">
                   <span className="flex items-center gap-1.5">
@@ -223,7 +242,7 @@ export const App: React.FC = () => {
         )}
 
         {/* Auto-Resume Notification Banner */}
-        {resumeBannerPositionMs !== null && (
+        {resumeBannerPositionMs !== null && !youtubeId && (
           <div className="absolute top-12 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-top duration-300">
             <div className="glass-panel px-5 py-2.5 rounded-2xl border border-sky-400/30 shadow-2xl flex items-center gap-3">
               <span className="text-sm text-white/90">
@@ -249,8 +268,8 @@ export const App: React.FC = () => {
           </div>
         )}
 
-        {/* Glassmorphic Controls Overlay */}
-        {currentUri && (
+        {/* Glassmorphic Controls Overlay (for native/local/HLS video) */}
+        {currentUri && !youtubeId && (
           <ControlsOverlay
             onOpenEq={() => setIsEqOpen(true)}
             onOpenSettings={() => setIsSettingsOpen(true)}

@@ -226,8 +226,7 @@ export class WebMediaEngine implements IPlayerEngine {
   private static readonly EQ_FREQUENCIES = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
 
   async initialize(container?: HTMLVideoElement): Promise<void> {
-    this.videoEl = container ?? document.createElement('video');
-    this.videoEl.crossOrigin = 'anonymous';
+    this.videoEl = container ?? (document.getElementById('aether-video-viewport') as HTMLVideoElement) ?? document.createElement('video');
     this.videoEl.playsInline = true;
     this.videoEl.preload = 'auto';
 
@@ -250,6 +249,13 @@ export class WebMediaEngine implements IPlayerEngine {
     this.startTelemetryLoop();
   }
 
+  public bindVideoElement(el: HTMLVideoElement): void {
+    if (this.videoEl !== el) {
+      this.videoEl = el;
+      this.setupWebAudioGraph();
+    }
+  }
+
   private setupWebAudioGraph(): void {
     if (!this.videoEl || this.audioCtx) return;
     try {
@@ -258,6 +264,8 @@ export class WebMediaEngine implements IPlayerEngine {
         (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       if (!AudioCtxClass) return;
       this.audioCtx = new AudioCtxClass();
+
+      // Only attempt media element source if crossOrigin is supported or local
       const source = this.audioCtx.createMediaElementSource(this.videoEl);
 
       this.eqBands = WebMediaEngine.EQ_FREQUENCIES.map((freq) => {
@@ -272,13 +280,11 @@ export class WebMediaEngine implements IPlayerEngine {
       this.compressorNode = this.audioCtx.createDynamicsCompressor();
       this.compressorNode.threshold.value = -24;
       this.compressorNode.knee.value = 30;
-      this.compressorNode.ratio.value = 1; // 1 = bypass unless Night Mode is active
+      this.compressorNode.ratio.value = 1;
 
-      // Overdrive GainNode: supports volume boost up to 200% (gain = 2.0) like VLC Player!
       this.gainNode = this.audioCtx.createGain();
       this.gainNode.gain.value = this.currentVolumePercent / 100;
 
-      // Connect chain: source -> 10 EQ bands -> compressor -> gainNode -> destination
       let currentNode: AudioNode = source;
       for (const band of this.eqBands) {
         currentNode.connect(band);
@@ -287,13 +293,15 @@ export class WebMediaEngine implements IPlayerEngine {
       currentNode.connect(this.compressorNode);
       this.compressorNode.connect(this.gainNode);
       this.gainNode.connect(this.audioCtx.destination);
-    } catch {
-      // AudioContext may be restricted by autoplay policy until user gesture
+    } catch (err) {
+      logWarn('WebAudio advanced routing optional or bypassed for CORS stream: ' + String(err));
     }
   }
 
   async load(uri: string, startPositionMs = 0): Promise<void> {
-    if (!this.videoEl) throw new Error('WebMediaEngine not initialized');
+    if (!this.videoEl) {
+      this.videoEl = (document.getElementById('aether-video-viewport') as HTMLVideoElement) ?? document.createElement('video');
+    }
 
     if (this.hls) {
       this.hls.destroy();
@@ -302,10 +310,18 @@ export class WebMediaEngine implements IPlayerEngine {
 
     const isHls = uri.includes('.m3u8');
     if (isHls && Hls.isSupported()) {
+      // High-performance Network Optimizer configuration
       this.hls = new Hls({
         enableWorker: true,
         lowLatencyMode: true,
+        startFragPrefetch: true, // Fast initial frame prefetch
         backBufferLength: 90,
+        maxBufferLength: 60,     // 60-second forward buffer
+        maxMaxBufferLength: 120,
+        maxBufferSize: 60 * 1024 * 1024, // 60MB memory buffer
+        progressive: true,
+        fragLoadingTimeOut: 15000,
+        manifestLoadingTimeOut: 10000,
       });
       this.hls.loadSource(uri);
       this.hls.attachMedia(this.videoEl);
