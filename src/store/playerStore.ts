@@ -12,6 +12,7 @@ import {
   VideoShaderConfig,
   parsePlayerError,
 } from '../core/PlayerEngine';
+import { PlayerThemeId } from '../types/theme';
 
 export interface MediaHistoryItem {
   mediaId: string;
@@ -33,6 +34,13 @@ export interface MediaBookmark {
   label: string;
   thumbnailUri?: string;
   createdAt: number;
+}
+
+export interface YouTubeHistoryItem {
+  id: string;
+  url: string;
+  title: string;
+  timestamp: number;
 }
 
 export interface MediaPreferences {
@@ -82,9 +90,14 @@ export interface PlayerStoreState {
   nightModeEnabled: boolean;
   shaderConfig: VideoShaderConfig;
 
-  // SQLite Hydrated State
+  // Themes & Customization
+  themeId: PlayerThemeId;
+  setTheme: (themeId: PlayerThemeId) => void;
+
+  // Hydrated State & History
   recentMedia: MediaHistoryItem[];
   bookmarks: MediaBookmark[];
+  youtubeHistory: YouTubeHistoryItem[];
   resumeBannerPositionMs: number | null;
 
   // Error & Recovery State
@@ -103,7 +116,10 @@ export interface PlayerStoreState {
   updateShaderConfig: (config: Partial<VideoShaderConfig>) => Promise<void>;
   toggleLoop: () => void;
   takeSnapshot: () => void;
-  addBookmark: (label: string) => Promise<void>;
+  addBookmark: (label?: string) => Promise<void>;
+  removeRecentMedia: (uri: string) => void;
+  addYouTubeHistory: (url: string, title?: string) => void;
+  removeYouTubeHistory: (url: string) => void;
   refreshRecentMedia: () => Promise<void>;
   dismissError: () => void;
 }
@@ -147,6 +163,43 @@ const saveStoredBookmarks = (items: MediaBookmark[]) => {
   } catch {}
 };
 
+const STORAGE_KEY_THEME = 'miki_player_theme';
+const STORAGE_KEY_YOUTUBE = 'miki_youtube_history';
+
+const loadStoredTheme = (): PlayerThemeId => {
+  if (typeof window === 'undefined') return 'cyberpunk';
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_THEME);
+    return (raw as PlayerThemeId) || 'cyberpunk';
+  } catch {
+    return 'cyberpunk';
+  }
+};
+
+const saveStoredTheme = (themeId: PlayerThemeId) => {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(STORAGE_KEY_THEME, themeId);
+  } catch {}
+};
+
+const loadStoredYouTubeHistory = (): YouTubeHistoryItem[] => {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_YOUTUBE);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveStoredYouTubeHistory = (items: YouTubeHistoryItem[]) => {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(STORAGE_KEY_YOUTUBE, JSON.stringify(items.slice(0, 30)));
+  } catch {}
+};
+
 let lastSqliteSyncMs = 0;
 
 export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
@@ -181,9 +234,43 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     upscaleMode: 'none',
   },
 
+  themeId: loadStoredTheme(),
+  setTheme: (themeId) => {
+    set({ themeId });
+    saveStoredTheme(themeId);
+  },
+
   recentMedia: loadStoredRecentMedia(),
   bookmarks: loadStoredBookmarks(),
+  youtubeHistory: loadStoredYouTubeHistory(),
   resumeBannerPositionMs: null,
+
+  addYouTubeHistory: (url, title) => {
+    const parsedId = url.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/)?.[1] || '';
+    if (!parsedId) return;
+    const existing = get().youtubeHistory;
+    const item: YouTubeHistoryItem = {
+      id: parsedId,
+      url,
+      title: title || `YouTube Stream (${parsedId})`,
+      timestamp: Date.now(),
+    };
+    const updated = [item, ...existing.filter((y) => y.id !== parsedId)].slice(0, 30);
+    set({ youtubeHistory: updated });
+    saveStoredYouTubeHistory(updated);
+  },
+
+  removeYouTubeHistory: (url) => {
+    const updated = get().youtubeHistory.filter((y) => y.url !== url && y.id !== url);
+    set({ youtubeHistory: updated });
+    saveStoredYouTubeHistory(updated);
+  },
+
+  removeRecentMedia: (uri) => {
+    const updated = get().recentMedia.filter((m) => m.uri !== uri);
+    set({ recentMedia: updated });
+    saveStoredRecentMedia(updated);
+  },
 
   lastError: null,
   retryCount: 0,
@@ -229,6 +316,20 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
           positionMs: telemetry.positionMs,
           durationMs: telemetry.durationMs,
         }).catch(() => {});
+      }
+
+      // Live progress persistence for recently played card displays
+      const curUri = get().currentUri;
+      if (curUri && telemetry.durationMs > 0 && !telemetry.isPaused) {
+        const pct = Math.min(100, Math.round((telemetry.positionMs / telemetry.durationMs) * 100));
+        const recents = get().recentMedia;
+        const target = recents.find((r) => r.uri === curUri);
+        if (target && target.progressPercent !== pct) {
+          target.progressPercent = pct;
+          target.lastPositionMs = telemetry.positionMs;
+          target.durationMs = telemetry.durationMs;
+          saveStoredRecentMedia(recents);
+        }
       }
     });
 
@@ -284,6 +385,7 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     // Check if it's a YouTube URL! If so, don't pass to HTML5 <video>
     const isYouTube = /(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/.test(uri);
     if (isYouTube) {
+      get().addYouTubeHistory(uri, resolvedTitle);
       const video = document.getElementById('aether-video-viewport') as HTMLVideoElement | null;
       if (video) {
         video.pause();

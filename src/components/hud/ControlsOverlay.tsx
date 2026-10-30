@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { usePlayerStore } from '../../store/playerStore';
+import { PLAYER_THEMES } from '../../types/theme';
 import { TimelineScrubber } from './TimelineScrubber';
 import {
   Play,
@@ -50,6 +51,9 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
   const subtitleTracks = usePlayerStore((s) => s.subtitleTracks);
   const isLooping = usePlayerStore((s) => s.isLooping);
   const toggleLoop = usePlayerStore((s) => s.toggleLoop);
+  const themeId = usePlayerStore((s) => s.themeId);
+
+  const theme = PLAYER_THEMES[themeId] || PLAYER_THEMES.cyberpunk;
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
@@ -64,21 +68,36 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
   }, []);
 
   const toggleFullscreen = () => {
+    // 1. macOS Cocoa native WebKit bridge
     if (
       typeof window !== 'undefined' &&
-      (window as unknown as { webkit?: { messageHandlers?: { windowAction?: { postMessage: (msg: string) => void } } } }).webkit?.messageHandlers?.windowAction
+      (window as unknown as { webkit?: { messageHandlers?: { windowAction?: { postMessage: (msg: string) => void } } } })?.webkit?.messageHandlers?.windowAction
     ) {
       (window as unknown as { webkit: { messageHandlers: { windowAction: { postMessage: (msg: string) => void } } } }).webkit.messageHandlers.windowAction.postMessage('toggleFullscreen');
+      setIsFullscreen((prev) => !prev);
       return;
     }
+
+    // 2. Tauri window API
     if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
-      import('@tauri-apps/api/window').then(({ getCurrentWindow }) => getCurrentWindow().toggleMaximize()).catch(() => {});
+      import('@tauri-apps/api/window')
+        .then(({ getCurrentWindow }) => getCurrentWindow().toggleMaximize())
+        .catch(() => {});
+      setIsFullscreen((prev) => !prev);
       return;
     }
+
+    // 3. HTML5 Fullscreen API
     if (!document.fullscreenElement) {
-      containerRef.current?.requestFullscreen().catch(() => {});
+      if (containerRef.current?.requestFullscreen) {
+        containerRef.current.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => {});
+      } else if (document.documentElement.requestFullscreen) {
+        document.documentElement.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => {});
+      }
     } else {
-      document.exitFullscreen().catch(() => {});
+      if (document.exitFullscreen) {
+        document.exitFullscreen().then(() => setIsFullscreen(false)).catch(() => {});
+      }
     }
   };
 
@@ -95,62 +114,81 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
 
   return (
     <div
-      className={`absolute inset-0 z-40 flex flex-col justify-end p-6 transition-all duration-500 pointer-events-none select-none ${
-        isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'
+      className={`absolute inset-0 z-40 flex flex-col justify-end p-6 transition-all duration-500 select-none ${
+        isVisible ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 translate-y-4 pointer-events-none'
       }`}
     >
       {/* Center Big Play Trigger Area */}
       <div
-        className={`absolute inset-0 flex items-center justify-center cursor-pointer pointer-events-auto transition-opacity duration-300 ${
-          isVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        className={`absolute inset-0 flex items-center justify-center cursor-pointer pointer-events-auto transition-all duration-300 ${
+          isPaused ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
         onClick={togglePlay}
       >
         {isPaused && (
-          <div className="p-6 rounded-full glass-panel shadow-2xl scale-100 hover:scale-110 transition-transform duration-200 border border-white/20">
-            <Play className="w-12 h-12 text-white fill-white translate-x-1" />
+          <div
+            className="p-7 rounded-3xl backdrop-blur-xl bg-black/60 shadow-2xl scale-100 hover:scale-110 active:scale-95 transition-all duration-300 border border-white/20 group"
+            style={{ boxShadow: `0 0 35px ${theme.haloGlow}` }}
+          >
+            <Play className="w-14 h-14 text-white fill-white translate-x-1 group-hover:scale-105 transition-transform" />
           </div>
         )}
       </div>
 
       {/* Bottom Floating Glass HUD */}
-      <div className="glass-panel p-4 rounded-3xl flex flex-col gap-3 pointer-events-auto shadow-2xl border border-white/15 z-10">
+      <div
+        className={`backdrop-blur-2xl p-5 rounded-3xl flex flex-col gap-4 pointer-events-auto shadow-2xl border transition-all duration-300 z-10 ${theme.glassBg} ${theme.glassBorder}`}
+        style={{
+          boxShadow: `0 20px 50px rgba(0, 0, 0, 0.7), 0 0 30px ${theme.haloGlow}`,
+        }}
+      >
         {/* Magnetic Timeline */}
         <TimelineScrubber />
 
         {/* Action Controls */}
         <div className="flex items-center justify-between pt-1">
           {/* Left Controls: Play/Pause, Seek, VLC 200% Volume, Timestamps */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            {/* Redesigned Luxury Play/Pause Button */}
             <button
               onClick={togglePlay}
-              className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors"
+              className={`p-3 rounded-2xl bg-gradient-to-r ${theme.accentGradient} text-white shadow-lg hover:brightness-110 active:scale-95 transition-all duration-200 flex items-center justify-center`}
+              style={{
+                boxShadow: `0 4px 15px ${theme.haloGlow}`,
+              }}
+              title={isPaused ? 'Play (Space)' : 'Pause (Space)'}
             >
-              {isPaused ? <Play className="w-5 h-5 fill-white" /> : <Pause className="w-5 h-5 fill-white" />}
+              {isPaused ? (
+                <Play className="w-5 h-5 fill-white translate-x-0.5" />
+              ) : (
+                <Pause className="w-5 h-5 fill-white" />
+              )}
             </button>
 
+            {/* Quick Seek Rewind 10s */}
             <button
               onClick={() => seek(Math.max(0, positionMs - 10_000))}
-              className="p-2 text-white/70 hover:text-white transition-colors"
-              title="Rewind 10s"
+              className="p-2.5 rounded-xl bg-white/5 hover:bg-white/15 border border-white/10 text-white/80 hover:text-white transition-all active:scale-95"
+              title="Rewind 10s (Left Arrow)"
             >
               <RotateCcw className="w-4 h-4" />
             </button>
 
+            {/* Quick Seek Forward 10s */}
             <button
               onClick={() => seek(positionMs + 10_000)}
-              className="p-2 text-white/70 hover:text-white transition-colors"
-              title="Forward 10s"
+              className="p-2.5 rounded-xl bg-white/5 hover:bg-white/15 border border-white/10 text-white/80 hover:text-white transition-all active:scale-95"
+              title="Forward 10s (Right Arrow)"
             >
               <RotateCw className="w-4 h-4" />
             </button>
 
             {/* VLC-Style 200% Overdrive Volume Slider */}
-            <div className="flex items-center gap-2 group relative">
+            <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-2xl bg-white/5 border border-white/10">
               <button
                 onClick={() => setVolume(volume === 0 ? 100 : 0)}
-                className="p-2 text-white/70 hover:text-white transition-colors"
-                title={volume > 100 ? `VLC Boost (${volume}%)` : `Volume (${volume}%)`}
+                className="text-white/70 hover:text-white transition-colors"
+                title={volume > 100 ? `VLC Overdrive (${volume}%)` : `Volume (${volume}%)`}
               >
                 {volume === 0 || isMuted ? (
                   <VolumeX className="w-4 h-4 text-rose-400" />
@@ -163,7 +201,7 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
                 )}
               </button>
 
-              <div className="flex flex-col gap-0.5">
+              <div className="flex flex-col justify-center">
                 <input
                   type="range"
                   min={0}
@@ -171,51 +209,62 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
                   step={1}
                   value={volume}
                   onChange={(e) => setVolume(parseInt(e.target.value, 10))}
-                  className="w-24 h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-sky-400"
+                  className="w-24 h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-cyan-400"
                 />
               </div>
 
               {/* Volume Percentage Badge */}
               <span
-                className={`text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-md ${
+                className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-lg transition-colors ${
                   volume > 100
-                    ? 'text-amber-400 bg-amber-400/20 border border-amber-400/30'
-                    : 'text-white/60'
+                    ? 'text-amber-300 bg-amber-500/20 border border-amber-400/40'
+                    : 'text-white/70 bg-white/5 border border-white/10'
                 }`}
               >
                 {volume}%
               </span>
             </div>
 
-            <div className="font-mono text-xs text-white/60">
-              <span className="text-white/90">{formatTime(positionMs)}</span> / {formatTime(durationMs)}
+            {/* Formatted Timestamps */}
+            <div className="font-mono text-xs text-white/60 tracking-wider pl-1">
+              <span className="text-white font-medium">{formatTime(positionMs)}</span>
+              <span className="mx-1 text-white/30">/</span>
+              <span>{formatTime(durationMs)}</span>
             </div>
           </div>
 
           {/* Right Controls: Loop, Speed, EQ, Tracks, Settings, Fullscreen */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             {/* Loop Toggle */}
             <button
               onClick={toggleLoop}
-              className={`p-2 rounded-xl transition-colors ${
-                isLooping ? 'bg-sky-500/20 text-sky-300 border border-sky-400/40' : 'glass-pill text-white/60 hover:text-white'
+              className={`p-2.5 rounded-2xl transition-all active:scale-95 border ${
+                isLooping
+                  ? `${theme.badgeClass} shadow-md`
+                  : 'bg-white/5 hover:bg-white/15 border-white/10 text-white/70 hover:text-white'
               }`}
               title={isLooping ? 'Looping Enabled' : 'Loop Off'}
             >
               <Repeat className="w-4 h-4" />
             </button>
 
-            {/* Speed Selector */}
+            {/* Playback Speed Selector */}
             <div className="relative">
               <button
                 onClick={() => setShowSpeedMenu(!showSpeedMenu)}
-                className="glass-pill px-3 py-1.5 rounded-xl text-xs font-mono font-medium text-white/80 hover:text-white flex items-center gap-1.5"
+                className="px-3 py-2 rounded-2xl bg-white/5 hover:bg-white/15 border border-white/10 text-xs font-mono font-medium text-white/80 hover:text-white flex items-center gap-1.5 transition-all active:scale-95"
+                title="Playback Speed"
               >
-                <FastForward className="w-3.5 h-3.5" />
+                <FastForward className="w-3.5 h-3.5 text-cyan-400" />
                 {playbackRate}x
               </button>
               {showSpeedMenu && (
-                <div className="absolute bottom-10 right-0 glass-panel p-2 rounded-xl flex flex-col gap-1 min-w-24 z-50">
+                <div
+                  className={`absolute bottom-12 right-0 p-2 rounded-2xl flex flex-col gap-1 min-w-28 z-50 backdrop-blur-2xl border shadow-2xl ${theme.glassBg} ${theme.glassBorder}`}
+                >
+                  <div className="text-[10px] font-semibold uppercase tracking-wider text-white/40 px-2 py-1">
+                    Speed
+                  </div>
                   {[0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0].map((r) => (
                     <button
                       key={r}
@@ -223,11 +272,13 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
                         setPlaybackRate(r);
                         setShowSpeedMenu(false);
                       }}
-                      className={`px-3 py-1 rounded-lg text-xs font-mono text-left transition-colors ${
-                        playbackRate === r ? 'bg-sky-500/30 text-sky-300 font-bold' : 'hover:bg-white/10 text-white/80'
+                      className={`px-3 py-1.5 rounded-xl text-xs font-mono text-left transition-all ${
+                        playbackRate === r
+                          ? `${theme.badgeClass} font-bold`
+                          : 'hover:bg-white/10 text-white/80'
                       }`}
                     >
-                      {r}x
+                      {r}x {r === 1.0 && '• Normal'}
                     </button>
                   ))}
                 </div>
@@ -238,21 +289,23 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
             <div className="relative">
               <button
                 onClick={() => setShowTrackMenu(!showTrackMenu)}
-                className="glass-pill p-2 rounded-xl text-white/80 hover:text-white transition-colors"
+                className="p-2.5 rounded-2xl bg-white/5 hover:bg-white/15 border border-white/10 text-white/80 hover:text-white transition-all active:scale-95"
                 title="Tracks & Subtitles"
               >
-                <Subtitles className="w-4 h-4" />
+                <Subtitles className="w-4 h-4 text-purple-400" />
               </button>
               {showTrackMenu && (
-                <div className="absolute bottom-10 right-0 glass-panel p-3 rounded-2xl flex flex-col gap-2 min-w-48 z-50">
-                  <span className="text-[11px] font-semibold text-white/50 uppercase tracking-wider">
+                <div
+                  className={`absolute bottom-12 right-0 p-3.5 rounded-2xl flex flex-col gap-2 min-w-52 z-50 backdrop-blur-2xl border shadow-2xl ${theme.glassBg} ${theme.glassBorder}`}
+                >
+                  <span className="text-[10px] font-semibold text-white/50 uppercase tracking-wider">
                     Audio & Subtitles
                   </span>
                   {audioTracks.length > 0 && (
                     <div className="flex flex-col gap-1">
-                      <span className="text-[10px] text-sky-400 font-semibold uppercase">Audio</span>
+                      <span className="text-[10px] text-cyan-400 font-semibold uppercase">Audio</span>
                       {audioTracks.map((t) => (
-                        <span key={t.id} className="text-xs text-white/80">
+                        <span key={t.id} className="text-xs text-white/90 truncate">
                           {t.label}
                         </span>
                       ))}
@@ -260,26 +313,26 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
                   )}
                   {subtitleTracks.length > 0 && (
                     <div className="flex flex-col gap-1">
-                      <span className="text-[10px] text-sky-400 font-semibold uppercase">Subtitles</span>
+                      <span className="text-[10px] text-purple-400 font-semibold uppercase">Subtitles</span>
                       {subtitleTracks.map((t) => (
-                        <span key={t.id} className="text-xs text-white/80">
+                        <span key={t.id} className="text-xs text-white/90 truncate">
                           {t.label}
                         </span>
                       ))}
                     </div>
                   )}
                   {audioTracks.length === 0 && subtitleTracks.length === 0 && (
-                    <span className="text-xs text-white/40 italic">Embedded tracks auto-syncing</span>
+                    <span className="text-xs text-white/40 italic py-1">Embedded tracks auto-syncing</span>
                   )}
                 </div>
               )}
             </div>
 
-            {/* Bookmark button */}
+            {/* Add Bookmark button */}
             <button
               onClick={() => addBookmark(`Bookmark at ${formatTime(positionMs)}`)}
-              className="glass-pill p-2 rounded-xl text-white/80 hover:text-white transition-colors"
-              title="Add Bookmark"
+              className="p-2.5 rounded-2xl bg-white/5 hover:bg-white/15 border border-white/10 text-white/80 hover:text-white transition-all active:scale-95"
+              title="Add Bookmark (B)"
             >
               <Bookmark className="w-4 h-4 text-amber-400" />
             </button>
@@ -287,36 +340,41 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
             {/* Media Explorer / Library Button */}
             <button
               onClick={onOpenFileBrowser}
-              className="glass-pill p-2 rounded-xl text-white/80 hover:text-white transition-colors"
-              title="Open Media Library"
+              className="p-2.5 rounded-2xl bg-white/5 hover:bg-white/15 border border-white/10 text-white/80 hover:text-white transition-all active:scale-95"
+              title="Media Library & Streams"
             >
               <FolderOpen className="w-4 h-4 text-sky-400" />
             </button>
 
-            {/* Parametric Equalizer Button */}
+            {/* 10-Band Parametric Equalizer Button */}
             <button
               onClick={onOpenEq}
-              className="glass-pill p-2 rounded-xl text-white/80 hover:text-white transition-colors"
-              title="Equalizer & Audio DSP"
+              className="p-2.5 rounded-2xl bg-white/5 hover:bg-white/15 border border-white/10 text-white/80 hover:text-white transition-all active:scale-95"
+              title="10-Band Audio Equalizer (E)"
             >
               <Sliders className="w-4 h-4 text-emerald-400" />
             </button>
 
-            {/* Video & Shaders Settings Button */}
+            {/* Video Settings, Shaders & 10 Themes */}
             <button
               onClick={onOpenSettings}
-              className="glass-pill p-2 rounded-xl text-white/80 hover:text-white transition-colors"
-              title="Video Settings & Shaders"
+              className="p-2.5 rounded-2xl bg-white/5 hover:bg-white/15 border border-white/10 text-white/80 hover:text-white transition-all active:scale-95"
+              title="Video Enhancements & Themes"
             >
-              <Settings className="w-4 h-4 text-indigo-400" />
+              <Settings className="w-4 h-4 text-fuchsia-400" />
             </button>
 
-            {/* Fullscreen Toggle */}
+            {/* Fullscreen Toggle (macOS Cocoa + Tauri + Web) */}
             <button
               onClick={toggleFullscreen}
-              className="glass-pill p-2 rounded-xl text-white/80 hover:text-white transition-colors"
+              className="p-2.5 rounded-2xl bg-white/5 hover:bg-white/15 border border-white/10 text-white/80 hover:text-white transition-all active:scale-95"
+              title={isFullscreen ? 'Exit Fullscreen (F)' : 'Fullscreen (F)'}
             >
-              {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+              {isFullscreen ? (
+                <Minimize className="w-4 h-4 text-white" />
+              ) : (
+                <Maximize className="w-4 h-4 text-white" />
+              )}
             </button>
           </div>
         </div>

@@ -14,6 +14,8 @@ class BorderlessKeyWindow: NSWindow {
 class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMessageHandler, WKUIDelegate {
     var window: BorderlessKeyWindow!
     var webView: WKWebView!
+    var isCustomFullScreen = false
+    var savedFrame: NSRect = .zero
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupMainMenu()
@@ -38,6 +40,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         window.hasShadow = true
         window.isMovableByWindowBackground = true
         window.minSize = NSSize(width: 720, height: 440)
+        window.collectionBehavior = [.fullScreenPrimary, .managed]
         window.delegate = self
 
         // Configure WKWebView with full media playback capabilities
@@ -122,6 +125,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
             if message.name == "windowAction", let action = message.body as? String {
                 switch action {
                 case "startDrag":
+                    if self.isCustomFullScreen {
+                        // Restore before dragging
+                        self.window.setFrame(self.savedFrame, display: true, animate: false)
+                        self.isCustomFullScreen = false
+                    }
                     if let currentEvent = NSApp.currentEvent {
                         self.window.performDrag(with: currentEvent)
                     }
@@ -132,7 +140,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
                 case "maximize":
                     self.window.zoom(nil)
                 case "toggleFullscreen":
-                    self.window.toggleFullScreen(nil)
+                    if self.isCustomFullScreen {
+                        self.window.setFrame(self.savedFrame, display: true, animate: true)
+                        self.isCustomFullScreen = false
+                    } else {
+                        self.savedFrame = self.window.frame
+                        if let screen = self.window.screen ?? NSScreen.main {
+                            self.window.setFrame(screen.frame, display: true, animate: true)
+                            self.isCustomFullScreen = true
+                        }
+                    }
                 default:
                     break
                 }
