@@ -45,6 +45,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         config.mediaTypesRequiringUserActionForPlayback = []
         config.allowsAirPlayForMediaPlayback = true
         config.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
+        if #available(macOS 12.0, *) {
+            config.preferences.isElementFullscreenEnabled = true
+        }
 
         // Window controls & Native dialogs IPC script handler
         let contentController = WKUserContentController()
@@ -118,12 +121,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
             guard let self = self else { return }
             if message.name == "windowAction", let action = message.body as? String {
                 switch action {
+                case "startDrag":
+                    if let currentEvent = NSApp.currentEvent {
+                        self.window.performDrag(with: currentEvent)
+                    }
                 case "close":
                     NSApp.terminate(nil)
                 case "minimize":
                     self.window.miniaturize(nil)
                 case "maximize":
                     self.window.zoom(nil)
+                case "toggleFullscreen":
+                    self.window.toggleFullScreen(nil)
                 default:
                     break
                 }

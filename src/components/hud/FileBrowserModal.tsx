@@ -50,6 +50,8 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({ isOpen, onCl
   const openMedia = usePlayerStore((s) => s.openMedia);
   const recentMedia = usePlayerStore((s) => s.recentMedia);
   const bookmarks = usePlayerStore((s) => s.bookmarks);
+  const seek = usePlayerStore((s) => s.seek);
+  const currentUri = usePlayerStore((s) => s.currentUri);
 
   const [activeTab, setActiveTab] = useState<'demos' | 'recent' | 'bookmarks' | 'url'>('demos');
   const [customUrl, setCustomUrl] = useState('');
@@ -312,14 +314,23 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({ isOpen, onCl
                 bookmarks.map((bm) => (
                   <div
                     key={bm.id}
-                    className="flex items-center justify-between p-3 rounded-2xl glass-pill"
+                    onClick={() => {
+                      if (currentUri !== bm.mediaId) {
+                        openMedia(bm.mediaId);
+                      }
+                      seek(bm.timestampMs);
+                      onClose();
+                    }}
+                    className="flex items-center justify-between p-3.5 rounded-2xl glass-pill hover:border-sky-400/40 cursor-pointer transition-all active:scale-[0.99]"
+                    title="Click to jump to bookmark"
                   >
                     <div className="flex flex-col gap-0.5">
                       <span className="text-sm font-medium text-white">{bm.label}</span>
                       <span className="text-xs font-mono text-sky-400">
-                        Timestamp: {(bm.timestampMs / 1000).toFixed(1)}s
+                        Jump to: {(bm.timestampMs / 1000).toFixed(1)}s
                       </span>
                     </div>
+                    <Play className="w-4 h-4 text-sky-400 shrink-0" />
                   </div>
                 ))
               )}
