@@ -1,4 +1,4 @@
-use crate::error::{PlayerError, PlayerResult};
+use crate::error::PlayerResult;
 use parking_lot::Mutex;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};

@@ -85,6 +85,9 @@ export const App: React.FC = () => {
   const playNextMedia = usePlayerStore((s) => s.playNextMedia);
   const playPreviousMedia = usePlayerStore((s) => s.playPreviousMedia);
   const snapshotNotification = usePlayerStore((s) => s.snapshotNotification);
+  const customBgImage = usePlayerStore((s) => s.customBgImage);
+  const customBgOpacity = usePlayerStore((s) => s.customBgOpacity);
+  const customBgBlur = usePlayerStore((s) => s.customBgBlur);
 
   const theme = PLAYER_THEMES[themeId] || PLAYER_THEMES.cyberpunk;
 
@@ -128,6 +131,10 @@ export const App: React.FC = () => {
   }, []);
 
   const handleCardClick = (item: MediaHistoryItem) => {
+    if (item.isYouTube || item.uri.includes('youtube.com') || item.uri.includes('youtu.be')) {
+      openMedia(item.uri, item.title, false);
+      return;
+    }
     if (item.lastPositionMs && item.lastPositionMs > 1000) {
       setPendingResumeItem(item);
       setIsResumeChoiceOpen(true);
@@ -389,6 +396,18 @@ export const App: React.FC = () => {
         areControlsVisible || !currentUri ? 'cursor-default' : 'cursor-none'
       }`}
     >
+      {/* Custom Background Image Layer (Below all Glassmorphic Layers) */}
+      {customBgImage && (
+        <div
+          className="absolute inset-0 z-0 pointer-events-none bg-cover bg-center transition-all duration-700 ease-out"
+          style={{
+            backgroundImage: `url(${customBgImage})`,
+            opacity: customBgOpacity,
+            filter: `blur(${customBgBlur}px)`,
+          }}
+        />
+      )}
+
       {/* Sleek, Clean Frameless Titlebar - Drag & 5s Inactivity Auto-Hide */}
       <div
         onMouseDown={handleStartWindowDrag}
@@ -684,14 +703,31 @@ export const App: React.FC = () => {
                           boxShadow: `0 12px 35px rgba(0, 0, 0, 0.55)`,
                         }}
                       >
-                        {/* 16:9 Stopped-Point Video Preview Thumbnail */}
+                        {/* 16:9 Stopped-Point Video Preview Thumbnail / YouTube Placeholder */}
                         <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-black/60 border border-white/10 group-hover:border-cyan-400/40 transition-colors">
+                          {item.isYouTube && (
+                            <div className="absolute top-2.5 left-2.5 z-20 px-2.5 py-0.5 rounded-lg bg-red-600 text-white font-extrabold text-[10px] tracking-wide flex items-center gap-1 shadow-lg shadow-red-900/40">
+                              <Play className="w-2.5 h-2.5 fill-white" />
+                              <span>YouTube</span>
+                            </div>
+                          )}
+
                           {item.thumbnailUri ? (
                             <img
                               src={item.thumbnailUri}
                               alt={item.title}
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                              onError={(e) => {
+                                (e.currentTarget as HTMLElement).style.display = 'none';
+                              }}
                             />
+                          ) : item.isYouTube ? (
+                            <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-red-950/60 via-slate-900 to-black text-white/50 gap-2">
+                              <div className="p-3 rounded-2xl bg-red-600/20 border border-red-500/30 text-red-400">
+                                <Play className="w-6 h-6 fill-red-500" />
+                              </div>
+                              <span className="text-[11px] font-mono text-white/70 font-semibold">YouTube Stream</span>
+                            </div>
                           ) : (
                             <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 to-black text-white/30 gap-2">
                               <Film className="w-8 h-8 opacity-40 text-cyan-400" />
@@ -701,14 +737,14 @@ export const App: React.FC = () => {
 
                           {/* Hover Play Glow Overlay */}
                           <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                            <div className="p-3.5 rounded-2xl bg-cyan-500/90 text-white shadow-xl shadow-cyan-500/40 scale-95 group-hover:scale-105 transition-transform">
+                            <div className={`p-3.5 rounded-2xl ${item.isYouTube ? 'bg-red-600 text-white shadow-xl shadow-red-600/40' : 'bg-cyan-500/90 text-white shadow-xl shadow-cyan-500/40'} scale-95 group-hover:scale-105 transition-transform`}>
                               <Play className="w-6 h-6 fill-white translate-x-0.5" />
                             </div>
                           </div>
 
                           {/* Stopped Position & Duration Badge */}
                           <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded-lg bg-black/80 backdrop-blur-md text-[10px] font-mono font-bold text-white/90 border border-white/15">
-                            {formatTime(item.lastPositionMs)} / {formatTime(item.durationMs)}
+                            {item.isYouTube ? 'Live / Stream' : `${formatTime(item.lastPositionMs)} / ${formatTime(item.durationMs)}`}
                           </div>
                         </div>
 
@@ -720,12 +756,14 @@ export const App: React.FC = () => {
                             </h3>
                             <span
                               className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg shrink-0 ${
-                                percent > 80
-                                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/30'
-                                  : `${theme.badgeClass}`
+                                item.isYouTube
+                                  ? 'bg-red-500/20 text-red-300 border border-red-400/30'
+                                  : percent > 80
+                                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/30'
+                                    : `${theme.badgeClass}`
                               }`}
                             >
-                              {percent.toFixed(0)}% watched
+                              {item.isYouTube ? 'YouTube Stream' : `${percent.toFixed(0)}% watched`}
                             </span>
                           </div>
                         </div>
@@ -733,8 +771,8 @@ export const App: React.FC = () => {
                         {/* Theme-Gradient Progress Bar */}
                         <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden p-0.5 border border-white/5">
                           <div
-                            className={`h-full rounded-full bg-gradient-to-r ${theme.timelineTrack} transition-all duration-300`}
-                            style={{ width: `${percent}%` }}
+                            className={`h-full rounded-full bg-gradient-to-r ${item.isYouTube ? 'from-red-500 to-rose-600' : theme.timelineTrack} transition-all duration-300`}
+                            style={{ width: `${item.isYouTube ? 100 : percent}%` }}
                           />
                         </div>
 
@@ -745,10 +783,10 @@ export const App: React.FC = () => {
                               e.stopPropagation();
                               handleCardClick(item);
                             }}
-                            className={`px-4 py-2 rounded-2xl bg-gradient-to-r ${theme.accentGradient} text-white font-bold text-xs flex items-center gap-1.5 shadow-md hover:brightness-110 active:scale-95 transition-all`}
+                            className={`px-4 py-2 rounded-2xl bg-gradient-to-r ${item.isYouTube ? 'from-red-600 to-rose-600' : theme.accentGradient} text-white font-bold text-xs flex items-center gap-1.5 shadow-md hover:brightness-110 active:scale-95 transition-all`}
                           >
                             <Play className="w-3.5 h-3.5 fill-white" />
-                            <span>Resume Playback</span>
+                            <span>{item.isYouTube ? 'Play Stream' : 'Resume Playback'}</span>
                           </button>
 
                           <button

@@ -1,4 +1,4 @@
-use crate::error::{PlayerError, PlayerResult};
+use crate::error::PlayerResult;
 use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::process::Command;

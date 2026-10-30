@@ -2,7 +2,7 @@ use crate::db::{DatabaseManager, MediaBookmark, MediaHistoryItem, MediaPreferenc
 use crate::engine::audio_dsp::AudioDspManager;
 use crate::engine::mpv_controller::MpvController;
 use crate::engine::types::{PlaybackState, VideoShaderConfig};
-use crate::error::{PlayerError, PlayerResult};
+use crate::error::PlayerResult;
 use crate::platform::window_compositor::WindowCompositor;
 use parking_lot::Mutex;
 use std::sync::Arc;

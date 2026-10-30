@@ -1,6 +1,6 @@
 use crate::error::{PlayerError, PlayerResult};
 use libloading::{Library, Symbol};
-use std::ffi::{c_char, c_int, c_void, CStr, CString};
+use std::ffi::{c_char, c_int, c_void};
 use std::sync::Arc;
 
 pub type MpvHandle = *mut c_void;

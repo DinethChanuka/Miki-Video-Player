@@ -13,8 +13,29 @@ use std::sync::Arc;
 use tauri::Manager;
 
 pub fn run() {
+    let thumbnail_extractor = Arc::new(ThumbnailExtractor::new());
+    let extractor_for_protocol = thumbnail_extractor.clone();
+    let extractor_for_setup = thumbnail_extractor.clone();
+
     tauri::Builder::default()
-        .setup(|app| {
+        .register_uri_scheme_protocol("thumb", move |_app, request| {
+            let path = request.uri().path().trim_start_matches('/');
+            let mut parts = path.split('/');
+            let media_id = parts.next().unwrap_or("unknown");
+            let timestamp_ms: i64 = parts.next().and_then(|s| s.parse().ok()).unwrap_or(0);
+
+            let jpeg_bytes = match extractor_for_protocol.get_or_extract_thumbnail("", media_id, timestamp_ms) {
+                Ok(bytes) => bytes,
+                Err(_) => vec![],
+            };
+
+            tauri::http::Response::builder()
+                .header("Content-Type", "image/jpeg")
+                .header("Access-Control-Allow-Origin", "*")
+                .body(jpeg_bytes)
+                .unwrap_or_else(|_| tauri::http::Response::builder().body(vec![]).unwrap())
+        })
+        .setup(move |app| {
             // Resolve local app data directory for SQLite database storage
             let app_data_dir = app
                 .path()
@@ -27,35 +48,12 @@ pub fn run() {
 
             let mpv_controller = Arc::new(Mutex::new(MpvController::new()));
             let audio_dsp = Arc::new(Mutex::new(AudioDspManager::new()));
-            let thumbnail_extractor = Arc::new(ThumbnailExtractor::new());
 
             // Register global thread-safe state in Tauri DI container
             app.manage(db_manager);
             app.manage(mpv_controller);
             app.manage(audio_dsp);
-            app.manage(thumbnail_extractor.clone());
-
-            // Custom URI Scheme Protocol: thumb://localhost/<media_id>/<timestamp_ms>
-            let extractor = thumbnail_extractor;
-            app.register_uri_scheme_protocol("thumb", move |_app, request| {
-                let uri = request.uri().to_string();
-                // Parse URI path: /<media_id>/<timestamp_ms>
-                let path = request.uri().path().trim_start_matches('/');
-                let mut parts = path.split('/');
-                let media_id = parts.next().unwrap_or("unknown");
-                let timestamp_ms: i64 = parts.next().and_then(|s| s.parse().ok()).unwrap_or(0);
-
-                let jpeg_bytes = match extractor.get_or_extract_thumbnail("", media_id, timestamp_ms) {
-                    Ok(bytes) => bytes,
-                    Err(_) => vec![],
-                };
-
-                tauri::http::Response::builder()
-                    .header("Content-Type", "image/jpeg")
-                    .header("Access-Control-Allow-Origin", "*")
-                    .body(jpeg_bytes)
-                    .map_err(|e| tauri::http::Error::from(e))
-            });
+            app.manage(extractor_for_setup.clone());
 
             log::info!("AetherPlayer backend successfully initialized.");
             Ok(())
