@@ -44,4 +44,16 @@ declare module 'lucide-react' {
   export const Ratio: LucideIcon;
   export const Youtube: LucideIcon;
   export const Zap: LucideIcon;
+  export const Trash2: LucideIcon;
+  export const Trash: LucideIcon;
+  export const Plus: LucideIcon;
+  export const Palette: LucideIcon;
+  export const Check: LucideIcon;
+  export const ShieldCheck: LucideIcon;
+  export const FileQuestion: LucideIcon;
+  export const ExternalLink: LucideIcon;
+
+  // Fallback index signature so any other Lucide icon is also typed
+  const icons: { [key: string]: LucideIcon };
+  export default icons;
 }

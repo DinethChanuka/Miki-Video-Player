@@ -1,146 +1,216 @@
-# AetherPlayer 🌌🎬
+# Miki Player 🌌🎬
 
-[![Tauri v2](https://img.shields.io/badge/Tauri-v2-24C8DB?logo=tauri&logoColor=white)](https://v2.tauri.app/)
-[![React 19](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev/)
-[![TypeScript 5](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Rust 2024](https://img.shields.io/badge/Rust-2024-black?logo=rust&logoColor=white)](https://www.rust-lang.org/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4-38BDF8?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
+[![Cross-Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Windows%20%7C%20Linux%20%7C%20iOS%20%7C%20Android-blueviolet?style=for-the-badge)](https://github.com)
+[![Tauri v2](https://img.shields.io/badge/Tauri-v2.0-24C8DB?style=for-the-badge&logo=tauri&logoColor=white)](https://v2.tauri.app/)
+[![React 19](https://img.shields.io/badge/React-19.0-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
+[![TypeScript 5](https://img.shields.io/badge/TypeScript-5.7-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Swift Cocoa](https://img.shields.io/badge/macOS-Swift%20Cocoa%20WebKit-F05138?style=for-the-badge&logo=swift&logoColor=white)](https://apple.com)
+[![VLC Boost](https://img.shields.io/badge/Audio-200%25%20VLC%20Overdrive-FFA500?style=for-the-badge)](https://videolan.org)
 
-**AetherPlayer** is an ultra-modern, cross-platform multimedia player engineered with **Tauri v2 (Rust)** and **React 19 (TypeScript + Vite + Tailwind CSS)**. It targets macOS, Windows, Linux, iOS, Android, and standalone Web/PWA with a unified, zero-latency playback architecture.
+**Miki Player** is an ultra-modern, cross-platform multimedia player designed from the ground up for high-performance video playback, rich audio DSP, luxury UI customizability, and native OS integration. Engineered with a **Hybrid Dual-Engine Architecture**, it unifies native hardware GPU acceleration (macOS Cocoa + Tauri Rust + libmpv) with a high-fidelity Web Media Engine (React 19 + HLS.js + WebAudio DSP + WebGL Shaders).
 
 ---
 
-## 🚀 Core Architectural Paradigm: Hybrid Dual-Engine Playback
-
-Standard browser WebViews cannot natively decode complex containers (e.g., 10-bit MKV, HEVC, AV1, TrueHD audio, SSA/ASS subtitles) and IPC frame copying introduces latency bottlenecks at 4K/60fps+. AetherPlayer resolves this through a **Hybrid Dual-Engine Architecture**:
+## 🚀 Key Highlights & Architectural Features
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
-│                   AetherPlayer Application Layer                       │
+│                      Miki Player Application HUD                       │
+│    (Frameless Undecorated Window • 5s Auto-Hide • 10 Luxury Themes)    │
 └───────────────────────────────────┬────────────────────────────────────┘
                                     │
                ┌────────────────────┴────────────────────┐
                ▼                                         ▼
-   [ Desktop / Mobile Native ]               [ Web & Cloud Streaming ]
-     Tauri v2 + libmpv Engine                  WebMediaEngine (HLS.js)
+   [ Native OS Hardware Pipeline ]            [ Web & Network Optimizer ]
+     macOS Cocoa / Tauri v2 / libmpv             WebMediaEngine & HLS.js
   ┌─────────────────────────────┐           ┌─────────────────────────────┐
-  │  Transparent Tauri WebView  │           │   HTML5 Video + WebGL2      │
-  │     (React 19 Glass HUD)    │           │    (Ambient Glow Shader)    │
+  │  Borderless Key Window      │           │   HTTP 206 Partial Stream   │
+  │  Zero-Latency Direct Blit   │           │   YouTube Stream Optimizer  │
   ├─────────────────────────────┤           ├─────────────────────────────┤
-  │  Native Window Child Surface│           │   WebAudio DSP 10-Band EQ   │
-  │ (CAMetalLayer / HWND / X11) │           │    + Dynamic Compressor     │
+  │  VLC 200% Audio Gain Node   │           │   10-Band Parametric DSP    │
+  │  Anime4K & Shaders Pipeline │           │   Real-Time Ambient Glow    │
   └─────────────────────────────┘           └─────────────────────────────┘
                ▲                                         ▲
                └────────────────────┬────────────────────┘
                                     │
-                     [ SQLite WAL Persistence Engine ]
-                   (Auto-Resume, History, Preferences)
+                 [ Unified Storage & Diagnostic Layer ]
+              • LocalStorage & SQLite WAL State Engine
+              • Java Smart Media Validator (AetherPlayerLauncher)
+              • Enhanced Alert System for Moved / Deleted Files
 ```
 
-### 1. Native Desktop & Mobile Engine (`TauriMpvEngine`)
-- **Zero-Copy Video Surface:** The Tauri main window is configured with `transparent: true` and `decorations: false`. `libmpv` renders hardware-accelerated frames (`VideoToolbox` on macOS, `D3D11VA`/`NVDEC` on Windows, `VAAPI` on Linux, `MediaCodec` on Android) directly onto a native child surface (`raw-window-handle`) positioned *behind* the transparent WebView HUD.
-- **High-Frequency Telemetry:** Playback state, positions, chapters, and track lists are throttled to 60Hz and streamed to the frontend via zero-copy typed `tauri::ipc::Channel` instances.
+### 1. 🎨 10 Luxury Switchable Player Themes
+Miki Player features 10 handcrafted visual themes with synchronized gradients, timeline tracks, glowing thumb knobs, and glassmorphic panels stored in persistent state:
+- **Cyberpunk Neon:** High-contrast neon cyan and hot magenta laser glow.
+- **Midnight OLED:** Ultra-deep obsidian black with pure silver frost accents.
+- **Tokyo Violet:** Cinematic deep indigo and fluorescent purple glow.
+- **Matrix Emerald:** Deep dark forest with vibrant electric emerald green.
+- **Sunset Horizon:** Warm golden amber, coral, and glowing rose red.
+- **Glacier Frost:** Arctic blue, crystalline ice cyan, and pure silver.
+- **Royal Obsidian:** Prestige obsidian black and champagne gold luxury.
+- **Crimson Velvet:** Bold ruby crimson and deep dark neon burgundy.
+- **Retro Synthwave:** 80s arcade neon pink, laser cyan, and deep purple.
+- **Nordic Frost:** Minimalist Scandinavian matte steel and fog glass.
 
-### 2. Web & Cloud Streaming Engine (`WebMediaEngine`)
-- **Browser Fallback & Adaptive Streams:** For web deployments or cloud streams (HLS/DASH/MP4 over CDN/R2), the player seamlessly activates a `<video>` + WebGL2 fragment shader pipeline.
-- **Ambient Lighting Mode:** Real-time low-resolution downsampled frame projection blurred with custom shaders to project dynamic ambient glow behind the player viewport.
+### 2. 🔊 200% VLC Audio Overdrive & 10-Band Parametric DSP
+- **VLC-Style 200% Overdrive Slider:** Boosts quiet dialogues and weak audio tracks up to +6dB beyond 100% using WebAudio `GainNode` and dynamic headroom limiting.
+- **10-Band Parametric Equalizer:** Full frequency spectrum control (31Hz, 62Hz, 125Hz, 250Hz, 500Hz, 1kHz, 2kHz, 4kHz, 8kHz, 16kHz) with gain clamping (-20dB to +20dB).
+- **Night Mode (Dynamic Range Compression):** Tames abrupt explosions while boosting quiet whispering for late-night viewing.
+
+### 3. ✨ Anime4K & Shaders Video Quality Enhancers
+1-click instant visual enhancement presets powered by GPU-accelerated CSS and WebGL shader matrix:
+- **Anime4K Sharp:** Crisp edge enhancement and line art contrast clarity.
+- **Cinematic HDR:** Expanded dynamic range, deep rich blacks, and balanced highlights.
+- **Vivid Vibrance:** Color punch and saturation lift for nature and music videos.
+- **Night Vision Boost:** Shadow detail enhancement for underexposed video files.
+- **Studio Crisp Hi-Fi:** High-fidelity master color calibration and neutral tone mapping.
+- **YouTube-Style Ambient Glow:** Projects real-time blurred peripheral colors behind the screen.
+
+### 4. 🎬 Jump Back In (Recently Viewed Cards)
+When opening Miki Player, if media was viewed recently, the home screen renders an interactive card grid:
+- Exact **Timeline Percentage badge** (e.g., `45% watched`).
+- Interactive progress bar styled with the active theme gradient.
+- Last viewed position vs total duration (`04:12 / 18:30`).
+- **1-Click Resume Playback** button.
+- Clean **Remove from Recents** button to prune deleted or finished files.
+
+### 5. 📺 YouTube & URL Stream Cards
+- Supports pasting any standard YouTube URL (`youtube.com/watch?v=...`, `youtu.be/...`, shorts, embeds) and direct HLS/DASH/MP4 network links.
+- Automatically saves streamed videos into rich preview cards with video thumbnails (`img.youtube.com/vi/{id}/mqdefault.jpg`), title, and 1-click replay.
+
+### 6. 🛡️ Java Smart Error Handling & Diagnostics
+- Integrated with `AetherPlayerLauncher.java`:
+  ```bash
+  java AetherPlayerLauncher --validate "/path/to/video.mp4"
+  ```
+- If a user moves or deletes a previously played video file, Miki Player displays an **Enhanced Smart Alert Modal** offering a 1-click `[Remove from Recents]` button instead of a cryptic crash toast.
 
 ---
 
-## ✨ Features
+## 🌐 Universal Cross-Platform Architecture & Path Handling
 
-- 🎧 **Parametric Audio DSP:** 10-band equalizer (31Hz – 16kHz) with gain clamping (-20dB to +20dB) and Night Mode Dynamic Range Compression (DRC).
-- 🎞️ **Magnetic Timeline Scrubber:** Hover thumbnail preview card streaming binary keyframes over custom URI scheme `thumb://localhost/<media_id>/<timestamp>`.
-- 💾 **SQLite WAL Persistence:** Auto-resumes media, remembers audio/subtitle tracks, per-file EQ presets, and timestamps with smart completion detection (>= 95% resets to start).
-- 🛡️ **Self-Healing Error Hierarchy:** Structured error envelopes with automated recovery strategies (`fallback_to_web_engine`, `retry_with_backoff`, `reset_audio_filters`).
-- 👆 **Ergonomic Gestures & Hotkeys:**
-  - Hold for 2x speed boost.
-  - Double-tap edges for ±10s ripple seek.
-  - Hotkeys: `Space`/`K` (Play/Pause), `J`/`L` (±10s seek), `Arrow` keys (seek & volume), `,`/`.` (Frame step), `F` (Fullscreen), `[`/`]` (Speed).
+Miki Player is architected for uniform operation across desktop, mobile, and web targets.
+
+### Universal Path Resolver
+Different operating systems represent file systems differently:
+- **Windows:** Drive letters and backslashes (e.g. `C:\Users\User\Videos\movie.mp4` or `file:///C:/Users/...`). Miki Player normalizes Windows paths, handles URI escaping, and bridges local files via HTTP 206 byte-range streaming.
+- **macOS & Linux:** Standard POSIX root paths (e.g. `/Users/username/Movies/video.mkv` or `/home/user/Videos/...`).
+- **Android & iOS:** Sandboxed document directories and Android Content Provider URIs (`content://...`).
+- **Web & Cloud:** Standard HTTP/HTTPS CORS streams, HLS playlists (`.m3u8`), and DASH manifests (`.mpd`).
 
 ---
 
-## 📁 Project Directory Structure
+## 🖥️ Operating System Deployment Guide
+
+### 🍎 macOS Standalone Application Bundle (`Miki Player.app`)
+Miki Player includes a standalone, double-clickable macOS Application Bundle:
+- **Location:** `./Miki Player.app`
+- **To run directly:** Double-click `Miki Player.app` in Finder, or execute:
+  ```bash
+  open "Miki Player.app"
+  ```
+- **To rebuild the bundle anytime:**
+  ```bash
+  npm run package:mac
+  ```
+  This compiles `MikiPlayerApp.swift` with Cocoa + WebKit, renders the multi-resolution `AppIcon.icns`, and embeds production web assets.
+
+### 🪟 Windows Standalone Executable (`.exe`)
+To build on Windows (Windows 10 / 11):
+1. **Prerequisites:** Install [Node.js](https://nodejs.org) and [Rust](https://rustup.rs).
+2. **One-Click Build Script:**
+   ```bat
+   scripts\build-windows-exe.bat
+   ```
+   Or run:
+   ```bash
+   npm run package:win
+   ```
+3. **Output Executable:** Located in `src-tauri/target/release/` and `src-tauri/target/release/bundle/nsis/Miki_Player_x64-setup.exe`.
+
+### 🐧 Linux (AppImage & Debian Package)
+1. **Prerequisites:**
+   ```bash
+   sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+   ```
+2. **Build Binary:**
+   ```bash
+   npm run build
+   npx tauri build
+   ```
+3. **Output:** Located in `src-tauri/target/release/bundle/appimage/` and `src-tauri/target/release/bundle/deb/`.
+
+### 🤖 Android & 📱 iOS
+Miki Player supports mobile compilation through Tauri v2 Mobile CLI:
+```bash
+npx tauri android init && npx tauri android build
+npx tauri ios init && npx tauri ios build
+```
+
+---
+
+## ⚙️ CI/CD Workflow (`.github/workflows/build-crossplatform.yml`)
+
+The repository includes an enterprise multi-OS GitHub Actions workflow that automatically builds and bundles:
+- **Windows x64:** Compiles standalone `.exe` and NSIS installer.
+- **macOS Universal:** Compiles Cocoa `.app` bundle, signs, and zips.
+- **Linux x86_64:** Compiles `.AppImage` and `.deb` distribution packages.
+
+---
+
+## ⌨️ Keyboard Shortcuts & Touch Gestures
+
+| Key / Gesture | Action |
+|:---:|:---|
+| <kbd>Space</kbd> | Toggle Play / Pause |
+| <kbd>F</kbd> | Toggle Fullscreen (Native Window & HTML5) |
+| <kbd>←</kbd> / <kbd>→</kbd> | Seek Backward / Forward 10 seconds |
+| <kbd>M</kbd> | Toggle Mute / Restore Volume |
+| <kbd>B</kbd> | Add Timestamp Bookmark |
+| <kbd>E</kbd> | Open 10-Band Parametric Audio Equalizer |
+| <kbd>S</kbd> | Open Video Settings, Shaders & 10 Themes |
+| <kbd>L</kbd> | Toggle Video Repeat / Looping |
+| **Double-Click Left / Right** | Quick Seek ±10s ripple |
+| **Mouse Inactivity (5s)** | Auto-hide HUD & titlebar for immersive video |
+| **Window Background Drag** | Seamless borderless window repositioning |
+
+---
+
+## 📁 Repository Structure
 
 ```
 .
+├── Miki Player.app/                   # Standalone macOS Application Bundle
+│   └── Contents/
+│       ├── Info.plist                 # Bundle identity & permissions
+│       ├── MacOS/Miki Player          # Executable launcher
+│       └── Resources/AppIcon.icns     # High-resolution native icon
 ├── src/                               # React 19 Frontend
 │   ├── components/
-│   │   ├── ambient/
-│   │   │   └── AmbientCanvas.tsx      # Real-time ambient glow sampler
-│   │   └── hud/
-│   │       ├── ControlsOverlay.tsx    # Glassmorphic floating control bar
-│   │       ├── TimelineScrubber.tsx   # Magnetic chapter bar & thumbnail preview
-│   │       ├── EqualizerModal.tsx     # 10-band DSP parametric EQ & Night Mode
-│   │       └── ErrorToast.tsx         # Self-healing recovery notification
-│   ├── core/
-│   │   └── PlayerEngine.ts            # IPlayerEngine contract, TauriMpvEngine & WebMediaEngine
-│   ├── hooks/
-│   │   └── usePlayerGestures.ts       # Touch gestures & desktop hotkeys
-│   ├── store/
-│   │   └── playerStore.ts             # Zustand store with SQLite hydration
-│   ├── App.tsx                        # Master application layout
-│   ├── main.tsx                       # React DOM entry point
-│   └── index.css                      # Tailwind & Glassmorphism styles
-│
-├── src-tauri/                         # Rust Tauri v2 Backend
-│   ├── src/
-│   │   ├── engine/
-│   │   │   ├── mpv_controller.rs      # Thread-safe libmpv controller & 60Hz Channel
-│   │   │   ├── mpv_ffi.rs             # Dynamic runtime FFI loader for libmpv
-│   │   │   ├── audio_dsp.rs           # 10-band EQ & DRC audio filter builder
-│   │   │   ├── thumbnail_extractor.rs # Fast keyframe extractor & LRU buffer cache
-│   │   │   └── types.rs               # Playback state & telemetry structures
-│   │   ├── platform/
-│   │   │   └── window_compositor.rs   # raw-window-handle (macOS, Windows, Linux)
-│   │   ├── db/
-│   │   │   └── mod.rs                 # SQLite WAL persistence manager & migrations
-│   │   ├── error.rs                   # Structured error envelopes & recovery hints
-│   │   ├── commands.rs                # Typed Tauri IPC command handlers
-│   │   ├── lib.rs                     # Tauri builder wiring & thumb:// protocol
-│   │   └── main.rs                    # Application entry point
-│   ├── Cargo.toml                     # Rust dependencies (rusqlite, libloading, tauri v2)
-│   └── tauri.conf.json                # Transparent windowing & protocol permissions
-│
-├── package.json                       # Frontend dependencies & scripts
-├── vite.config.ts                     # Vite bundler configuration
-├── tailwind.config.ts                 # Glassmorphic theme styling
-└── tsconfig.json                      # Strict TypeScript compiler options
+│   │   ├── ambient/AmbientCanvas.tsx  # Real-time ambient glow sampler
+│   │   ├── hud/ControlsOverlay.tsx    # Luxury HUD & Play/Pause controls
+│   │   ├── hud/TimelineScrubber.tsx   # Magnetic scrubber with theme gradients
+│   │   ├── hud/EqualizerModal.tsx     # 10-Band audio DSP equalizer
+│   │   ├── hud/VideoSettingsModal.tsx # 10 Themes & Anime4K video shaders
+│   │   ├── hud/FileBrowserModal.tsx   # Media explorer & YouTube stream cards
+│   │   └── hud/ErrorToast.tsx         # Smart error & moved file alert system
+│   ├── core/PlayerEngine.ts           # Hybrid Dual-Engine playback core
+│   ├── types/theme.ts                 # 10 handcrafted luxury player themes
+│   ├── store/playerStore.ts           # Zustand store with persistent state
+│   └── App.tsx                        # Master UI, Recently Viewed cards & hotkeys
+├── src-tauri/                         # Rust Tauri v2 Backend & libmpv engine
+├── .github/workflows/                 # Automated cross-platform CI/CD
+│   └── build-crossplatform.yml        # Windows .exe, macOS .app, Linux AppImage
+├── scripts/
+│   ├── package-mac.sh                 # macOS .app bundle packaging script
+│   └── build-windows-exe.bat          # Windows .exe packaging script
+├── AetherPlayerLauncher.java          # Java launcher & media validation diagnostic
+├── MikiPlayerApp.swift                # Native Swift Cocoa borderless window
+├── package.json                       # Project configuration & scripts
+└── README.md                          # Comprehensive documentation
 ```
-
----
-
-## 🛠️ Getting Started
-
-### Prerequisites
-1. **Node.js**: v18+ (Node v20+ recommended).
-2. **Rust**: v1.78+ (via `rustup`).
-3. *(Optional for Native Mode)*: `libmpv` (e.g. `brew install mpv` on macOS, or Linux package manager). *If libmpv is absent, AetherPlayer automatically self-heals by falling back to the WebMediaEngine.*
-
-### Setup & Run
-
-1. **Install Frontend Dependencies:**
-   ```bash
-   npm install
-   ```
-
-2. **Run in Web Browser Mode:**
-   ```bash
-   npm run dev
-   ```
-
-3. **Run in Tauri v2 Desktop Mode:**
-   ```bash
-   npm run tauri dev
-   ```
-
-4. **Build Production Application:**
-   ```bash
-   npm run tauri build
-   ```
 
 ---
 
 ## 📜 License
-MIT License. Built with ❤️ for modern multimedia experiences.
-
+Released under the MIT License. Built with ❤️ for next-generation multimedia playback.

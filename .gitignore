@@ -25,14 +25,16 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# Java bytecode
+# Native binaries & App bundles
+MikiPlayer
+Miki Player.app/
 *.class
 
-# Native binaries
-MikiPlayer
-
-# Superpowers agent scratch
-.superpowers/sdd/
+# Agent scratch & internal plans
+.superpowers/
+docs/superpowers/
+plans/
+*.plan.md
 
 # Operating System files
 .DS_Store
