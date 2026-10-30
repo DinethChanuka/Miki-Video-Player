@@ -19,6 +19,7 @@ import {
   Trash2,
   Film,
   Plus,
+  Camera,
 } from 'lucide-react';
 
 export function parseYouTubeId(url: string | null): string | null {
@@ -83,6 +84,7 @@ export const App: React.FC = () => {
   const saveCurrentThumbnail = usePlayerStore((s) => s.saveCurrentThumbnail);
   const playNextMedia = usePlayerStore((s) => s.playNextMedia);
   const playPreviousMedia = usePlayerStore((s) => s.playPreviousMedia);
+  const snapshotNotification = usePlayerStore((s) => s.snapshotNotification);
 
   const theme = PLAYER_THEMES[themeId] || PLAYER_THEMES.cyberpunk;
 
@@ -232,6 +234,29 @@ export const App: React.FC = () => {
     window.addEventListener('miki:nativeFileSelected', handleNativePicked);
     return () => window.removeEventListener('miki:nativeFileSelected', handleNativePicked);
   }, [openMedia]);
+
+  // Listen to Cocoa native directory picker and screenshot saved events
+  useEffect(() => {
+    const handleDirPicked = (e: Event) => {
+      const customEvent = e as CustomEvent<{ path: string }>;
+      if (customEvent.detail && customEvent.detail.path) {
+        usePlayerStore.getState().setScreenshotDirectory(customEvent.detail.path);
+      }
+    };
+    const handleScreenshotSaved = (e: Event) => {
+      const customEvent = e as CustomEvent<{ path: string }>;
+      if (customEvent.detail && customEvent.detail.path) {
+        usePlayerStore.getState().setSnapshotNotification(`Saved to: ${customEvent.detail.path}`);
+        setTimeout(() => usePlayerStore.getState().setSnapshotNotification(null), 4000);
+      }
+    };
+    window.addEventListener('miki:nativeDirectorySelected', handleDirPicked);
+    window.addEventListener('miki:screenshotSaved', handleScreenshotSaved);
+    return () => {
+      window.removeEventListener('miki:nativeDirectorySelected', handleDirPicked);
+      window.removeEventListener('miki:screenshotSaved', handleScreenshotSaved);
+    };
+  }, []);
 
   // Global Keyboard Shortcuts
   useEffect(() => {
@@ -422,7 +447,7 @@ export const App: React.FC = () => {
           )}
         </div>
 
-        {/* Center Engine & Active Theme Indicator */}
+        {/* Center Media Engine Indicator (Theme name removed for clean HUD) */}
         <div className="hidden sm:flex items-center gap-2 text-[10px] font-mono tracking-wider uppercase text-white/70 bg-white/5 px-3 py-1 rounded-full border border-white/10">
           <span
             className="w-2 h-2 rounded-full animate-pulse"
@@ -435,8 +460,6 @@ export const App: React.FC = () => {
                 ? 'Native Hardware GPU'
                 : 'Web Media Engine'}
           </span>
-          <span className="text-white/30">•</span>
-          <span className="text-cyan-400 font-bold">{theme.name}</span>
         </div>
 
         {/* Right Navigation & Window Controls */}
@@ -829,6 +852,21 @@ export const App: React.FC = () => {
               >
                 Dismiss
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* Screenshot Notification Toast */}
+        {snapshotNotification && (
+          <div className="absolute top-14 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-top duration-300 pointer-events-none">
+            <div
+              className={`backdrop-blur-2xl px-5 py-2.5 rounded-2xl border shadow-2xl flex items-center gap-2.5 ${theme.glassBg} ${theme.glassBorder}`}
+              style={{ boxShadow: `0 10px 30px ${theme.haloGlow}` }}
+            >
+              <Camera className="w-4 h-4 text-cyan-400" />
+              <span className="text-xs font-semibold text-white/90 font-mono">
+                {snapshotNotification}
+              </span>
             </div>
           </div>
         )}

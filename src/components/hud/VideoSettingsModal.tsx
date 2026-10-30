@@ -22,6 +22,7 @@ import {
   VolumeX,
   Split,
   Eye,
+  FolderOpen,
 } from 'lucide-react';
 
 interface VideoSettingsModalProps {
@@ -49,6 +50,9 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
   const isLooping = usePlayerStore((s) => s.isLooping);
   const toggleLoop = usePlayerStore((s) => s.toggleLoop);
   const takeSnapshot = usePlayerStore((s) => s.takeSnapshot);
+  const screenshotDirectory = usePlayerStore((s) => s.screenshotDirectory);
+  const setScreenshotDirectory = usePlayerStore((s) => s.setScreenshotDirectory);
+  const snapshotNotification = usePlayerStore((s) => s.snapshotNotification);
 
   const spatialState = usePlayerStore((s) => s.spatialState);
   const setSpatialAudioEnabled = usePlayerStore((s) => s.setSpatialAudioEnabled);
@@ -56,6 +60,17 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
   const setSpatialCoordinates = usePlayerStore((s) => s.setSpatialCoordinates);
   const setSpeakerVolume = usePlayerStore((s) => s.setSpeakerVolume);
   const setLfeCrossover = usePlayerStore((s) => s.setLfeCrossover);
+
+  const handleBrowseScreenshotDir = () => {
+    if (
+      typeof window !== 'undefined' &&
+      (window as unknown as { webkit?: { messageHandlers?: { openNativeDirectoryDialog?: { postMessage: (msg: string) => void } } } })
+        .webkit?.messageHandlers?.openNativeDirectoryDialog
+    ) {
+      (window as unknown as { webkit: { messageHandlers: { openNativeDirectoryDialog: { postMessage: (msg: string) => void } } } })
+        .webkit.messageHandlers.openNativeDirectoryDialog.postMessage('open');
+    }
+  };
 
   const [activeTab, setActiveTab] = useState<'themes' | 'clarity' | 'spatial' | 'tools'>(initialTab);
 
@@ -805,6 +820,77 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
                     <span className="text-[11px] font-semibold text-white/80">Audio DSP</span>
                   </button>
                 </div>
+              </div>
+
+              {/* Screenshot Saving Path Configuration */}
+              <div className="flex flex-col gap-3 border-t border-white/10 pt-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-white/90 flex items-center gap-2">
+                    <Camera className="w-4 h-4 text-cyan-400" />
+                    Screenshot Storage Location
+                  </span>
+                  {snapshotNotification && (
+                    <span className="text-[11px] font-mono text-cyan-300 bg-cyan-950/80 px-2.5 py-0.5 rounded-lg border border-cyan-400/40 animate-pulse">
+                      {snapshotNotification}
+                    </span>
+                  )}
+                </div>
+
+                {/* Preset Directory Selectors */}
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { label: 'Pictures (Default)', path: '~/Pictures/Miki Player/Screenshots' },
+                    { label: 'Downloads', path: '~/Downloads' },
+                    { label: 'Desktop', path: '~/Desktop' },
+                  ].map((preset) => (
+                    <button
+                      key={preset.path}
+                      onClick={() => setScreenshotDirectory(preset.path)}
+                      className={`py-2 px-3 rounded-xl text-xs font-medium transition-all text-center truncate ${
+                        screenshotDirectory === preset.path
+                          ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/50 shadow-md shadow-cyan-500/20 font-bold'
+                          : 'bg-white/5 border border-white/10 text-white/70 hover:text-white hover:bg-white/10'
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Custom Path Input + Native Browse Button */}
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-black/40 border border-white/15 focus-within:border-cyan-400/60 transition-colors">
+                    <FolderOpen className="w-4 h-4 text-white/40 shrink-0" />
+                    <input
+                      type="text"
+                      value={screenshotDirectory}
+                      onChange={(e) => setScreenshotDirectory(e.target.value)}
+                      placeholder="~/Pictures/Miki Player/Screenshots"
+                      className="w-full bg-transparent text-xs text-white placeholder-white/30 focus:outline-none font-mono"
+                    />
+                  </div>
+
+                  <button
+                    onClick={handleBrowseScreenshotDir}
+                    className="px-4 py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/15 text-xs font-semibold text-white transition-all active:scale-95 shrink-0 flex items-center gap-1.5"
+                    title="Choose custom folder on disk"
+                  >
+                    <FolderOpen className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Browse...</span>
+                  </button>
+
+                  <button
+                    onClick={takeSnapshot}
+                    className="px-3.5 py-2.5 rounded-2xl bg-gradient-to-r from-cyan-500 to-fuchsia-500 text-white text-xs font-bold shadow-md hover:brightness-110 active:scale-95 transition-all shrink-0 flex items-center gap-1.5"
+                    title="Capture test frame now"
+                  >
+                    <Camera className="w-3.5 h-3.5" />
+                    <span>Capture</span>
+                  </button>
+                </div>
+                <p className="text-[10px] text-white/40">
+                  Lossless PNG snapshots will be automatically saved to this configured folder.
+                </p>
               </div>
             </div>
           )}

@@ -142,3 +142,4 @@ export const ResumeChoiceModal: React.FC<ResumeChoiceModalProps> = ({
     </div>
   );
 };
+

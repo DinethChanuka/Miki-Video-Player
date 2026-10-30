@@ -143,6 +143,10 @@ export interface PlayerStoreState {
   updateShaderConfig: (config: Partial<VideoShaderConfig>) => Promise<void>;
   toggleLoop: () => void;
   takeSnapshot: () => void;
+  screenshotDirectory: string;
+  setScreenshotDirectory: (dir: string) => void;
+  snapshotNotification: string | null;
+  setSnapshotNotification: (msg: string | null) => void;
   addBookmark: (label?: string) => Promise<void>;
   removeRecentMedia: (uri: string) => void;
   addYouTubeHistory: (url: string, title?: string) => void;
@@ -224,6 +228,25 @@ const saveStoredYouTubeHistory = (items: YouTubeHistoryItem[]) => {
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(STORAGE_KEY_YOUTUBE, JSON.stringify(items.slice(0, 30)));
+  } catch {}
+};
+
+const STORAGE_KEY_SCREENSHOT_DIR = 'miki_screenshot_directory';
+export const DEFAULT_SCREENSHOT_DIR = '~/Pictures/Miki Player/Screenshots';
+
+const loadStoredScreenshotDirectory = (): string => {
+  if (typeof window === 'undefined') return DEFAULT_SCREENSHOT_DIR;
+  try {
+    return localStorage.getItem(STORAGE_KEY_SCREENSHOT_DIR) || DEFAULT_SCREENSHOT_DIR;
+  } catch {
+    return DEFAULT_SCREENSHOT_DIR;
+  }
+};
+
+const saveStoredScreenshotDirectory = (dir: string) => {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(STORAGE_KEY_SCREENSHOT_DIR, dir);
   } catch {}
 };
 
@@ -351,6 +374,13 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
   bookmarks: loadStoredBookmarks(),
   youtubeHistory: loadStoredYouTubeHistory(),
   resumeBannerPositionMs: null,
+  screenshotDirectory: loadStoredScreenshotDirectory(),
+  setScreenshotDirectory: (dir) => {
+    set({ screenshotDirectory: dir });
+    saveStoredScreenshotDirectory(dir);
+  },
+  snapshotNotification: null,
+  setSnapshotNotification: (msg) => set({ snapshotNotification: msg }),
 
   addYouTubeHistory: (url, title) => {
     const parsedId = url.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/)?.[1] || '';
@@ -708,10 +738,34 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     if (engine?.captureSnapshot) {
       const dataUrl = engine.captureSnapshot();
       if (dataUrl) {
+        const titleClean = (get().currentTitle || 'Media').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 30);
+        const filename = `Miki_${titleClean}_${Date.now()}.png`;
+        const dir = get().screenshotDirectory || DEFAULT_SCREENSHOT_DIR;
+
+        // 1. macOS Cocoa native WebKit bridge
+        if (
+          typeof window !== 'undefined' &&
+          (window as unknown as { webkit?: { messageHandlers?: { saveScreenshot?: { postMessage: (msg: unknown) => void } } } })
+            .webkit?.messageHandlers?.saveScreenshot
+        ) {
+          (window as unknown as { webkit: { messageHandlers: { saveScreenshot: { postMessage: (msg: unknown) => void } } } })
+            .webkit.messageHandlers.saveScreenshot.postMessage({
+              base64Data: dataUrl,
+              filename,
+              directory: dir,
+            });
+          set({ snapshotNotification: `Snapshot saved to ${dir}/${filename}` });
+          setTimeout(() => set({ snapshotNotification: null }), 4000);
+          return;
+        }
+
+        // 2. Web / Browser download fallback
         const a = document.createElement('a');
         a.href = dataUrl;
-        a.download = `aether-snapshot-${Date.now()}.png`;
+        a.download = filename;
         a.click();
+        set({ snapshotNotification: `Snapshot saved: ${filename}` });
+        setTimeout(() => set({ snapshotNotification: null }), 4000);
       }
     }
   },

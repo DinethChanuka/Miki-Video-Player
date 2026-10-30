@@ -30,7 +30,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         // Fully Undecorated / Borderless window with KEY window keyboard capability
         window = BorderlessKeyWindow(
             contentRect: contentRect,
-            styleMask: [.borderless, .resizable],
+            styleMask: [.borderless, .resizable, .miniaturizable],
             backing: .buffered,
             defer: false
         )
@@ -56,6 +56,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         let contentController = WKUserContentController()
         contentController.add(self, name: "windowAction")
         contentController.add(self, name: "openNativeFileDialog")
+        contentController.add(self, name: "openNativeDirectoryDialog")
+        contentController.add(self, name: "saveScreenshot")
         config.userContentController = contentController
 
         webView = WKWebView(frame: window.contentView!.bounds, configuration: config)
@@ -170,6 +172,49 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
                         let escapedName = selectedUrl.lastPathComponent.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "'", with: "\\'")
                         let js = "window.dispatchEvent(new CustomEvent('miki:nativeFileSelected', { detail: { path: '\(escapedPath)', name: '\(escapedName)' } }));"
                         self?.webView.evaluateJavaScript(js, completionHandler: nil)
+                    }
+                }
+            } else if message.name == "openNativeDirectoryDialog" {
+                let openPanel = NSOpenPanel()
+                openPanel.title = "Select Screenshot Save Folder - Miki Player"
+                openPanel.canChooseFiles = false
+                openPanel.canChooseDirectories = true
+                openPanel.canCreateDirectories = true
+                openPanel.allowsMultipleSelection = false
+                openPanel.begin { [weak self] response in
+                    if response == .OK, let selectedUrl = openPanel.url {
+                        let escapedPath = selectedUrl.path.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "'", with: "\\'")
+                        let js = "window.dispatchEvent(new CustomEvent('miki:nativeDirectorySelected', { detail: { path: '\(escapedPath)' } }));"
+                        self?.webView.evaluateJavaScript(js, completionHandler: nil)
+                    }
+                }
+            } else if message.name == "saveScreenshot", let dict = message.body as? [String: Any] {
+                let base64Data = dict["base64Data"] as? String ?? ""
+                let filename = dict["filename"] as? String ?? "miki-snapshot-\(Int(Date().timeIntervalSince1970)).png"
+                var dirPath = dict["directory"] as? String ?? "~/Pictures/Miki Player/Screenshots"
+
+                if dirPath.hasPrefix("~/") {
+                    let home = FileManager.default.homeDirectoryForCurrentUser.path
+                    dirPath = dirPath.replacingOccurrences(of: "~", with: home, options: .anchored)
+                }
+
+                let cleanBase64: String
+                if let commaIndex = base64Data.firstIndex(of: ",") {
+                    cleanBase64 = String(base64Data[base64Data.index(after: commaIndex)...])
+                } else {
+                    cleanBase64 = base64Data
+                }
+
+                if let imgData = Data(base64Encoded: cleanBase64) {
+                    do {
+                        try FileManager.default.createDirectory(atPath: dirPath, withIntermediateDirectories: true, attributes: nil)
+                        let targetFileUrl = URL(fileURLWithPath: dirPath).appendingPathComponent(filename)
+                        try imgData.write(to: targetFileUrl)
+                        let savedPath = targetFileUrl.path.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "'", with: "\\'")
+                        let js = "window.dispatchEvent(new CustomEvent('miki:screenshotSaved', { detail: { path: '\(savedPath)' } }));"
+                        self.webView.evaluateJavaScript(js, completionHandler: nil)
+                    } catch {
+                        print("[Miki] Screenshot write failed: \(error)")
                     }
                 }
             }
