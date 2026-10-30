@@ -126,8 +126,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
                 switch action {
                 case "startDrag":
                     if self.isCustomFullScreen {
-                        // Restore before dragging
                         self.window.setFrame(self.savedFrame, display: true, animate: false)
+                        self.window.level = .normal
                         self.isCustomFullScreen = false
                     }
                     if let currentEvent = NSApp.currentEvent {
@@ -142,10 +142,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
                 case "toggleFullscreen":
                     if self.isCustomFullScreen {
                         self.window.setFrame(self.savedFrame, display: true, animate: true)
+                        self.window.level = .normal
                         self.isCustomFullScreen = false
                     } else {
                         self.savedFrame = self.window.frame
                         if let screen = self.window.screen ?? NSScreen.main {
+                            self.window.level = .mainMenu + 1
                             self.window.setFrame(screen.frame, display: true, animate: true)
                             self.isCustomFullScreen = true
                         }

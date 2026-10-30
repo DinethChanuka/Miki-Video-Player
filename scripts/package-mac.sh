@@ -32,3 +32,4 @@ chmod +x "Miki Player.app/Contents/MacOS/MikiPlayerBinary"
 chmod +x "Miki Player.app/Contents/MacOS/Miki Player"
 
 echo "✅ [Miki Player] Miki Player.app standalone bundle ready! You can double-click it in Finder or run 'open \"Miki Player.app\"'."
+

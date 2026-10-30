@@ -13,6 +13,13 @@ import {
   parsePlayerError,
 } from '../core/PlayerEngine';
 import { PlayerThemeId } from '../types/theme';
+import {
+  SpatialAudioEngine,
+  SpatialAudioState,
+  SpeakerLevels,
+  SpatialProfileId,
+  DEFAULT_SPATIAL_STATE,
+} from '../core/SpatialAudioEngine';
 
 export interface MediaHistoryItem {
   mediaId: string;
@@ -103,6 +110,26 @@ export interface PlayerStoreState {
   // Error & Recovery State
   lastError: PlayerErrorEnvelope | null;
   retryCount: number;
+
+  // 3D Spatial Audio & Multi-Speaker System
+  spatialAudio: SpatialAudioEngine;
+  spatialState: SpatialAudioState;
+  setSpatialAudioEnabled: (enabled: boolean) => void;
+  setSpatialProfile: (profile: SpatialProfileId) => void;
+  setSpatialCoordinates: (x: number, y: number, z: number) => void;
+  setSpeakerVolume: (speaker: keyof SpeakerLevels, volume: number) => void;
+  setLfeCrossover: (hz: number) => void;
+
+  // Video Super-Resolution & Split Comparison
+  setSuperResolution: (mode: VideoShaderConfig['superResolution']) => void;
+  setSplitCompare: (enabled: boolean, position?: number) => void;
+
+  // Track & Playlist Navigation
+  playNextMedia: () => Promise<void>;
+  playPreviousMedia: () => Promise<void>;
+
+  // Thumbnail stopped-point persistence
+  saveCurrentThumbnail: (dataUrl: string) => void;
 
   // Actions
   bootEngine: (preferred?: EngineType, videoEl?: HTMLVideoElement) => Promise<void>;
@@ -230,8 +257,88 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     contrast: 1.0,
     saturation: 1.0,
     sharpness: 0.2,
+    clarityBoost: 0,
+    deNoise: 0,
+    deBanding: false,
+    superResolution: 'off',
+    splitCompareEnabled: false,
+    splitComparePosition: 50,
     aspectRatio: 'auto',
     upscaleMode: 'none',
+  },
+
+  spatialAudio: new SpatialAudioEngine(),
+  spatialState: { ...DEFAULT_SPATIAL_STATE },
+  setSpatialAudioEnabled: (enabled) => {
+    get().spatialAudio.setEnabled(enabled);
+    set((state) => ({
+      spatialState: { ...state.spatialState, enabled },
+    }));
+  },
+  setSpatialProfile: (profile) => {
+    get().spatialAudio.setProfile(profile);
+    set({ spatialState: get().spatialAudio.getState() });
+  },
+  setSpatialCoordinates: (x, y, z) => {
+    get().spatialAudio.setCoordinates(x, y, z);
+    set((state) => ({
+      spatialState: {
+        ...state.spatialState,
+        coordinates: { x, y, z },
+      },
+    }));
+  },
+  setSpeakerVolume: (speaker, volume) => {
+    get().spatialAudio.setSpeakerVolume(speaker, volume);
+    set((state) => ({
+      spatialState: {
+        ...state.spatialState,
+        speakers: { ...state.spatialState.speakers, [speaker]: volume },
+      },
+    }));
+  },
+  setLfeCrossover: (hz) => {
+    const next = { ...get().spatialState, lfeCrossoverHz: hz };
+    get().spatialAudio.applyState(next);
+    set({ spatialState: next });
+  },
+  setSuperResolution: (mode) => {
+    get().updateShaderConfig({ superResolution: mode });
+  },
+  setSplitCompare: (enabled, position) => {
+    get().updateShaderConfig({
+      splitCompareEnabled: enabled,
+      ...(position !== undefined ? { splitComparePosition: position } : {}),
+    });
+  },
+  playNextMedia: async () => {
+    const { recentMedia, currentUri, openMedia } = get();
+    if (recentMedia.length <= 1) return;
+    const idx = recentMedia.findIndex((m) => m.uri === currentUri);
+    const nextIdx = (idx + 1) % recentMedia.length;
+    const nextItem = recentMedia[nextIdx];
+    if (nextItem) {
+      await openMedia(nextItem.uri, nextItem.title);
+    }
+  },
+  playPreviousMedia: async () => {
+    const { recentMedia, currentUri, openMedia } = get();
+    if (recentMedia.length <= 1) return;
+    const idx = recentMedia.findIndex((m) => m.uri === currentUri);
+    const prevIdx = (idx - 1 + recentMedia.length) % recentMedia.length;
+    const prevItem = recentMedia[prevIdx];
+    if (prevItem) {
+      await openMedia(prevItem.uri, prevItem.title);
+    }
+  },
+  saveCurrentThumbnail: (dataUrl) => {
+    const { currentUri, recentMedia } = get();
+    if (!currentUri || !dataUrl) return;
+    const updated = recentMedia.map((m) =>
+      m.uri === currentUri ? { ...m, thumbnailUri: dataUrl } : m
+    );
+    saveStoredRecentMedia(updated);
+    set({ recentMedia: updated });
   },
 
   themeId: loadStoredTheme(),

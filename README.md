@@ -213,4 +213,4 @@ The repository includes an enterprise multi-OS GitHub Actions workflow that auto
 ---
 
 ## 📜 License
-Released under the MIT License. Built with ❤️ for next-generation multimedia playback.
+Released under the MIT License. 
