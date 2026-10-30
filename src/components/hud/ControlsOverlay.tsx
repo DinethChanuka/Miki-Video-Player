@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { usePlayerStore } from '../../store/playerStore';
 import { TimelineScrubber } from './TimelineScrubber';
 import {
@@ -25,6 +25,7 @@ interface ControlsOverlayProps {
   onOpenSettings: () => void;
   onOpenFileBrowser: () => void;
   containerRef: React.RefObject<HTMLDivElement | null>;
+  isVisible?: boolean;
 }
 
 export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
@@ -32,6 +33,7 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
   onOpenSettings,
   onOpenFileBrowser,
   containerRef,
+  isVisible = true,
 }) => {
   const isPaused = usePlayerStore((s) => s.isPaused);
   const togglePlay = usePlayerStore((s) => s.togglePlay);
@@ -49,29 +51,9 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
   const isLooping = usePlayerStore((s) => s.isLooping);
   const toggleLoop = usePlayerStore((s) => s.toggleLoop);
 
-  const [isVisible, setIsVisible] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
   const [showTrackMenu, setShowTrackMenu] = useState(false);
-  const hideTimerRef = useRef<number | null>(null);
-
-  // Auto-hide controls after 3 seconds of inactivity during active playback
-  const resetHideTimer = () => {
-    setIsVisible(true);
-    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
-    if (!isPaused) {
-      hideTimerRef.current = window.setTimeout(() => {
-        setIsVisible(false);
-      }, 3500);
-    }
-  };
-
-  useEffect(() => {
-    resetHideTimer();
-    return () => {
-      if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
-    };
-  }, [isPaused]);
 
   useEffect(() => {
     const handleFsChange = () => {
@@ -82,6 +64,17 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
   }, []);
 
   const toggleFullscreen = () => {
+    if (
+      typeof window !== 'undefined' &&
+      (window as unknown as { webkit?: { messageHandlers?: { windowAction?: { postMessage: (msg: string) => void } } } }).webkit?.messageHandlers?.windowAction
+    ) {
+      (window as unknown as { webkit: { messageHandlers: { windowAction: { postMessage: (msg: string) => void } } } }).webkit.messageHandlers.windowAction.postMessage('toggleFullscreen');
+      return;
+    }
+    if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
+      import('@tauri-apps/api/window').then(({ getCurrentWindow }) => getCurrentWindow().toggleMaximize()).catch(() => {});
+      return;
+    }
     if (!document.fullscreenElement) {
       containerRef.current?.requestFullscreen().catch(() => {});
     } else {
@@ -102,14 +95,15 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
 
   return (
     <div
-      onMouseMove={resetHideTimer}
-      className={`absolute inset-0 z-40 flex flex-col justify-end p-6 transition-opacity duration-300 pointer-events-none select-none ${
-        isVisible ? 'opacity-100' : 'opacity-0'
+      className={`absolute inset-0 z-40 flex flex-col justify-end p-6 transition-all duration-500 pointer-events-none select-none ${
+        isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'
       }`}
     >
       {/* Center Big Play Trigger Area */}
       <div
-        className="absolute inset-0 flex items-center justify-center cursor-pointer pointer-events-auto"
+        className={`absolute inset-0 flex items-center justify-center cursor-pointer pointer-events-auto transition-opacity duration-300 ${
+          isVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        }`}
         onClick={togglePlay}
       >
         {isPaused && (

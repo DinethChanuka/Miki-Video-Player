@@ -140,6 +140,13 @@ const loadStoredBookmarks = (): MediaBookmark[] => {
   }
 };
 
+const saveStoredBookmarks = (items: MediaBookmark[]) => {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(STORAGE_KEY_BOOKMARKS, JSON.stringify(items.slice(0, 50)));
+  } catch {}
+};
+
 let lastSqliteSyncMs = 0;
 
 export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
@@ -489,17 +496,56 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
   },
 
   addBookmark: async (label) => {
-    const { currentMediaId, positionMs, bookmarks } = get();
-    if (!isTauriRuntime() || !currentMediaId) return;
+    const { currentUri, positionMs, bookmarks, currentMediaId } = get();
+    const targetUri = currentUri || currentMediaId;
+    if (!targetUri) return;
 
-    const newBookmark = await invoke<MediaBookmark>('db_add_bookmark', {
-      mediaId: currentMediaId,
+    const formatMs = (ms: number) => {
+      const totalSec = Math.max(0, Math.floor(ms / 1000));
+      const m = Math.floor(totalSec / 60);
+      const s = totalSec % 60;
+      return `${m}:${s.toString().padStart(2, '0')}`;
+    };
+
+    const newBookmark: MediaBookmark = {
+      id: Date.now(),
+      mediaId: targetUri,
       timestampMs: positionMs,
-      label,
-    });
+      label: label || `Bookmark at ${formatMs(positionMs)}`,
+      createdAt: Date.now(),
+    };
+
+    if (isTauriRuntime() && currentMediaId) {
+      try {
+        const saved = await invoke<MediaBookmark>('db_add_bookmark', {
+          mediaId: currentMediaId,
+          timestampMs: positionMs,
+          label: newBookmark.label,
+        });
+        newBookmark.id = saved.id;
+      } catch {}
+    }
+
+    const updated = [...bookmarks, newBookmark].sort((a, b) => a.timestampMs - b.timestampMs);
+    set({ bookmarks: updated });
+    saveStoredBookmarks(updated);
+
+    // Provide friendly confirmation toast to user
     set({
-      bookmarks: [...bookmarks, newBookmark].sort((a, b) => a.timestampMs - b.timestampMs),
+      lastError: {
+        code: 'BOOKMARK_SAVED',
+        message: `🔖 ${newBookmark.label} saved successfully!`,
+        severity: 'recoverable',
+        recovery: 'none',
+        timestampMs: Date.now(),
+      },
     });
+
+    setTimeout(() => {
+      if (get().lastError?.code === 'BOOKMARK_SAVED') {
+        get().dismissError();
+      }
+    }, 2500);
   },
 
   refreshRecentMedia: async () => {

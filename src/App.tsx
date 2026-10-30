@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { usePlayerStore } from './store/playerStore';
 import { AmbientCanvas } from './components/ambient/AmbientCanvas';
 import { ControlsOverlay } from './components/hud/ControlsOverlay';
@@ -62,6 +62,46 @@ export const App: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isFileBrowserOpen, setIsFileBrowserOpen] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
+  const [areControlsVisible, setAreControlsVisible] = useState(true);
+  const hideControlsTimerRef = useRef<number | null>(null);
+
+  const resetControlsTimer = useCallback(() => {
+    setAreControlsVisible(true);
+    if (hideControlsTimerRef.current) {
+      window.clearTimeout(hideControlsTimerRef.current);
+    }
+    // Only auto-hide after 5 seconds of inactivity when media is actively loaded
+    if (currentUri) {
+      hideControlsTimerRef.current = window.setTimeout(() => {
+        setAreControlsVisible(false);
+      }, 5000);
+    }
+  }, [currentUri]);
+
+  useEffect(() => {
+    resetControlsTimer();
+    return () => {
+      if (hideControlsTimerRef.current) {
+        window.clearTimeout(hideControlsTimerRef.current);
+      }
+    };
+  }, [resetControlsTimer]);
+
+  const handleStartWindowDrag = (e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || target.closest('input') || target.closest('label') || target.closest('a')) {
+      return;
+    }
+    if (
+      typeof window !== 'undefined' &&
+      (window as unknown as { webkit?: { messageHandlers?: { windowAction?: { postMessage: (msg: string) => void } } } }).webkit?.messageHandlers?.windowAction
+    ) {
+      (window as unknown as { webkit: { messageHandlers: { windowAction: { postMessage: (msg: string) => void } } } }).webkit.messageHandlers.windowAction.postMessage('startDrag');
+    } else if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
+      import('@tauri-apps/api/window').then(({ getCurrentWindow }) => getCurrentWindow().startDragging()).catch(() => {});
+    }
+  };
 
   const { handleTouchStart, handleTouchEnd } = usePlayerGestures(containerRef);
 
@@ -136,15 +176,28 @@ export const App: React.FC = () => {
   return (
     <div
       ref={containerRef}
+      onMouseMove={resetControlsTimer}
+      onMouseDown={resetControlsTimer}
+      onKeyDown={resetControlsTimer}
       onDrop={handleFileDrop}
       onDragOver={handleDragOver}
-      onTouchStart={handleTouchStart}
+      onTouchStart={(e) => {
+        resetControlsTimer();
+        handleTouchStart(e);
+      }}
       onTouchEnd={handleTouchEnd}
-      className="relative w-screen h-screen overflow-hidden bg-slate-950 select-none flex flex-col font-sans"
+      className={`relative w-screen h-screen overflow-hidden bg-slate-950 select-none flex flex-col font-sans ${
+        areControlsVisible || !currentUri ? 'cursor-default' : 'cursor-none'
+      }`}
     >
-      {/* Sleek, Clean Frameless Titlebar - No duplicate traffic lights */}
+      {/* Sleek, Clean Frameless Titlebar - Drag & 5s Inactivity Auto-Hide */}
       <div
-        className="w-full h-10 z-50 flex items-center justify-between px-4 bg-black/70 backdrop-blur-md border-b border-white/10 select-none"
+        onMouseDown={handleStartWindowDrag}
+        className={`w-full h-10 z-50 flex items-center justify-between px-4 bg-black/70 backdrop-blur-md border-b border-white/10 select-none transition-all duration-500 ${
+          areControlsVisible || !currentUri
+            ? 'opacity-100 translate-y-0'
+            : 'opacity-0 -translate-y-full pointer-events-none'
+        }`}
         style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
       >
         {/* Left Branding & Return Button */}
@@ -385,6 +438,7 @@ export const App: React.FC = () => {
             onOpenSettings={() => setIsSettingsOpen(true)}
             onOpenFileBrowser={() => setIsFileBrowserOpen(true)}
             containerRef={containerRef}
+            isVisible={areControlsVisible}
           />
         )}
       </div>

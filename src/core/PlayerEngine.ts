@@ -14,7 +14,8 @@ export type ErrorCode =
   | 'AUDIO_DSP_INVALID'
   | 'DB_QUERY_FAILED'
   | 'THUMBNAIL_EXTRACT_FAILED'
-  | 'IPC_CHANNEL_CLOSED';
+  | 'IPC_CHANNEL_CLOSED'
+  | 'BOOKMARK_SAVED';
 
 export type RecoveryStrategy =
   | 'none'
@@ -206,6 +207,21 @@ export class TauriMpvEngine implements IPlayerEngine {
   }
 }
 
+export function resolveMediaStreamUrl(uri: string): string {
+  if (!uri) return uri;
+  if (
+    uri.startsWith('blob:') ||
+    uri.startsWith('data:') ||
+    uri.startsWith('http://') ||
+    uri.startsWith('https://') ||
+    uri.startsWith('/@media-stream')
+  ) {
+    return uri;
+  }
+  // Local filesystem path e.g. /Users/... or file:///... or C:\...
+  return `http://localhost:1420/@media-stream?path=${encodeURIComponent(uri)}`;
+}
+
 /**
  * 2. Web & Cloud Streaming Engine (HTML5 Video + HLS.js + WebAudio 10-Band EQ + 200% VLC Overdrive)
  */
@@ -332,7 +348,8 @@ export class WebMediaEngine implements IPlayerEngine {
       this.hls = null;
     }
 
-    const isHls = uri.includes('.m3u8');
+    const resolvedUri = resolveMediaStreamUrl(uri);
+    const isHls = resolvedUri.includes('.m3u8');
     if (isHls && Hls.isSupported()) {
       // High-performance Network Optimizer configuration
       this.hls = new Hls({
@@ -347,7 +364,7 @@ export class WebMediaEngine implements IPlayerEngine {
         fragLoadingTimeOut: 15000,
         manifestLoadingTimeOut: 10000,
       });
-      this.hls.loadSource(uri);
+      this.hls.loadSource(resolvedUri);
       this.hls.attachMedia(el);
       this.hls.on(Hls.Events.MANIFEST_PARSED, () => {
         if (startPositionMs > 0) {
@@ -367,7 +384,7 @@ export class WebMediaEngine implements IPlayerEngine {
         }
       });
     } else {
-      el.src = uri;
+      el.src = resolvedUri;
       el.load();
 
       const onCanPlay = () => {
