@@ -55,7 +55,13 @@ export interface VideoShaderConfig {
   brightness: number; // -50 to 50 (%)
   contrast: number; // 0.5 to 1.5
   saturation: number; // 0.0 to 2.0
-  sharpness: number; // 0.0 to 1.0
+  sharpness: number; // 0.0 to 2.0
+  clarityBoost: number; // 0.0 to 2.0 (Texture detail extraction)
+  deNoise: number; // 0.0 to 1.0 (Compression artifact reduction)
+  deBanding: boolean; // Color gradation smoothing
+  superResolution: 'off' | 'anime4k' | 'clarity-ultra' | 'cinematic-crisp' | 'hdr-enhanced';
+  splitCompareEnabled: boolean; // Split-screen before/after
+  splitComparePosition: number; // 0 to 100 (%)
   aspectRatio: 'auto' | '16:9' | '4:3' | '21:9' | '1:1' | 'fill';
   upscaleMode: 'none' | 'anime4k-fast' | 'anime4k-hq';
 }
@@ -489,7 +495,18 @@ export class WebMediaEngine implements IPlayerEngine {
   async applyVideoFilter(config: VideoShaderConfig): Promise<void> {
     if (!this.videoEl) return;
     const brightnessVal = 100 + (config.brightness || 0); // e.g. 100% standard
-    this.videoEl.style.filter = `brightness(${brightnessVal}%) contrast(${config.contrast}) saturate(${config.saturation})`;
+    let filters = `brightness(${brightnessVal}%) contrast(${config.contrast}) saturate(${config.saturation})`;
+
+    if (config.superResolution && config.superResolution !== 'off') {
+      filters += ` contrast(${Math.round(config.contrast * 105)}%) drop-shadow(0 0 1px rgba(255,255,255,0.08))`;
+    }
+    if (config.clarityBoost && config.clarityBoost > 0) {
+      filters += ` contrast(${Math.round(100 + config.clarityBoost * 15)}%)`;
+    }
+    if (config.deNoise && config.deNoise > 0) {
+      filters += ` blur(${Math.min(0.35, config.deNoise * 0.25)}px)`;
+    }
+    this.videoEl.style.filter = filters;
 
     // Aspect ratio application
     switch (config.aspectRatio) {

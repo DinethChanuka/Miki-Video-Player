@@ -5,6 +5,8 @@ import { TimelineScrubber } from './TimelineScrubber';
 import {
   Play,
   Pause,
+  SkipBack,
+  SkipForward,
   RotateCcw,
   RotateCw,
   Volume2,
@@ -19,6 +21,7 @@ import {
   Settings,
   FolderOpen,
   Repeat,
+  Camera,
 } from 'lucide-react';
 
 interface ControlsOverlayProps {
@@ -51,6 +54,9 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
   const subtitleTracks = usePlayerStore((s) => s.subtitleTracks);
   const isLooping = usePlayerStore((s) => s.isLooping);
   const toggleLoop = usePlayerStore((s) => s.toggleLoop);
+  const playNextMedia = usePlayerStore((s) => s.playNextMedia);
+  const playPreviousMedia = usePlayerStore((s) => s.playPreviousMedia);
+  const takeSnapshot = usePlayerStore((s) => s.takeSnapshot);
   const themeId = usePlayerStore((s) => s.themeId);
 
   const theme = PLAYER_THEMES[themeId] || PLAYER_THEMES.cyberpunk;
@@ -61,21 +67,42 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
 
   useEffect(() => {
     const handleFsChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
+      const doc = document as any;
+      setIsFullscreen(
+        !!(
+          doc.fullscreenElement ||
+          doc.webkitFullscreenElement ||
+          doc.mozFullScreenElement ||
+          doc.msFullscreenElement
+        )
+      );
     };
     document.addEventListener('fullscreenchange', handleFsChange);
-    return () => document.removeEventListener('fullscreenchange', handleFsChange);
+    document.addEventListener('webkitfullscreenchange', handleFsChange);
+    document.addEventListener('mozfullscreenchange', handleFsChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFsChange);
+      document.removeEventListener('webkitfullscreenchange', handleFsChange);
+      document.removeEventListener('mozfullscreenchange', handleFsChange);
+    };
   }, []);
 
   const toggleFullscreen = () => {
+    const doc = document as any;
+    const elem = containerRef.current || document.documentElement;
+    const isCurrentlyFs = !!(
+      doc.fullscreenElement ||
+      doc.webkitFullscreenElement ||
+      doc.mozFullScreenElement ||
+      doc.msFullscreenElement
+    );
+
     // 1. macOS Cocoa native WebKit bridge
     if (
       typeof window !== 'undefined' &&
-      (window as unknown as { webkit?: { messageHandlers?: { windowAction?: { postMessage: (msg: string) => void } } } })?.webkit?.messageHandlers?.windowAction
+      (window as any)?.webkit?.messageHandlers?.windowAction
     ) {
-      (window as unknown as { webkit: { messageHandlers: { windowAction: { postMessage: (msg: string) => void } } } }).webkit.messageHandlers.windowAction.postMessage('toggleFullscreen');
-      setIsFullscreen((prev) => !prev);
-      return;
+      (window as any).webkit.messageHandlers.windowAction.postMessage('toggleFullscreen');
     }
 
     // 2. Tauri window API
@@ -83,20 +110,35 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
       import('@tauri-apps/api/window')
         .then(({ getCurrentWindow }) => getCurrentWindow().toggleMaximize())
         .catch(() => {});
-      setIsFullscreen((prev) => !prev);
-      return;
     }
 
-    // 3. HTML5 Fullscreen API
-    if (!document.fullscreenElement) {
-      if (containerRef.current?.requestFullscreen) {
-        containerRef.current.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => {});
-      } else if (document.documentElement.requestFullscreen) {
-        document.documentElement.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => {});
+    // 3. HTML5 Fullscreen API (cross-browser fallbacks)
+    const el = elem as any;
+    if (!isCurrentlyFs) {
+      if (el.requestFullscreen) {
+        el.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => {});
+      } else if (el.webkitRequestFullscreen) {
+        el.webkitRequestFullscreen();
+        setIsFullscreen(true);
+      } else if (el.mozRequestFullScreen) {
+        el.mozRequestFullScreen();
+        setIsFullscreen(true);
+      } else if (el.msRequestFullscreen) {
+        el.msRequestFullscreen();
+        setIsFullscreen(true);
       }
     } else {
-      if (document.exitFullscreen) {
-        document.exitFullscreen().then(() => setIsFullscreen(false)).catch(() => {});
+      if (doc.exitFullscreen) {
+        doc.exitFullscreen().then(() => setIsFullscreen(false)).catch(() => {});
+      } else if (doc.webkitExitFullscreen) {
+        doc.webkitExitFullscreen();
+        setIsFullscreen(false);
+      } else if (doc.mozCancelFullScreen) {
+        doc.mozCancelFullScreen();
+        setIsFullscreen(false);
+      } else if (doc.msExitFullscreen) {
+        doc.msExitFullscreen();
+        setIsFullscreen(false);
       }
     }
   };
@@ -147,14 +189,32 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
 
         {/* Action Controls */}
         <div className="flex items-center justify-between pt-1">
-          {/* Left Controls: Play/Pause, Seek, VLC 200% Volume, Timestamps */}
-          <div className="flex items-center gap-3">
-            {/* Redesigned Luxury Play/Pause Button */}
+          {/* Left Controls: Prev, Rewind, Play/Pause, Forward, Next, VLC Volume */}
+          <div className="flex items-center gap-2 sm:gap-2.5">
+            {/* Previous Video / Track */}
+            <button
+              onClick={playPreviousMedia}
+              className="p-2.5 rounded-2xl bg-white/5 hover:bg-white/15 border border-white/10 text-white/80 hover:text-white transition-all active:scale-95"
+              title="Previous Video (Shift+P)"
+            >
+              <SkipBack className="w-4 h-4" />
+            </button>
+
+            {/* Quick Rewind 10s */}
+            <button
+              onClick={() => seek(Math.max(0, positionMs - 10_000))}
+              className="p-2.5 rounded-2xl bg-white/5 hover:bg-white/15 border border-white/10 text-white/80 hover:text-white transition-all active:scale-95"
+              title="Rewind 10s (Left Arrow)"
+            >
+              <RotateCcw className="w-4 h-4" />
+            </button>
+
+            {/* Prominent Play/Pause Button */}
             <button
               onClick={togglePlay}
-              className={`p-3 rounded-2xl bg-gradient-to-r ${theme.accentGradient} text-white shadow-lg hover:brightness-110 active:scale-95 transition-all duration-200 flex items-center justify-center`}
+              className={`p-3.5 rounded-2xl bg-gradient-to-r ${theme.accentGradient} text-white shadow-lg hover:brightness-110 active:scale-95 transition-all duration-200 flex items-center justify-center`}
               style={{
-                boxShadow: `0 4px 15px ${theme.haloGlow}`,
+                boxShadow: `0 4px 18px ${theme.haloGlow}`,
               }}
               title={isPaused ? 'Play (Space)' : 'Pause (Space)'}
             >
@@ -165,26 +225,26 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
               )}
             </button>
 
-            {/* Quick Seek Rewind 10s */}
-            <button
-              onClick={() => seek(Math.max(0, positionMs - 10_000))}
-              className="p-2.5 rounded-xl bg-white/5 hover:bg-white/15 border border-white/10 text-white/80 hover:text-white transition-all active:scale-95"
-              title="Rewind 10s (Left Arrow)"
-            >
-              <RotateCcw className="w-4 h-4" />
-            </button>
-
-            {/* Quick Seek Forward 10s */}
+            {/* Quick Forward 10s */}
             <button
               onClick={() => seek(positionMs + 10_000)}
-              className="p-2.5 rounded-xl bg-white/5 hover:bg-white/15 border border-white/10 text-white/80 hover:text-white transition-all active:scale-95"
+              className="p-2.5 rounded-2xl bg-white/5 hover:bg-white/15 border border-white/10 text-white/80 hover:text-white transition-all active:scale-95"
               title="Forward 10s (Right Arrow)"
             >
               <RotateCw className="w-4 h-4" />
             </button>
 
+            {/* Next Video / Track */}
+            <button
+              onClick={playNextMedia}
+              className="p-2.5 rounded-2xl bg-white/5 hover:bg-white/15 border border-white/10 text-white/80 hover:text-white transition-all active:scale-95"
+              title="Next Video (Shift+N)"
+            >
+              <SkipForward className="w-4 h-4" />
+            </button>
+
             {/* VLC-Style 200% Overdrive Volume Slider */}
-            <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-2xl bg-white/5 border border-white/10">
+            <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-2xl bg-white/5 border border-white/10 ml-1">
               <button
                 onClick={() => setVolume(volume === 0 ? 100 : 0)}
                 className="text-white/70 hover:text-white transition-colors"
@@ -195,7 +255,7 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
                 ) : volume > 100 ? (
                   <Volume2 className="w-4 h-4 text-amber-400" />
                 ) : volume > 50 ? (
-                  <Volume2 className="w-4 h-4 text-sky-400" />
+                  <Volume2 className="w-4 h-4 text-cyan-400" />
                 ) : (
                   <Volume1 className="w-4 h-4 text-white/70" />
                 )}
@@ -209,7 +269,7 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
                   step={1}
                   value={volume}
                   onChange={(e) => setVolume(parseInt(e.target.value, 10))}
-                  className="w-24 h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-cyan-400"
+                  className="w-20 sm:w-24 h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-cyan-400"
                 />
               </div>
 
@@ -225,16 +285,25 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
               </span>
             </div>
 
-            {/* Formatted Timestamps */}
-            <div className="font-mono text-xs text-white/60 tracking-wider pl-1">
+            {/* Timestamps */}
+            <div className="hidden lg:flex items-center font-mono text-xs text-white/60 tracking-wider pl-1">
               <span className="text-white font-medium">{formatTime(positionMs)}</span>
               <span className="mx-1 text-white/30">/</span>
               <span>{formatTime(durationMs)}</span>
             </div>
           </div>
 
-          {/* Right Controls: Loop, Speed, EQ, Tracks, Settings, Fullscreen */}
-          <div className="flex items-center gap-2.5">
+          {/* Right Controls: Loop, Speed, EQ, Tracks, Fullscreen */}
+          <div className="flex items-center gap-2">
+            {/* Lossless Snapshot Button */}
+            <button
+              onClick={takeSnapshot}
+              className="p-2.5 rounded-2xl bg-white/5 hover:bg-white/15 border border-white/10 text-white/80 hover:text-white transition-all active:scale-95"
+              title="Capture Lossless Frame (Snapshot)"
+            >
+              <Camera className="w-4 h-4 text-sky-400" />
+            </button>
+
             {/* Loop Toggle */}
             <button
               onClick={toggleLoop}
@@ -328,7 +397,7 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
               )}
             </div>
 
-            {/* Add Bookmark button */}
+            {/* Bookmark button */}
             <button
               onClick={() => addBookmark(`Bookmark at ${formatTime(positionMs)}`)}
               className="p-2.5 rounded-2xl bg-white/5 hover:bg-white/15 border border-white/10 text-white/80 hover:text-white transition-all active:scale-95"
@@ -364,14 +433,18 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
               <Settings className="w-4 h-4 text-fuchsia-400" />
             </button>
 
-            {/* Fullscreen Toggle (macOS Cocoa + Tauri + Web) */}
+            {/* Fullscreen Toggle (macOS Cocoa + Tauri + HTML5) */}
             <button
               onClick={toggleFullscreen}
-              className="p-2.5 rounded-2xl bg-white/5 hover:bg-white/15 border border-white/10 text-white/80 hover:text-white transition-all active:scale-95"
+              className={`p-2.5 rounded-2xl border transition-all active:scale-95 ${
+                isFullscreen
+                  ? 'bg-cyan-500/25 border-cyan-400/40 text-cyan-300 shadow-md'
+                  : 'bg-white/5 hover:bg-white/15 border-white/10 text-white/80 hover:text-white'
+              }`}
               title={isFullscreen ? 'Exit Fullscreen (F)' : 'Fullscreen (F)'}
             >
               {isFullscreen ? (
-                <Minimize className="w-4 h-4 text-white" />
+                <Minimize className="w-4 h-4 text-cyan-300" />
               ) : (
                 <Maximize className="w-4 h-4 text-white" />
               )}

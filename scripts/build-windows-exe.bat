@@ -33,3 +33,4 @@ echo    src-tauri\target\release\
 echo    src-tauri\target\release\bundle\nsis\
 echo =========================================================================
 pause
+

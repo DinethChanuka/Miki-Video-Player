@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { usePlayerStore } from './store/playerStore';
+import { usePlayerStore, MediaHistoryItem } from './store/playerStore';
 import { PLAYER_THEMES } from './types/theme';
 import { AmbientCanvas } from './components/ambient/AmbientCanvas';
 import { ControlsOverlay } from './components/hud/ControlsOverlay';
 import { EqualizerModal } from './components/hud/EqualizerModal';
 import { VideoSettingsModal } from './components/hud/VideoSettingsModal';
 import { FileBrowserModal } from './components/hud/FileBrowserModal';
+import { ResumeChoiceModal } from './components/hud/ResumeChoiceModal';
 import { ErrorToast } from './components/hud/ErrorToast';
 import { SplashScreen } from './components/splash/SplashScreen';
 import { usePlayerGestures } from './hooks/usePlayerGestures';
@@ -78,15 +79,88 @@ export const App: React.FC = () => {
   const resumeBannerPositionMs = usePlayerStore((s) => s.resumeBannerPositionMs);
   const seek = usePlayerStore((s) => s.seek);
   const themeId = usePlayerStore((s) => s.themeId);
+  const shaderConfig = usePlayerStore((s) => s.shaderConfig);
+  const saveCurrentThumbnail = usePlayerStore((s) => s.saveCurrentThumbnail);
+  const playNextMedia = usePlayerStore((s) => s.playNextMedia);
+  const playPreviousMedia = usePlayerStore((s) => s.playPreviousMedia);
 
   const theme = PLAYER_THEMES[themeId] || PLAYER_THEMES.cyberpunk;
 
   const [isEqOpen, setIsEqOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isFileBrowserOpen, setIsFileBrowserOpen] = useState(false);
+  const [pendingResumeItem, setPendingResumeItem] = useState<MediaHistoryItem | null>(null);
+  const [isResumeChoiceOpen, setIsResumeChoiceOpen] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
   const [areControlsVisible, setAreControlsVisible] = useState(true);
   const hideControlsTimerRef = useRef<number | null>(null);
+  const lastThumbCaptureTimeRef = useRef<number>(0);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const isDraggingSplitterRef = useRef(false);
+
+  const handleSplitterMouseDown = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    isDraggingSplitterRef.current = true;
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDraggingSplitterRef.current || !viewportRef.current) return;
+      const rect = viewportRef.current.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const pct = Math.min(95, Math.max(5, (x / rect.width) * 100));
+      usePlayerStore.getState().setSplitCompare(true, Math.round(pct));
+    };
+
+    const handleMouseUp = () => {
+      isDraggingSplitterRef.current = false;
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
+
+  const handleCardClick = (item: MediaHistoryItem) => {
+    if (item.lastPositionMs && item.lastPositionMs > 1000) {
+      setPendingResumeItem(item);
+      setIsResumeChoiceOpen(true);
+    } else {
+      openMedia(item.uri, item.title, false);
+    }
+  };
+
+  const handleConfirmResume = (item: MediaHistoryItem) => {
+    setIsResumeChoiceOpen(false);
+    setPendingResumeItem(null);
+    openMedia(item.uri, item.title, true);
+  };
+
+  const handleConfirmRestart = (item: MediaHistoryItem) => {
+    setIsResumeChoiceOpen(false);
+    setPendingResumeItem(null);
+    openMedia(item.uri, item.title, false);
+  };
+
+  // Auto-capture video thumbnail of the stopped point
+  const captureCurrentVideoFrame = useCallback(() => {
+    const v = videoRef.current;
+    if (!v || v.videoWidth === 0 || v.videoHeight === 0) return;
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = 320;
+      canvas.height = Math.round((320 * v.videoHeight) / v.videoWidth) || 180;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+      saveCurrentThumbnail(dataUrl);
+    } catch {}
+  }, [saveCurrentThumbnail]);
 
   const resetControlsTimer = useCallback(() => {
     setAreControlsVisible(true);
@@ -213,12 +287,24 @@ export const App: React.FC = () => {
           e.preventDefault();
           setIsSettingsOpen((prev) => !prev);
           break;
+        case 'n':
+          if (e.shiftKey) {
+            e.preventDefault();
+            playNextMedia();
+          }
+          break;
+        case 'p':
+          if (e.shiftKey) {
+            e.preventDefault();
+            playPreviousMedia();
+          }
+          break;
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [seek, resetControlsTimer]);
+  }, [seek, resetControlsTimer, playNextMedia, playPreviousMedia]);
 
   const handleOpenLocalFileDialog = () => {
     if (
@@ -297,7 +383,10 @@ export const App: React.FC = () => {
         >
           {currentUri ? (
             <button
-              onClick={closeMedia}
+              onClick={() => {
+                captureCurrentVideoFrame();
+                closeMedia();
+              }}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-white/5 hover:bg-white/15 border border-white/10 text-xs font-semibold text-white/90 hover:text-white transition-all active:scale-95 shadow-sm"
               title="Return to Library / Home"
             >
@@ -362,10 +451,11 @@ export const App: React.FC = () => {
             <FolderOpen className="w-3.5 h-3.5 text-cyan-400" />
             <span>Library</span>
           </button>
+
           <button
             onClick={() => setIsSettingsOpen(true)}
             className="text-xs text-white/80 hover:text-white p-2 rounded-2xl bg-white/5 hover:bg-white/15 border border-white/10 transition-colors active:scale-95"
-            title="Themes, Shaders & Settings"
+            title="Themes, 3D Sound, Clarity & Settings"
           >
             <Settings className="w-3.5 h-3.5 text-fuchsia-400" />
           </button>
@@ -414,49 +504,114 @@ export const App: React.FC = () => {
             />
           </div>
         ) : activeEngineType === 'web-media' ? (
-          <video
-            id="aether-video-viewport"
-            ref={videoRef}
-            className="w-full h-full object-contain z-10 cursor-pointer"
-            playsInline
-            preload="auto"
-            onClick={() => usePlayerStore.getState().togglePlay()}
-            onPlay={() => usePlayerStore.setState({ isPaused: false })}
-            onPause={() => usePlayerStore.setState({ isPaused: true })}
-            onEnded={() => usePlayerStore.setState({ isPaused: true })}
-            onTimeUpdate={(e) => {
-              const v = e.currentTarget;
-              usePlayerStore.setState({
-                positionMs: Math.round(v.currentTime * 1000),
-                durationMs: Math.round((v.duration || 0) * 1000),
-              });
-            }}
-          />
+          <div ref={viewportRef} className="relative w-full h-full flex items-center justify-center overflow-hidden">
+            <video
+              id="aether-video-viewport"
+              ref={videoRef}
+              className="w-full h-full object-contain z-10 cursor-pointer"
+              playsInline
+              preload="auto"
+              onClick={() => usePlayerStore.getState().togglePlay()}
+              onPlay={() => usePlayerStore.setState({ isPaused: false })}
+              onPause={() => {
+                usePlayerStore.setState({ isPaused: true });
+                captureCurrentVideoFrame();
+              }}
+              onEnded={() => {
+                usePlayerStore.setState({ isPaused: true });
+                captureCurrentVideoFrame();
+              }}
+              onTimeUpdate={(e) => {
+                const v = e.currentTarget;
+                const pos = Math.round(v.currentTime * 1000);
+                usePlayerStore.setState({
+                  positionMs: pos,
+                  durationMs: Math.round((v.duration || 0) * 1000),
+                });
+
+                // Periodically capture frame thumbnail (every 5 seconds)
+                if (Date.now() - lastThumbCaptureTimeRef.current > 5000) {
+                  lastThumbCaptureTimeRef.current = Date.now();
+                  captureCurrentVideoFrame();
+                }
+              }}
+            />
+
+            {/* Split-Screen Compare Mode: Draggable Divider & Unclipped Comparison */}
+            {shaderConfig.splitCompareEnabled && (
+              <>
+                {/* Clarity AI Enhanced Right Side Filter Overlay */}
+                <div
+                  className="absolute inset-0 pointer-events-none z-20 backdrop-filter"
+                  style={{
+                    clipPath: `polygon(${shaderConfig.splitComparePosition}% 0, 100% 0, 100% 100%, ${shaderConfig.splitComparePosition}% 100%)`,
+                    backdropFilter: 'contrast(135%) brightness(108%) saturate(120%)',
+                    WebkitBackdropFilter: 'contrast(135%) brightness(108%) saturate(120%)',
+                  }}
+                />
+
+                {/* Unclipped High-Visibility Badges & Interactive Divider Line */}
+                <div className="absolute inset-0 pointer-events-none z-30">
+                  <div className="absolute top-4 left-4 px-3 py-1.5 rounded-xl bg-black/80 backdrop-blur-md text-[10px] font-mono font-bold text-white/90 border border-white/20 shadow-lg flex items-center gap-1.5 pointer-events-auto">
+                    <span className="w-2 h-2 rounded-full bg-white/40" />
+                    <span>ORIGINAL (LEFT)</span>
+                  </div>
+                  <div className="absolute top-4 right-4 px-3 py-1.5 rounded-xl bg-cyan-950/85 backdrop-blur-md text-[10px] font-mono font-bold text-cyan-300 border border-cyan-400/40 shadow-lg flex items-center gap-1.5 pointer-events-auto">
+                    <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                    <span>CLARITY AI (RIGHT)</span>
+                  </div>
+
+                  {/* Interactive Draggable Splitter Line & Knob */}
+                  <div
+                    className="absolute top-0 bottom-0 pointer-events-auto cursor-ew-resize group select-none"
+                    style={{
+                      left: `${shaderConfig.splitComparePosition}%`,
+                      transform: 'translateX(-50%)',
+                      width: '32px',
+                    }}
+                    onMouseDown={handleSplitterMouseDown}
+                    title="Drag left/right to compare Before/After"
+                  >
+                    {/* Glowing vertical line */}
+                    <div className="w-1 h-full mx-auto bg-gradient-to-b from-cyan-400 via-fuchsia-400 to-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.95)] group-hover:w-1.5 transition-all" />
+
+                    {/* Centered Grabbable Knob */}
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-slate-950 border-2 border-cyan-400 group-hover:border-fuchsia-400 flex items-center justify-center shadow-[0_0_20px_rgba(34,211,238,0.7)] group-hover:scale-110 active:scale-95 transition-all">
+                      <div className="flex items-center gap-0.5 pointer-events-none">
+                        <div className="w-0.5 h-3.5 bg-cyan-400 rounded-full" />
+                        <div className="w-0.5 h-3.5 bg-fuchsia-400 rounded-full" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
         ) : (
           <div className="w-full h-full pointer-events-none z-10" />
         )}
 
-        {/* Home View / Recently Viewed Cards & Welcome Screen */}
+        {/* Home View / Top-Aligned Jump Back In & Card Previews */}
         {!currentUri && (
-          <div className="absolute inset-0 z-30 flex flex-col items-center justify-center p-6 sm:p-10 pointer-events-auto bg-black/70 backdrop-blur-md animate-in fade-in duration-300 overflow-y-auto">
+          <div className="absolute inset-0 z-30 flex flex-col items-center justify-start pt-6 sm:pt-8 pb-12 px-6 sm:px-10 pointer-events-auto bg-black/75 backdrop-blur-md animate-in fade-in duration-300 overflow-y-auto">
             {recentMedia.length > 0 ? (
-              /* Rich Card Grid for Recently Viewed Videos with Timeline Percentage */
-              <div className="w-full max-w-5xl flex flex-col gap-6 py-6">
-                {/* Top Action Bar */}
+              /* Rich Card Grid: Stopped-Point Video Preview Thumbnail, No Paths/URLs */
+              <div className="w-full max-w-6xl flex flex-col gap-6">
+                {/* Header Action Bar */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/10">
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3.5">
                     <div
                       className={`p-3 rounded-2xl bg-gradient-to-r ${theme.accentGradient} text-white shadow-lg`}
-                      style={{ boxShadow: `0 0 15px ${theme.haloGlow}` }}
+                      style={{ boxShadow: `0 0 18px ${theme.haloGlow}` }}
                     >
                       <Film className="w-6 h-6 fill-white" />
                     </div>
                     <div>
-                      <h2 className="text-xl font-extrabold text-white tracking-tight">
+                      <h2 className="text-2xl font-extrabold text-white tracking-tight">
                         Jump Back In
                       </h2>
                       <p className="text-xs text-white/50">
-                        Pick up right where you left off with 1-click instant resume
+                        Pick up right where you left off with stopped-point frame previews
                       </p>
                     </div>
                   </div>
@@ -492,25 +647,54 @@ export const App: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Cards Grid with Progress Bars & Percentage */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {/* Cards Grid: Preview Image of Stopped Point, No Path/URL shown */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                   {recentMedia.map((item) => {
                     const percent = Math.min(100, Math.max(0, item.progressPercent || 0));
 
                     return (
                       <div
                         key={item.mediaId}
-                        className={`group relative rounded-3xl p-5 border transition-all duration-300 flex flex-col justify-between gap-4 bg-white/5 hover:bg-white/10 ${theme.glassBorder} shadow-xl hover:shadow-2xl hover:scale-[1.01]`}
+                        onClick={() => handleCardClick(item)}
+                        className={`group relative rounded-3xl p-4 border transition-all duration-300 flex flex-col gap-3.5 bg-white/5 hover:bg-white/10 ${theme.glassBorder} shadow-xl hover:shadow-2xl hover:scale-[1.015] cursor-pointer`}
                         style={{
-                          boxShadow: `0 10px 30px rgba(0, 0, 0, 0.5)`,
+                          boxShadow: `0 12px 35px rgba(0, 0, 0, 0.55)`,
                         }}
                       >
-                        {/* Title & Metadata */}
+                        {/* 16:9 Stopped-Point Video Preview Thumbnail */}
+                        <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-black/60 border border-white/10 group-hover:border-cyan-400/40 transition-colors">
+                          {item.thumbnailUri ? (
+                            <img
+                              src={item.thumbnailUri}
+                              alt={item.title}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 to-black text-white/30 gap-2">
+                              <Film className="w-8 h-8 opacity-40 text-cyan-400" />
+                              <span className="text-[10px] font-mono">Video Preview</span>
+                            </div>
+                          )}
+
+                          {/* Hover Play Glow Overlay */}
+                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="p-3.5 rounded-2xl bg-cyan-500/90 text-white shadow-xl shadow-cyan-500/40 scale-95 group-hover:scale-105 transition-transform">
+                              <Play className="w-6 h-6 fill-white translate-x-0.5" />
+                            </div>
+                          </div>
+
+                          {/* Stopped Position & Duration Badge */}
+                          <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded-lg bg-black/80 backdrop-blur-md text-[10px] font-mono font-bold text-white/90 border border-white/15">
+                            {formatTime(item.lastPositionMs)} / {formatTime(item.durationMs)}
+                          </div>
+                        </div>
+
+                        {/* Title & Watched Percentage Badge (NO Path or URL shown) */}
                         <div className="flex flex-col gap-2">
                           <div className="flex items-start justify-between gap-2">
-                            <span className="text-sm font-bold text-white group-hover:text-cyan-300 transition-colors line-clamp-2 leading-snug">
+                            <h3 className="text-sm font-bold text-white group-hover:text-cyan-300 transition-colors line-clamp-2 leading-snug">
                               {item.title}
-                            </span>
+                            </h3>
                             <span
                               className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg shrink-0 ${
                                 percent > 80
@@ -521,30 +705,23 @@ export const App: React.FC = () => {
                               {percent.toFixed(0)}% watched
                             </span>
                           </div>
-                          <span className="text-[11px] font-mono text-white/40 truncate">
-                            {item.uri}
-                          </span>
                         </div>
 
-                        {/* Interactive Progress Bar */}
-                        <div className="flex flex-col gap-1.5">
-                          <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden p-0.5 border border-white/5">
-                            <div
-                              className={`h-full rounded-full bg-gradient-to-r ${theme.timelineTrack} transition-all duration-300`}
-                              style={{ width: `${percent}%` }}
-                            />
-                          </div>
-
-                          <div className="flex items-center justify-between text-[11px] font-mono text-white/50">
-                            <span>{formatTime(item.lastPositionMs)}</span>
-                            <span>{formatTime(item.durationMs)}</span>
-                          </div>
+                        {/* Theme-Gradient Progress Bar */}
+                        <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden p-0.5 border border-white/5">
+                          <div
+                            className={`h-full rounded-full bg-gradient-to-r ${theme.timelineTrack} transition-all duration-300`}
+                            style={{ width: `${percent}%` }}
+                          />
                         </div>
 
                         {/* Card Actions: Resume & Remove */}
                         <div className="flex items-center justify-between pt-2 border-t border-white/10">
                           <button
-                            onClick={() => openMedia(item.uri, item.title, true)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCardClick(item);
+                            }}
                             className={`px-4 py-2 rounded-2xl bg-gradient-to-r ${theme.accentGradient} text-white font-bold text-xs flex items-center gap-1.5 shadow-md hover:brightness-110 active:scale-95 transition-all`}
                           >
                             <Play className="w-3.5 h-3.5 fill-white" />
@@ -570,7 +747,7 @@ export const App: React.FC = () => {
             ) : (
               /* Welcome Screen when History is Empty */
               <div
-                className={`p-10 rounded-3xl backdrop-blur-2xl flex flex-col items-center gap-6 text-center max-w-lg border shadow-2xl ${theme.glassBg} ${theme.glassBorder}`}
+                className={`p-10 rounded-3xl backdrop-blur-2xl flex flex-col items-center gap-6 text-center max-w-lg border shadow-2xl mt-12 ${theme.glassBg} ${theme.glassBorder}`}
                 style={{
                   boxShadow: `0 20px 50px rgba(0, 0, 0, 0.7), 0 0 35px ${theme.haloGlow}`,
                 }}
@@ -585,7 +762,7 @@ export const App: React.FC = () => {
                 <div>
                   <h1 className="text-3xl font-extrabold tracking-tight text-white">Miki Player</h1>
                   <p className="text-sm text-white/60 mt-2 leading-relaxed">
-                    Ultra-modern, cross-platform multimedia player with 200% VLC overdrive, real-time ambient glow, and YouTube stream optimizer.
+                    Ultra-modern, cross-platform multimedia player with 3D Spatial Audio, 200% VLC overdrive, Anime4K Super-Resolution, and YouTube stream optimizer.
                   </p>
                 </div>
 
@@ -676,6 +853,16 @@ export const App: React.FC = () => {
         onOpenEq={() => setIsEqOpen(true)}
       />
       <FileBrowserModal isOpen={isFileBrowserOpen} onClose={() => setIsFileBrowserOpen(false)} />
+      <ResumeChoiceModal
+        isOpen={isResumeChoiceOpen}
+        item={pendingResumeItem}
+        onClose={() => {
+          setIsResumeChoiceOpen(false);
+          setPendingResumeItem(null);
+        }}
+        onResume={handleConfirmResume}
+        onRestart={handleConfirmRestart}
+      />
       <ErrorToast />
 
       {/* Cinematic Startup Video Splash Loader */}
