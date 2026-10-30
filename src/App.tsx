@@ -1,13 +1,12 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { usePlayerStore } from './store/playerStore';
+import { usePlayerStore, MediaHistoryItem } from './store/playerStore';
 import { PLAYER_THEMES } from './types/theme';
 import { AmbientCanvas } from './components/ambient/AmbientCanvas';
 import { ControlsOverlay } from './components/hud/ControlsOverlay';
 import { EqualizerModal } from './components/hud/EqualizerModal';
 import { VideoSettingsModal } from './components/hud/VideoSettingsModal';
 import { FileBrowserModal } from './components/hud/FileBrowserModal';
-import { SpatialAudioModal } from './components/hud/SpatialAudioModal';
-import { VideoQualityModal } from './components/hud/VideoQualityModal';
+import { ResumeChoiceModal } from './components/hud/ResumeChoiceModal';
 import { ErrorToast } from './components/hud/ErrorToast';
 import { SplashScreen } from './components/splash/SplashScreen';
 import { usePlayerGestures } from './hooks/usePlayerGestures';
@@ -20,7 +19,6 @@ import {
   Trash2,
   Film,
   Plus,
-  Headphones,
 } from 'lucide-react';
 
 export function parseYouTubeId(url: string | null): string | null {
@@ -91,12 +89,62 @@ export const App: React.FC = () => {
   const [isEqOpen, setIsEqOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isFileBrowserOpen, setIsFileBrowserOpen] = useState(false);
-  const [isSpatialAudioOpen, setIsSpatialAudioOpen] = useState(false);
-  const [isVideoQualityOpen, setIsVideoQualityOpen] = useState(false);
+  const [pendingResumeItem, setPendingResumeItem] = useState<MediaHistoryItem | null>(null);
+  const [isResumeChoiceOpen, setIsResumeChoiceOpen] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
   const [areControlsVisible, setAreControlsVisible] = useState(true);
   const hideControlsTimerRef = useRef<number | null>(null);
   const lastThumbCaptureTimeRef = useRef<number>(0);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const isDraggingSplitterRef = useRef(false);
+
+  const handleSplitterMouseDown = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    isDraggingSplitterRef.current = true;
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDraggingSplitterRef.current || !viewportRef.current) return;
+      const rect = viewportRef.current.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const pct = Math.min(95, Math.max(5, (x / rect.width) * 100));
+      usePlayerStore.getState().setSplitCompare(true, Math.round(pct));
+    };
+
+    const handleMouseUp = () => {
+      isDraggingSplitterRef.current = false;
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
+
+  const handleCardClick = (item: MediaHistoryItem) => {
+    if (item.lastPositionMs && item.lastPositionMs > 1000) {
+      setPendingResumeItem(item);
+      setIsResumeChoiceOpen(true);
+    } else {
+      openMedia(item.uri, item.title, false);
+    }
+  };
+
+  const handleConfirmResume = (item: MediaHistoryItem) => {
+    setIsResumeChoiceOpen(false);
+    setPendingResumeItem(null);
+    openMedia(item.uri, item.title, true);
+  };
+
+  const handleConfirmRestart = (item: MediaHistoryItem) => {
+    setIsResumeChoiceOpen(false);
+    setPendingResumeItem(null);
+    openMedia(item.uri, item.title, false);
+  };
 
   // Auto-capture video thumbnail of the stopped point
   const captureCurrentVideoFrame = useCallback(() => {
@@ -397,24 +445,6 @@ export const App: React.FC = () => {
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
           <button
-            onClick={() => setIsSpatialAudioOpen(true)}
-            className="text-xs text-cyan-300 hover:text-white px-3 py-1.5 rounded-2xl bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-400/30 transition-colors font-medium flex items-center gap-1.5 active:scale-95"
-            title="3D Spatial Audio & Speaker Sound System"
-          >
-            <Headphones className="w-3.5 h-3.5 text-cyan-400" />
-            <span className="hidden md:inline">3D Sound</span>
-          </button>
-
-          <button
-            onClick={() => setIsVideoQualityOpen(true)}
-            className="text-xs text-fuchsia-300 hover:text-white px-3 py-1.5 rounded-2xl bg-fuchsia-500/10 hover:bg-fuchsia-500/20 border border-fuchsia-400/30 transition-colors font-medium flex items-center gap-1.5 active:scale-95"
-            title="Video Super-Resolution & Clarity Engine"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-fuchsia-400" />
-            <span className="hidden md:inline">Clarity AI</span>
-          </button>
-
-          <button
             onClick={() => setIsFileBrowserOpen(true)}
             className="text-xs text-white/80 hover:text-white px-3 py-1.5 rounded-2xl bg-white/5 hover:bg-white/15 border border-white/10 transition-colors font-medium flex items-center gap-1.5 active:scale-95"
           >
@@ -425,7 +455,7 @@ export const App: React.FC = () => {
           <button
             onClick={() => setIsSettingsOpen(true)}
             className="text-xs text-white/80 hover:text-white p-2 rounded-2xl bg-white/5 hover:bg-white/15 border border-white/10 transition-colors active:scale-95"
-            title="Themes, Shaders & Settings"
+            title="Themes, 3D Sound, Clarity & Settings"
           >
             <Settings className="w-3.5 h-3.5 text-fuchsia-400" />
           </button>
@@ -474,7 +504,7 @@ export const App: React.FC = () => {
             />
           </div>
         ) : activeEngineType === 'web-media' ? (
-          <div className="relative w-full h-full flex items-center justify-center">
+          <div ref={viewportRef} className="relative w-full h-full flex items-center justify-center overflow-hidden">
             <video
               id="aether-video-viewport"
               ref={videoRef}
@@ -507,25 +537,54 @@ export const App: React.FC = () => {
               }}
             />
 
-            {/* Split-Screen Compare Mode Indicator & Line */}
+            {/* Split-Screen Compare Mode: Draggable Divider & Unclipped Comparison */}
             {shaderConfig.splitCompareEnabled && (
-              <div
-                className="absolute inset-0 pointer-events-none z-20"
-                style={{
-                  clipPath: `polygon(0 0, ${shaderConfig.splitComparePosition}% 0, ${shaderConfig.splitComparePosition}% 100%, 0 100%)`,
-                }}
-              >
+              <>
+                {/* Clarity AI Enhanced Right Side Filter Overlay */}
                 <div
-                  className="absolute top-0 bottom-0 w-0.5 bg-purple-400 shadow-[0_0_10px_#c084fc]"
-                  style={{ left: `${shaderConfig.splitComparePosition}%` }}
+                  className="absolute inset-0 pointer-events-none z-20 backdrop-filter"
+                  style={{
+                    clipPath: `polygon(${shaderConfig.splitComparePosition}% 0, 100% 0, 100% 100%, ${shaderConfig.splitComparePosition}% 100%)`,
+                    backdropFilter: 'contrast(135%) brightness(108%) saturate(120%)',
+                    WebkitBackdropFilter: 'contrast(135%) brightness(108%) saturate(120%)',
+                  }}
                 />
-                <div className="absolute top-4 left-4 px-3 py-1 rounded-xl bg-black/70 backdrop-blur-md text-[10px] font-mono font-bold text-white/80 border border-white/20">
-                  ORIGINAL SOURCE (LEFT)
+
+                {/* Unclipped High-Visibility Badges & Interactive Divider Line */}
+                <div className="absolute inset-0 pointer-events-none z-30">
+                  <div className="absolute top-4 left-4 px-3 py-1.5 rounded-xl bg-black/80 backdrop-blur-md text-[10px] font-mono font-bold text-white/90 border border-white/20 shadow-lg flex items-center gap-1.5 pointer-events-auto">
+                    <span className="w-2 h-2 rounded-full bg-white/40" />
+                    <span>ORIGINAL (LEFT)</span>
+                  </div>
+                  <div className="absolute top-4 right-4 px-3 py-1.5 rounded-xl bg-cyan-950/85 backdrop-blur-md text-[10px] font-mono font-bold text-cyan-300 border border-cyan-400/40 shadow-lg flex items-center gap-1.5 pointer-events-auto">
+                    <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                    <span>CLARITY AI (RIGHT)</span>
+                  </div>
+
+                  {/* Interactive Draggable Splitter Line & Knob */}
+                  <div
+                    className="absolute top-0 bottom-0 pointer-events-auto cursor-ew-resize group select-none"
+                    style={{
+                      left: `${shaderConfig.splitComparePosition}%`,
+                      transform: 'translateX(-50%)',
+                      width: '32px',
+                    }}
+                    onMouseDown={handleSplitterMouseDown}
+                    title="Drag left/right to compare Before/After"
+                  >
+                    {/* Glowing vertical line */}
+                    <div className="w-1 h-full mx-auto bg-gradient-to-b from-cyan-400 via-fuchsia-400 to-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.95)] group-hover:w-1.5 transition-all" />
+
+                    {/* Centered Grabbable Knob */}
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-slate-950 border-2 border-cyan-400 group-hover:border-fuchsia-400 flex items-center justify-center shadow-[0_0_20px_rgba(34,211,238,0.7)] group-hover:scale-110 active:scale-95 transition-all">
+                      <div className="flex items-center gap-0.5 pointer-events-none">
+                        <div className="w-0.5 h-3.5 bg-cyan-400 rounded-full" />
+                        <div className="w-0.5 h-3.5 bg-fuchsia-400 rounded-full" />
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div className="absolute top-4 right-4 px-3 py-1 rounded-xl bg-purple-950/80 backdrop-blur-md text-[10px] font-mono font-bold text-purple-300 border border-purple-400/30">
-                  SUPER-RESOLUTION CLARITY (RIGHT)
-                </div>
-              </div>
+              </>
             )}
           </div>
         ) : (
@@ -596,7 +655,7 @@ export const App: React.FC = () => {
                     return (
                       <div
                         key={item.mediaId}
-                        onClick={() => openMedia(item.uri, item.title, true)}
+                        onClick={() => handleCardClick(item)}
                         className={`group relative rounded-3xl p-4 border transition-all duration-300 flex flex-col gap-3.5 bg-white/5 hover:bg-white/10 ${theme.glassBorder} shadow-xl hover:shadow-2xl hover:scale-[1.015] cursor-pointer`}
                         style={{
                           boxShadow: `0 12px 35px rgba(0, 0, 0, 0.55)`,
@@ -661,7 +720,7 @@ export const App: React.FC = () => {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              openMedia(item.uri, item.title, true);
+                              handleCardClick(item);
                             }}
                             className={`px-4 py-2 rounded-2xl bg-gradient-to-r ${theme.accentGradient} text-white font-bold text-xs flex items-center gap-1.5 shadow-md hover:brightness-110 active:scale-95 transition-all`}
                           >
@@ -780,8 +839,6 @@ export const App: React.FC = () => {
             onOpenEq={() => setIsEqOpen(true)}
             onOpenSettings={() => setIsSettingsOpen(true)}
             onOpenFileBrowser={() => setIsFileBrowserOpen(true)}
-            onOpenSpatialAudio={() => setIsSpatialAudioOpen(true)}
-            onOpenVideoQuality={() => setIsVideoQualityOpen(true)}
             containerRef={containerRef}
             isVisible={areControlsVisible}
           />
@@ -790,14 +847,22 @@ export const App: React.FC = () => {
 
       {/* Modals */}
       <EqualizerModal isOpen={isEqOpen} onClose={() => setIsEqOpen(false)} />
-      <SpatialAudioModal isOpen={isSpatialAudioOpen} onClose={() => setIsSpatialAudioOpen(false)} />
-      <VideoQualityModal isOpen={isVideoQualityOpen} onClose={() => setIsVideoQualityOpen(false)} />
       <VideoSettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         onOpenEq={() => setIsEqOpen(true)}
       />
       <FileBrowserModal isOpen={isFileBrowserOpen} onClose={() => setIsFileBrowserOpen(false)} />
+      <ResumeChoiceModal
+        isOpen={isResumeChoiceOpen}
+        item={pendingResumeItem}
+        onClose={() => {
+          setIsResumeChoiceOpen(false);
+          setPendingResumeItem(null);
+        }}
+        onResume={handleConfirmResume}
+        onRestart={handleConfirmRestart}
+      />
       <ErrorToast />
 
       {/* Cinematic Startup Video Splash Loader */}

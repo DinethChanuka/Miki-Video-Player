@@ -21,8 +21,6 @@ import {
   Settings,
   FolderOpen,
   Repeat,
-  Headphones,
-  Sparkles,
   Camera,
 } from 'lucide-react';
 
@@ -30,8 +28,6 @@ interface ControlsOverlayProps {
   onOpenEq: () => void;
   onOpenSettings: () => void;
   onOpenFileBrowser: () => void;
-  onOpenSpatialAudio?: () => void;
-  onOpenVideoQuality?: () => void;
   containerRef: React.RefObject<HTMLDivElement | null>;
   isVisible?: boolean;
 }
@@ -40,8 +36,6 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
   onOpenEq,
   onOpenSettings,
   onOpenFileBrowser,
-  onOpenSpatialAudio,
-  onOpenVideoQuality,
   containerRef,
   isVisible = true,
 }) => {
@@ -299,32 +293,8 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
             </div>
           </div>
 
-          {/* Right Controls: 3D Audio, Resolution, Loop, Speed, EQ, Tracks, Fullscreen */}
+          {/* Right Controls: Loop, Speed, EQ, Tracks, Fullscreen */}
           <div className="flex items-center gap-2">
-            {/* 3D Spatial Audio & Multi-Speaker Sound System Button */}
-            {onOpenSpatialAudio && (
-              <button
-                onClick={onOpenSpatialAudio}
-                className="p-2.5 rounded-2xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-400/30 text-cyan-300 hover:text-white transition-all active:scale-95 flex items-center gap-1.5 shadow-sm"
-                title="3D Spatial Audio & 5.1/7.1 Multi-Speaker Manager"
-              >
-                <Headphones className="w-4 h-4 text-cyan-400" />
-                <span className="hidden xl:inline text-xs font-bold font-mono">3D Audio</span>
-              </button>
-            )}
-
-            {/* Video Resolution, Clarity & Super-Resolution Button */}
-            {onOpenVideoQuality && (
-              <button
-                onClick={onOpenVideoQuality}
-                className="p-2.5 rounded-2xl bg-fuchsia-500/15 hover:bg-fuchsia-500/25 border border-fuchsia-400/30 text-fuchsia-300 hover:text-white transition-all active:scale-95 flex items-center gap-1.5 shadow-sm"
-                title="Video Resolution & Super-Resolution Clarity"
-              >
-                <Sparkles className="w-4 h-4 text-fuchsia-400" />
-                <span className="hidden xl:inline text-xs font-bold font-mono">Clarity AI</span>
-              </button>
-            )}
-
             {/* Lossless Snapshot Button */}
             <button
               onClick={takeSnapshot}

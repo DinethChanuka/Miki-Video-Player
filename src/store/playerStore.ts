@@ -511,17 +511,23 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
 
     // Record and persist to recent media (both web/local & Tauri)
     const existingRecent = get().recentMedia;
+    const existingItem = existingRecent.find((m) => m.uri === uri);
+    const savedPos = existingItem?.lastPositionMs ?? 0;
+    if (!isTauriRuntime()) {
+      startPos = autoResume ? savedPos : 0;
+    }
     const mediaId = uri;
     const newHistoryItem: MediaHistoryItem = {
       mediaId,
       uri,
       title: resolvedTitle,
-      durationMs: 0,
-      lastPositionMs: startPos,
-      progressPercent: 0,
+      durationMs: existingItem?.durationMs ?? 0,
+      lastPositionMs: startPos > 0 ? startPos : (existingItem?.lastPositionMs ?? 0),
+      progressPercent: existingItem?.progressPercent ?? 0,
       isCompleted: false,
-      playCount: ((existingRecent.find((m) => m.uri === uri)?.playCount) ?? 0) + 1,
+      playCount: (existingItem?.playCount ?? 0) + 1,
       lastPlayedAt: Date.now(),
+      thumbnailUri: existingItem?.thumbnailUri,
     };
 
     const updatedRecent = [
@@ -574,7 +580,13 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     }
 
     // Web / Standalone mode
-    set({ currentUri: uri, currentTitle: resolvedTitle, retryCount: 0, lastError: null });
+    set({
+      currentUri: uri,
+      currentTitle: resolvedTitle,
+      retryCount: 0,
+      lastError: null,
+      resumeBannerPositionMs: null,
+    });
     await get().engine?.load(uri, startPos);
     await get().engine?.play();
   },

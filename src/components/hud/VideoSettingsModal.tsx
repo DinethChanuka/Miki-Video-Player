@@ -1,13 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { usePlayerStore } from '../../store/playerStore';
 import { PLAYER_THEMES, PlayerThemeId } from '../../types/theme';
+import { SpeakerLevels, SpatialProfileId } from '../../core/SpatialAudioEngine';
+import { VideoShaderConfig } from '../../core/PlayerEngine';
 import {
   X,
   Camera,
   Repeat,
   Tv,
-  Sun,
-  Contrast,
   SlidersHorizontal,
   Sparkles,
   Ratio,
@@ -15,32 +15,185 @@ import {
   Check,
   ShieldCheck,
   Zap,
+  Headphones,
+  Radio,
+  RotateCcw,
+  Volume2,
+  VolumeX,
+  Split,
+  Eye,
 } from 'lucide-react';
 
 interface VideoSettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   onOpenEq: () => void;
+  initialTab?: 'themes' | 'clarity' | 'spatial' | 'tools';
 }
 
 export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
   isOpen,
   onClose,
   onOpenEq,
+  initialTab = 'themes',
 }) => {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const isDraggingRef = useRef(false);
+
+  const themeId = usePlayerStore((s) => s.themeId);
+  const setTheme = usePlayerStore((s) => s.setTheme);
+  const currentTheme = PLAYER_THEMES[themeId] || PLAYER_THEMES.cyberpunk;
+
   const shaderConfig = usePlayerStore((s) => s.shaderConfig);
   const updateShaderConfig = usePlayerStore((s) => s.updateShaderConfig);
   const isLooping = usePlayerStore((s) => s.isLooping);
   const toggleLoop = usePlayerStore((s) => s.toggleLoop);
   const takeSnapshot = usePlayerStore((s) => s.takeSnapshot);
-  const themeId = usePlayerStore((s) => s.themeId);
-  const setTheme = usePlayerStore((s) => s.setTheme);
 
-  const [activeTab, setActiveTab] = useState<'themes' | 'quality' | 'tools'>('themes');
+  const spatialState = usePlayerStore((s) => s.spatialState);
+  const setSpatialAudioEnabled = usePlayerStore((s) => s.setSpatialAudioEnabled);
+  const setSpatialProfile = usePlayerStore((s) => s.setSpatialProfile);
+  const setSpatialCoordinates = usePlayerStore((s) => s.setSpatialCoordinates);
+  const setSpeakerVolume = usePlayerStore((s) => s.setSpeakerVolume);
+  const setLfeCrossover = usePlayerStore((s) => s.setLfeCrossover);
+
+  const [activeTab, setActiveTab] = useState<'themes' | 'clarity' | 'spatial' | 'tools'>(initialTab);
+
+  // Draw 3D Soundstage Radar Canvas
+  const drawSoundstage = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const w = canvas.width;
+    const h = canvas.height;
+    const cx = w / 2;
+    const cy = h / 2;
+    const r = Math.min(cx, cy) - 24;
+
+    ctx.clearRect(0, 0, w, h);
+
+    // Radial background
+    const bgGrad = ctx.createRadialGradient(cx, cy, 10, cx, cy, r);
+    bgGrad.addColorStop(0, 'rgba(6, 182, 212, 0.08)');
+    bgGrad.addColorStop(1, 'rgba(2, 6, 23, 0.6)');
+    ctx.fillStyle = bgGrad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Radar Concentric Circles
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+    ctx.lineWidth = 1;
+    [0.33, 0.66, 1.0].forEach((ratio) => {
+      ctx.beginPath();
+      ctx.arc(cx, cy, r * ratio, 0, Math.PI * 2);
+      ctx.stroke();
+    });
+
+    // Crosshairs
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(cx - r, cy);
+    ctx.lineTo(cx + r, cy);
+    ctx.moveTo(cx, cy - r);
+    ctx.lineTo(cx, cy + r);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Speaker Positions around perimeter
+    const speakers = [
+      { label: 'FL', angle: -Math.PI / 4, color: '#38bdf8' },
+      { label: 'C', angle: -Math.PI / 2, color: '#a855f7' },
+      { label: 'FR', angle: -3 * Math.PI / 4, color: '#38bdf8' },
+      { label: 'SR', angle: 3 * Math.PI / 4, color: '#06b6d4' },
+      { label: 'SL', angle: Math.PI / 4, color: '#06b6d4' },
+    ];
+
+    speakers.forEach((spk) => {
+      const sx = cx + Math.cos(spk.angle) * (r - 12);
+      const sy = cy + Math.sin(spk.angle) * (r - 12);
+
+      ctx.fillStyle = spk.color;
+      ctx.beginPath();
+      ctx.arc(sx, sy, 6, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+      ctx.font = 'bold 9px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(spk.label, sx, sy - 12);
+    });
+
+    // Subwoofer LFE box in corner
+    ctx.fillStyle = '#f59e0b';
+    ctx.beginPath();
+    ctx.roundRect(14, h - 28, 42, 16, 4);
+    ctx.fill();
+    ctx.fillStyle = '#020617';
+    ctx.font = 'bold 8px monospace';
+    ctx.fillText('SUB LFE', 35, h - 20);
+
+    // Center Listener (Head + Ears)
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(cx, cy, 14, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Direction indicator
+    ctx.fillStyle = currentTheme.primaryHex || '#06b6d4';
+    ctx.beginPath();
+    ctx.moveTo(cx - 5, cy - 12);
+    ctx.lineTo(cx, cy - 20);
+    ctx.lineTo(cx + 5, cy - 12);
+    ctx.closePath();
+    ctx.fill();
+
+    // Sound Source (Draggable Orb)
+    const sx = cx + spatialState.coordinates.x * (r * 0.8);
+    const sy = cy - spatialState.coordinates.z * (r * 0.8);
+
+    ctx.strokeStyle = currentTheme.primaryHex || '#06b6d4';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(sx, sy, 18, 0, Math.PI * 2);
+    ctx.stroke();
+
+    const orbGrad = ctx.createRadialGradient(sx, sy, 2, sx, sy, 10);
+    orbGrad.addColorStop(0, '#ffffff');
+    orbGrad.addColorStop(1, currentTheme.primaryHex || '#06b6d4');
+    ctx.fillStyle = orbGrad;
+    ctx.beginPath();
+    ctx.arc(sx, sy, 10, 0, Math.PI * 2);
+    ctx.fill();
+  }, [spatialState.coordinates, currentTheme.primaryHex]);
+
+  useEffect(() => {
+    if (isOpen && activeTab === 'spatial') {
+      drawSoundstage();
+    }
+  }, [isOpen, activeTab, drawSoundstage]);
+
+  const handleCanvasInteraction = (clientX: number, clientY: number) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    const r = (Math.min(cx, cy) - 24) * 0.8;
+
+    const normX = Math.max(-1.0, Math.min(1.0, (x - cx) / r));
+    const normZ = Math.max(-1.0, Math.min(1.0, (cy - y) / r));
+
+    setSpatialCoordinates(normX, 0, normZ);
+  };
 
   if (!isOpen) return null;
-
-  const currentTheme = PLAYER_THEMES[themeId] || PLAYER_THEMES.cyberpunk;
 
   const togglePiP = async () => {
     try {
@@ -52,67 +205,73 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
           await video.requestPictureInPicture();
         }
       }
-    } catch {
-      // PiP not supported or permission denied
-    }
+    } catch {}
   };
 
-  const applyQualityPreset = (preset: 'anime4k' | 'hdr' | 'vivid' | 'night' | 'crisp' | 'neutral') => {
-    switch (preset) {
-      case 'anime4k':
-        updateShaderConfig({
-          brightness: 2,
-          contrast: 1.25,
-          saturation: 1.2,
-          ambientGlowEnabled: true,
-        });
-        break;
-      case 'hdr':
-        updateShaderConfig({
-          brightness: -2,
-          contrast: 1.3,
-          saturation: 1.25,
-          ambientGlowEnabled: true,
-        });
-        break;
-      case 'vivid':
-        updateShaderConfig({
-          brightness: 5,
-          contrast: 1.15,
-          saturation: 1.45,
-          ambientGlowEnabled: true,
-        });
-        break;
-      case 'night':
-        updateShaderConfig({
-          brightness: 25,
-          contrast: 1.1,
-          saturation: 0.95,
-          ambientGlowEnabled: true,
-        });
-        break;
-      case 'crisp':
-        updateShaderConfig({
-          brightness: 0,
-          contrast: 1.1,
-          saturation: 1.08,
-          ambientGlowEnabled: true,
-        });
-        break;
-      case 'neutral':
-        updateShaderConfig({
-          brightness: 0,
-          contrast: 1.0,
-          saturation: 1.0,
-          ambientGlowEnabled: true,
-        });
-        break;
-    }
-  };
+  const RESOLUTION_PRESETS: {
+    id: VideoShaderConfig['superResolution'];
+    name: string;
+    desc: string;
+    badge: string;
+    gradient: string;
+  }[] = [
+    {
+      id: 'anime4k',
+      name: 'Anime4K Neural Upscaler',
+      desc: 'Edge-preserving line art clarify, perfect for animation & anime',
+      badge: 'Edge Sharp',
+      gradient: 'from-fuchsia-500 to-cyan-500',
+    },
+    {
+      id: 'clarity-ultra',
+      name: 'Ultra Clarity 4K',
+      desc: 'Fine texture detail extraction and unsharp mask de-blurring',
+      badge: 'Crisp 4K',
+      gradient: 'from-cyan-400 to-blue-500',
+    },
+    {
+      id: 'cinematic-crisp',
+      name: 'Cinematic Master Hi-Fi',
+      desc: 'Expanded dynamic contrast with true-to-life color calibration',
+      badge: 'Cinema',
+      gradient: 'from-amber-400 to-rose-500',
+    },
+    {
+      id: 'hdr-enhanced',
+      name: 'HDR Dynamic Tone Mapping',
+      desc: 'Deep shadow detail recovery and highlight glare protection',
+      badge: 'HDR Tone',
+      gradient: 'from-emerald-400 to-teal-500',
+    },
+    {
+      id: 'off',
+      name: 'Original Source (Pass-Through)',
+      desc: 'Raw video stream playback without post-processing filters',
+      badge: 'Bypass',
+      gradient: 'from-white/20 to-white/10',
+    },
+  ];
+
+  const PROFILES: { id: SpatialProfileId; name: string; desc: string; icon: string }[] = [
+    { id: 'imax_3d', name: 'IMAX 3D Cinema', desc: 'Enriched dialogue center with wide surround reverb', icon: '🎬' },
+    { id: 'binaural_360', name: 'Binaural 360° Studio', desc: 'Full 3D spherical HRTF virtualization for headphones', icon: '🎧' },
+    { id: 'concert_hall', name: 'Concert Hall Live', desc: 'Expansive acoustic reverberation and wide separation', icon: '🏟️' },
+    { id: 'tactical_gaming', name: 'Tactical 3D Gaming', desc: 'Pinpoint acoustic localization and directional clarity', icon: '🎮' },
+    { id: 'vocal_isolation', name: 'Vocal Isolation', desc: 'Centers vocals & dialogues, softening side ambience', icon: '🗣️' },
+  ];
+
+  const SPEAKER_LABELS: { key: keyof SpeakerLevels; name: string; role: string; max: number }[] = [
+    { key: 'frontLeft', name: 'Front Left', role: 'Main stereo soundstage', max: 1.5 },
+    { key: 'center', name: 'Center', role: 'Speech, vocals & dialogue focus', max: 1.5 },
+    { key: 'frontRight', name: 'Front Right', role: 'Main stereo soundstage', max: 1.5 },
+    { key: 'surroundLeft', name: 'Surround Left', role: 'Rear spatial reflections', max: 1.5 },
+    { key: 'surroundRight', name: 'Surround Right', role: 'Rear spatial reflections', max: 1.5 },
+    { key: 'subwoofer', name: 'Subwoofer (LFE)', role: 'Deep low-end rumble (200% boost)', max: 2.0 },
+  ];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md animate-in fade-in duration-200 select-none p-4">
-      <div className="glass-panel w-full max-w-2xl p-6 rounded-3xl flex flex-col gap-5 border border-white/20 shadow-2xl max-h-[88vh] overflow-hidden bg-slate-950/95">
+      <div className="glass-panel w-full max-w-3xl p-6 rounded-3xl flex flex-col gap-5 border border-white/20 shadow-2xl max-h-[90vh] overflow-hidden bg-slate-950/95">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-white/10 pb-4">
           <div className="flex items-center gap-3">
@@ -123,8 +282,8 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
               <Palette className="w-5 h-5 fill-white" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-white tracking-tight">Player Customization & Video DSP</h2>
-              <p className="text-xs text-white/50">10 Luxury Themes, Anime4K Video Quality Enhancer, and Aspect Ratios</p>
+              <h2 className="text-lg font-bold text-white tracking-tight">Player Settings & Audio/Video DSP</h2>
+              <p className="text-xs text-white/50">Themes, Clarity Super-Resolution, 3D Spatial Audio & Speaker Matrix</p>
             </div>
           </div>
           <button
@@ -135,35 +294,47 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
           </button>
         </div>
 
-        {/* Tab Switcher */}
-        <div className="flex items-center gap-2 border-b border-white/10 pb-2.5">
+        {/* 4 Unified Luxury Tabs */}
+        <div className="flex items-center gap-2 border-b border-white/10 pb-2.5 overflow-x-auto">
           <button
             onClick={() => setActiveTab('themes')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-semibold transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-semibold transition-all shrink-0 ${
               activeTab === 'themes'
                 ? `${currentTheme.badgeClass} shadow-md`
                 : 'text-white/60 hover:text-white hover:bg-white/5'
             }`}
           >
             <Palette className="w-3.5 h-3.5" />
-            10 Player Themes
+            10 Themes
           </button>
 
           <button
-            onClick={() => setActiveTab('quality')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-semibold transition-all ${
-              activeTab === 'quality'
+            onClick={() => setActiveTab('clarity')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-semibold transition-all shrink-0 ${
+              activeTab === 'clarity'
                 ? `${currentTheme.badgeClass} shadow-md`
                 : 'text-white/60 hover:text-white hover:bg-white/5'
             }`}
           >
             <Sparkles className="w-3.5 h-3.5" />
-            Video Quality Enhancers
+            Clarity AI & Super-Res
+          </button>
+
+          <button
+            onClick={() => setActiveTab('spatial')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-semibold transition-all shrink-0 ${
+              activeTab === 'spatial'
+                ? `${currentTheme.badgeClass} shadow-md`
+                : 'text-white/60 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <Headphones className="w-3.5 h-3.5" />
+            3D Sound & Speakers
           </button>
 
           <button
             onClick={() => setActiveTab('tools')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-semibold transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-semibold transition-all shrink-0 ${
               activeTab === 'tools'
                 ? `${currentTheme.badgeClass} shadow-md`
                 : 'text-white/60 hover:text-white hover:bg-white/5'
@@ -207,7 +378,6 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
                       }}
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        {/* Dual-color preview orb */}
                         <div className="relative w-8 h-8 rounded-full overflow-hidden shrink-0 border border-white/20 shadow-inner flex">
                           <div
                             className="w-1/2 h-full"
@@ -220,12 +390,8 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
                         </div>
 
                         <div className="flex flex-col min-w-0">
-                          <span className="text-xs font-bold text-white truncate">
-                            {t.name}
-                          </span>
-                          <span className="text-[10px] text-white/50 truncate">
-                            {t.tagline}
-                          </span>
+                          <span className="text-xs font-bold text-white truncate">{t.name}</span>
+                          <span className="text-[10px] text-white/50 truncate">{t.tagline}</span>
                         </div>
                       </div>
 
@@ -243,167 +409,334 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
             </div>
           )}
 
-          {/* TAB 2: IN-BUILD VIDEO QUALITY ENHANCERS */}
-          {activeTab === 'quality' && (
+          {/* TAB 2: CLARITY AI & SUPER-RESOLUTION */}
+          {activeTab === 'clarity' && (
             <div className="flex flex-col gap-5">
-              {/* 1-Click One-Touch Quality Presets */}
               <div className="flex flex-col gap-2.5">
                 <span className="text-xs font-semibold text-white/80 flex items-center gap-2">
                   <Zap className="w-4 h-4 text-cyan-400" />
-                  1-Click Video Quality Optimizers (Anime4K & Shaders)
+                  1-Click Super-Resolution Modes
                 </span>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                  {[
-                    {
-                      id: 'anime4k',
-                      name: 'Anime4K Sharp',
-                      desc: 'Crisp line art & upscaled clarity',
-                      color: 'from-fuchsia-500 to-cyan-500',
-                    },
-                    {
-                      id: 'hdr',
-                      name: 'Cinematic HDR',
-                      desc: 'Dynamic tone mapping & contrast',
-                      color: 'from-amber-500 to-rose-500',
-                    },
-                    {
-                      id: 'vivid',
-                      name: 'Vivid Vibrance',
-                      desc: 'Deep color saturation & punch',
-                      color: 'from-emerald-400 to-teal-500',
-                    },
-                    {
-                      id: 'night',
-                      name: 'Night Vision Boost',
-                      desc: 'Lift dark shadows & low-light',
-                      color: 'from-sky-400 to-indigo-500',
-                    },
-                    {
-                      id: 'crisp',
-                      name: 'Studio Crisp Hi-Fi',
-                      desc: 'Balanced clarity & true color',
-                      color: 'from-slate-300 to-zinc-400',
-                    },
-                    {
-                      id: 'neutral',
-                      name: 'Neutral Native',
-                      desc: 'Unfiltered raw source',
-                      color: 'from-white/20 to-white/10',
-                    },
-                  ].map((p) => (
-                    <button
-                      key={p.id}
-                      onClick={() => applyQualityPreset(p.id as any)}
-                      className="p-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-left flex flex-col gap-1 transition-all active:scale-95"
-                    >
-                      <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                        <span
-                          className={`w-2 h-2 rounded-full bg-gradient-to-r ${p.color}`}
-                        />
-                        {p.name}
-                      </span>
-                      <span className="text-[10px] text-white/50">{p.desc}</span>
-                    </button>
-                  ))}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {RESOLUTION_PRESETS.map((preset) => {
+                    const isSelected = shaderConfig.superResolution === preset.id;
+                    return (
+                      <button
+                        key={preset.id}
+                        onClick={() => {
+                          updateShaderConfig({
+                            superResolution: preset.id,
+                            sharpness: preset.id === 'off' ? 0 : 0.8,
+                            clarityBoost: preset.id === 'off' ? 0 : 0.6,
+                            deNoise: preset.id === 'anime4k' ? 0.4 : 0.2,
+                            contrast: preset.id === 'cinematic-crisp' ? 1.25 : 1.1,
+                          });
+                        }}
+                        className={`p-3.5 rounded-2xl text-left border flex items-center justify-between gap-3 transition-all ${
+                          isSelected
+                            ? `bg-white/10 ${currentTheme.glassBorder} shadow-lg ring-1 ring-white/30 scale-[1.01]`
+                            : 'bg-white/5 border-white/10 hover:bg-white/10'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div
+                            className={`w-3.5 h-3.5 rounded-full shrink-0 bg-gradient-to-r ${preset.gradient}`}
+                          />
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-xs font-bold text-white truncate">{preset.name}</span>
+                            <span className="text-[10px] text-white/50 truncate">{preset.desc}</span>
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-white/10 text-white/70 shrink-0">
+                          {preset.badge}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
+              </div>
+
+              {/* Split Screen Compare Mode Toggle */}
+              <div className="p-4 rounded-3xl bg-white/5 border border-white/10 flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 rounded-xl bg-purple-500/20 text-purple-300">
+                      <Split className="w-4 h-4" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-xs font-bold text-white">Live Split-Screen Compare Mode</span>
+                      <span className="text-[10px] text-white/40">
+                        Shows an interactive draggable divider: Original (Left) vs Clarity AI (Right)
+                      </span>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() =>
+                      updateShaderConfig({
+                        splitCompareEnabled: !shaderConfig.splitCompareEnabled,
+                      })
+                    }
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                      shaderConfig.splitCompareEnabled
+                        ? 'bg-purple-500/30 text-purple-200 border border-purple-400/40 shadow-sm'
+                        : 'bg-white/5 text-white/50 border border-white/10'
+                    }`}
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    <span>{shaderConfig.splitCompareEnabled ? 'Split: ON' : 'Split: OFF'}</span>
+                  </button>
+                </div>
+
+                {shaderConfig.splitCompareEnabled && (
+                  <div className="flex flex-col gap-1.5 pt-2 border-t border-white/10">
+                    <div className="flex items-center justify-between text-xs text-white/70 font-mono">
+                      <span>Divider Position (Drag directly on video or use slider)</span>
+                      <span className="text-purple-300 font-bold">{shaderConfig.splitComparePosition ?? 50}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={10}
+                      max={90}
+                      step={1}
+                      value={shaderConfig.splitComparePosition ?? 50}
+                      onChange={(e) =>
+                        updateShaderConfig({ splitComparePosition: parseInt(e.target.value, 10) })
+                      }
+                      className="w-full h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-purple-400"
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Fine-Tuning Sliders */}
               <div className="flex flex-col gap-4 border-t border-white/10 pt-4">
-                <span className="text-xs font-semibold text-white/70">
-                  Manual Color Grading Sliders
+                <span className="text-xs font-semibold text-white/70 flex items-center gap-2">
+                  <SlidersHorizontal className="w-4 h-4 text-cyan-400" />
+                  Manual Clarity & Shader Tuning
                 </span>
 
-                {/* Brightness */}
                 <div className="flex flex-col gap-1.5">
                   <div className="flex items-center justify-between text-xs text-white/80">
-                    <span className="flex items-center gap-1.5">
-                      <Sun className="w-3.5 h-3.5 text-amber-400" />
-                      Brightness
-                    </span>
-                    <span className="font-mono text-cyan-400">{shaderConfig.brightness ?? 0}%</span>
-                  </div>
-                  <input
-                    type="range"
-                    min={-50}
-                    max={50}
-                    step={1}
-                    value={shaderConfig.brightness ?? 0}
-                    onChange={(e) => updateShaderConfig({ brightness: parseInt(e.target.value, 10) })}
-                    className="w-full h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-cyan-400"
-                  />
-                </div>
-
-                {/* Contrast */}
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex items-center justify-between text-xs text-white/80">
-                    <span className="flex items-center gap-1.5">
-                      <Contrast className="w-3.5 h-3.5 text-indigo-400" />
-                      Contrast
-                    </span>
-                    <span className="font-mono text-cyan-400">
-                      {(shaderConfig.contrast * 100).toFixed(0)}%
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min={0.5}
-                    max={1.5}
-                    step={0.05}
-                    value={shaderConfig.contrast}
-                    onChange={(e) => updateShaderConfig({ contrast: parseFloat(e.target.value) })}
-                    className="w-full h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-cyan-400"
-                  />
-                </div>
-
-                {/* Saturation */}
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex items-center justify-between text-xs text-white/80">
-                    <span className="flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-                      Saturation & Vibrance
-                    </span>
-                    <span className="font-mono text-cyan-400">
-                      {(shaderConfig.saturation * 100).toFixed(0)}%
-                    </span>
+                    <span>Texture Detail & Clarity Extraction</span>
+                    <span className="font-mono text-cyan-400">{Math.round((shaderConfig.clarityBoost ?? 0) * 100)}%</span>
                   </div>
                   <input
                     type="range"
                     min={0}
                     max={2.0}
                     step={0.05}
-                    value={shaderConfig.saturation}
-                    onChange={(e) => updateShaderConfig({ saturation: parseFloat(e.target.value) })}
+                    value={shaderConfig.clarityBoost ?? 0}
+                    onChange={(e) => updateShaderConfig({ clarityBoost: parseFloat(e.target.value) })}
                     className="w-full h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-cyan-400"
                   />
                 </div>
 
-                {/* Ambient Glow Toggle */}
-                <div className="flex items-center justify-between p-3.5 rounded-2xl bg-white/5 border border-white/10 mt-1">
-                  <div className="flex flex-col">
-                    <span className="text-xs font-semibold text-white">
-                      Real-Time Ambient Glow Canvas
-                    </span>
-                    <span className="text-[10px] text-white/40">
-                      Synchronizes dynamic halo reflections behind video
-                    </span>
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between text-xs text-white/80">
+                    <span>Edge Sharpening (Unsharp Masking)</span>
+                    <span className="font-mono text-cyan-400">{Math.round((shaderConfig.sharpness ?? 0) * 100)}%</span>
                   </div>
                   <input
-                    type="checkbox"
-                    checked={shaderConfig.ambientGlowEnabled}
-                    onChange={(e) => updateShaderConfig({ ambientGlowEnabled: e.target.checked })}
-                    className="w-4 h-4 accent-cyan-400 cursor-pointer"
+                    type="range"
+                    min={0}
+                    max={2.0}
+                    step={0.05}
+                    value={shaderConfig.sharpness ?? 0}
+                    onChange={(e) => updateShaderConfig({ sharpness: parseFloat(e.target.value) })}
+                    className="w-full h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-cyan-400"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between text-xs text-white/80">
+                    <span>Compression Artifact Reduction & De-Noising</span>
+                    <span className="font-mono text-cyan-400">{Math.round((shaderConfig.deNoise ?? 0) * 100)}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={1.0}
+                    step={0.05}
+                    value={shaderConfig.deNoise ?? 0}
+                    onChange={(e) => updateShaderConfig({ deNoise: parseFloat(e.target.value) })}
+                    className="w-full h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-cyan-400"
                   />
                 </div>
               </div>
             </div>
           )}
 
-          {/* TAB 3: ASPECT RATIO & TOOLS */}
+          {/* TAB 3: 3D SPATIAL AUDIO & MULTI-SPEAKER SYSTEM */}
+          {activeTab === 'spatial' && (
+            <div className="flex flex-col gap-5">
+              <div className="flex items-center justify-between p-3.5 rounded-2xl bg-white/5 border border-white/10">
+                <div className="flex flex-col">
+                  <span className="text-xs font-bold text-white">3D Spatial Audio Virtualizer (HRTF)</span>
+                  <span className="text-[10px] text-white/40">Real-time binaural spherical audio for headphones & 5.1/7.1 sound</span>
+                </div>
+                <button
+                  onClick={() => setSpatialAudioEnabled(!spatialState.enabled)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    spatialState.enabled
+                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 shadow-sm'
+                      : 'bg-white/5 text-white/50 border border-white/10'
+                  }`}
+                >
+                  <Radio className="w-3.5 h-3.5" />
+                  <span>{spatialState.enabled ? '3D Active' : 'Bypass'}</span>
+                </button>
+              </div>
+
+              {/* Radar & Position Control */}
+              <div className="flex flex-col sm:flex-row items-center gap-6 p-4 rounded-3xl bg-white/5 border border-white/10">
+                <div className="relative">
+                  <canvas
+                    ref={canvasRef}
+                    width={240}
+                    height={240}
+                    onMouseDown={(e) => {
+                      isDraggingRef.current = true;
+                      handleCanvasInteraction(e.clientX, e.clientY);
+                    }}
+                    onMouseMove={(e) => {
+                      if (isDraggingRef.current) handleCanvasInteraction(e.clientX, e.clientY);
+                    }}
+                    onMouseUp={() => { isDraggingRef.current = false; }}
+                    onMouseLeave={() => { isDraggingRef.current = false; }}
+                    className="rounded-2xl cursor-grab active:cursor-grabbing border border-white/10 shadow-inner bg-slate-950"
+                  />
+                  <span className="absolute bottom-2 right-2 text-[10px] font-mono text-white/40">
+                    Drag sound orb
+                  </span>
+                </div>
+
+                <div className="flex-1 flex flex-col gap-2.5 min-w-0">
+                  <span className="text-xs font-bold text-white uppercase tracking-wider">
+                    Interactive 360° Soundstage
+                  </span>
+                  <p className="text-xs text-white/60 leading-relaxed">
+                    Drag the orb to physically move sound origin in virtual 3D space around your head.
+                  </p>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+                    <div className="p-2 rounded-xl bg-black/40 border border-white/10">
+                      <span className="text-[10px] text-white/40 block">Azimuth (X)</span>
+                      <span className="text-cyan-400 font-bold">{(spatialState.coordinates.x * 100).toFixed(0)}%</span>
+                    </div>
+                    <div className="p-2 rounded-xl bg-black/40 border border-white/10">
+                      <span className="text-[10px] text-white/40 block">Elevation (Z)</span>
+                      <span className="text-purple-400 font-bold">{(spatialState.coordinates.z * 100).toFixed(0)}%</span>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setSpatialCoordinates(0, 0, 0.5)}
+                    className="self-start text-[11px] text-white/60 hover:text-white px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 flex items-center gap-1.5 transition-colors"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>Recenter Audio Source</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Spatial Profiles */}
+              <div className="flex flex-col gap-2">
+                <span className="text-xs font-semibold text-white/70">1-Click Sound Profiles</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {PROFILES.map((p) => (
+                    <button
+                      key={p.id}
+                      onClick={() => setSpatialProfile(p.id)}
+                      className={`p-3 rounded-2xl text-left border flex items-center gap-2.5 transition-all ${
+                        spatialState.profile === p.id
+                          ? `bg-white/10 ${currentTheme.glassBorder} shadow-lg ring-1 ring-white/30`
+                          : 'bg-white/5 border-white/10 hover:bg-white/10'
+                      }`}
+                    >
+                      <span className="text-xl">{p.icon}</span>
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-xs font-bold text-white truncate">{p.name}</span>
+                        <span className="text-[10px] text-white/50 truncate">{p.desc}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Speaker Volume Matrix */}
+              <div className="flex flex-col gap-2.5 pt-2 border-t border-white/10">
+                <span className="text-xs font-semibold text-white/70">Individual Speaker Channel Levels</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {SPEAKER_LABELS.map((spk) => {
+                    const vol = spatialState.speakers[spk.key];
+                    const percent = Math.round(vol * 100);
+
+                    return (
+                      <div
+                        key={spk.key}
+                        className="p-3 rounded-2xl bg-white/5 border border-white/10 flex flex-col gap-1.5"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-white">{spk.name}</span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => setSpeakerVolume(spk.key, vol === 0 ? 1.0 : 0)}
+                              className="text-white/60 hover:text-white"
+                            >
+                              {vol === 0 ? <VolumeX className="w-3.5 h-3.5 text-rose-400" /> : <Volume2 className="w-3.5 h-3.5 text-cyan-400" />}
+                            </button>
+                            <span className="text-[11px] font-mono font-bold text-cyan-300">{percent}%</span>
+                          </div>
+                        </div>
+                        <input
+                          type="range"
+                          min={0}
+                          max={spk.max}
+                          step={0.05}
+                          value={vol}
+                          onChange={(e) => setSpeakerVolume(spk.key, parseFloat(e.target.value))}
+                          className="w-full h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-cyan-400"
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Subwoofer LFE Crossover */}
+                <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 flex flex-col gap-2 mt-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-white flex items-center gap-2">
+                      <Radio className="w-3.5 h-3.5 text-fuchsia-400" />
+                      Subwoofer Low-Pass LFE Crossover
+                    </span>
+                    <span className="text-xs font-mono font-bold text-fuchsia-300">
+                      {spatialState.lfeCrossoverHz || 80} Hz
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={40}
+                    max={200}
+                    step={5}
+                    value={spatialState.lfeCrossoverHz || 80}
+                    onChange={(e) => setLfeCrossover(parseInt(e.target.value, 10))}
+                    className="w-full h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-fuchsia-400"
+                  />
+                  <div className="flex justify-between text-[10px] text-white/40 font-mono">
+                    <span>40 Hz (Deep Sub)</span>
+                    <span>80 Hz (THX Cinema)</span>
+                    <span>200 Hz (Punchy Bass)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: ASPECT RATIO & TOOLS */}
           {activeTab === 'tools' && (
             <div className="flex flex-col gap-5">
-              {/* Aspect Ratio Selection */}
               <div className="flex flex-col gap-2.5">
                 <label className="text-xs font-semibold text-white/70 flex items-center gap-2">
                   <Ratio className="w-4 h-4 text-cyan-400" />
@@ -426,11 +759,8 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
                 </div>
               </div>
 
-              {/* Quick Tools Row: Snapshot, PiP, Loop, Equalizer */}
               <div className="flex flex-col gap-2.5 border-t border-white/10 pt-4">
-                <span className="text-xs font-semibold text-white/70">
-                  Quick Player Utilities
-                </span>
+                <span className="text-xs font-semibold text-white/70">Quick Player Utilities</span>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                   <button
                     onClick={takeSnapshot}
@@ -460,9 +790,7 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
                     title="Toggle Repeat"
                   >
                     <Repeat className="w-5 h-5" />
-                    <span className="text-[11px] font-semibold">
-                      {isLooping ? 'Loop: On' : 'Loop: Off'}
-                    </span>
+                    <span className="text-[11px] font-semibold">{isLooping ? 'Loop: On' : 'Loop: Off'}</span>
                   </button>
 
                   <button
@@ -482,11 +810,11 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
           )}
         </div>
 
-        {/* Footer Reset Button */}
+        {/* Footer */}
         <div className="flex justify-between items-center pt-3 border-t border-white/10">
           <span className="text-[11px] text-white/40 flex items-center gap-1.5">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-            Theme and settings stored in persistent state
+            All settings, audio profiles & themes stored in database
           </span>
           <button
             onClick={() =>
@@ -496,11 +824,16 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
                 saturation: 1.0,
                 aspectRatio: 'auto',
                 ambientGlowEnabled: true,
+                superResolution: 'off',
+                sharpness: 0,
+                clarityBoost: 0,
+                deNoise: 0,
+                splitCompareEnabled: false,
               })
             }
             className="text-xs text-white/60 hover:text-white px-4 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
           >
-            Reset Settings
+            Reset All Settings
           </button>
         </div>
       </div>
