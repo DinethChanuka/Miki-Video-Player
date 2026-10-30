@@ -110,6 +110,36 @@ export interface PlayerStoreState {
 
 const isTauriRuntime = () => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
+const STORAGE_KEY_RECENT = 'miki_recent_media';
+const STORAGE_KEY_BOOKMARKS = 'miki_bookmarks';
+
+const loadStoredRecentMedia = (): MediaHistoryItem[] => {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_RECENT);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveStoredRecentMedia = (items: MediaHistoryItem[]) => {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(STORAGE_KEY_RECENT, JSON.stringify(items.slice(0, 30)));
+  } catch {}
+};
+
+const loadStoredBookmarks = (): MediaBookmark[] => {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_BOOKMARKS);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+};
+
 let lastSqliteSyncMs = 0;
 
 export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
@@ -144,8 +174,8 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     upscaleMode: 'none',
   },
 
-  recentMedia: [],
-  bookmarks: [],
+  recentMedia: loadStoredRecentMedia(),
+  bookmarks: loadStoredBookmarks(),
   resumeBannerPositionMs: null,
 
   lastError: null,
@@ -196,6 +226,12 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     });
 
     engine.onError(async (error: PlayerErrorEnvelope) => {
+      // Never display codec errors or trigger retry loops for YouTube embeds
+      const curUri = get().currentUri;
+      if (curUri && /(?:youtube\.com|youtu\.be)/.test(curUri)) {
+        return;
+      }
+
       set({ lastError: error });
 
       // Automated Self-Healing Recovery Execution
@@ -209,7 +245,9 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
         const delayMs = Math.pow(2, nextRetry) * 500;
         setTimeout(() => {
           const uri = get().currentUri;
-          if (uri) get().engine?.load(uri, get().positionMs);
+          if (uri && !/(?:youtube\.com|youtu\.be)/.test(uri)) {
+            get().engine?.load(uri, get().positionMs);
+          }
         }, delayMs);
       } else if (error.recovery === 'reset_audio_filters') {
         await get().setEqualizer([0, 0, 0, 0, 0, 0, 0, 0, 0, 0], false);
@@ -235,6 +273,48 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
   openMedia: async (uri, title, autoResume = true) => {
     const resolvedTitle = title ?? uri.split(/[\\/]/).pop() ?? 'Untitled Media';
     let startPos = 0;
+
+    // Check if it's a YouTube URL! If so, don't pass to HTML5 <video>
+    const isYouTube = /(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/.test(uri);
+    if (isYouTube) {
+      const video = document.getElementById('aether-video-viewport') as HTMLVideoElement | null;
+      if (video) {
+        video.pause();
+        video.removeAttribute('src');
+        video.load();
+      }
+      set({
+        currentUri: uri,
+        currentTitle: resolvedTitle,
+        retryCount: 0,
+        lastError: null,
+        isPaused: false,
+      });
+      return;
+    }
+
+    // Record and persist to recent media (both web/local & Tauri)
+    const existingRecent = get().recentMedia;
+    const mediaId = uri;
+    const newHistoryItem: MediaHistoryItem = {
+      mediaId,
+      uri,
+      title: resolvedTitle,
+      durationMs: 0,
+      lastPositionMs: startPos,
+      progressPercent: 0,
+      isCompleted: false,
+      playCount: ((existingRecent.find((m) => m.uri === uri)?.playCount) ?? 0) + 1,
+      lastPlayedAt: Date.now(),
+    };
+
+    const updatedRecent = [
+      newHistoryItem,
+      ...existingRecent.filter((m) => m.uri !== uri),
+    ].slice(0, 30);
+
+    set({ recentMedia: updatedRecent });
+    saveStoredRecentMedia(updatedRecent);
 
     if (isTauriRuntime()) {
       try {
@@ -278,7 +358,7 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     }
 
     // Web / Standalone mode
-    set({ currentUri: uri, currentTitle: resolvedTitle, retryCount: 0 });
+    set({ currentUri: uri, currentTitle: resolvedTitle, retryCount: 0, lastError: null });
     await get().engine?.load(uri, startPos);
     await get().engine?.play();
   },
@@ -301,6 +381,32 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
 
   togglePlay: async () => {
     const { engine, isPaused, currentMediaId, positionMs, durationMs } = get();
+
+    // Direct DOM element control for 100% reliable local video playback
+    const video = (document.getElementById('aether-video-viewport') as HTMLVideoElement) || null;
+    if (video) {
+      if (video.paused) {
+        try {
+          await video.play();
+          set({ isPaused: false });
+        } catch {
+          video.muted = false;
+          await video.play().catch(() => {});
+          set({ isPaused: false });
+        }
+        if (engine && 'play' in engine) {
+          await engine.play().catch(() => {});
+        }
+      } else {
+        video.pause();
+        set({ isPaused: true });
+        if (engine && 'pause' in engine) {
+          await engine.pause().catch(() => {});
+        }
+      }
+      return;
+    }
+
     if (!engine) return;
 
     if (isPaused) {
@@ -397,9 +503,13 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
   },
 
   refreshRecentMedia: async () => {
-    if (!isTauriRuntime()) return;
-    const items = await invoke<MediaHistoryItem[]>('db_get_recent_media', { limit: 25 });
-    set({ recentMedia: items });
+    if (isTauriRuntime()) {
+      const items = await invoke<MediaHistoryItem[]>('db_get_recent_media', { limit: 25 });
+      set({ recentMedia: items });
+      saveStoredRecentMedia(items);
+    } else {
+      set({ recentMedia: loadStoredRecentMedia() });
+    }
   },
 
   dismissError: () => set({ lastError: null }),

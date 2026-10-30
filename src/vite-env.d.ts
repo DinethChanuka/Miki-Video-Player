@@ -42,4 +42,6 @@ declare module 'lucide-react' {
   export const Sun: LucideIcon;
   export const Contrast: LucideIcon;
   export const Ratio: LucideIcon;
+  export const Youtube: LucideIcon;
+  export const Zap: LucideIcon;
 }
