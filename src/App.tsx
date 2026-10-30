@@ -84,6 +84,27 @@ export const App: React.FC = () => {
     }
   }, [videoRef]);
 
+  // Listen to Cocoa native file picker event from BorderlessKeyWindow
+  useEffect(() => {
+    const handleNativePicked = (e: Event) => {
+      const customEvent = e as CustomEvent<{ path: string; name: string }>;
+      if (customEvent.detail && customEvent.detail.path) {
+        openMedia(customEvent.detail.path, customEvent.detail.name);
+      }
+    };
+    window.addEventListener('miki:nativeFileSelected', handleNativePicked);
+    return () => window.removeEventListener('miki:nativeFileSelected', handleNativePicked);
+  }, [openMedia]);
+
+  const handleOpenLocalFileDialog = () => {
+    if (
+      typeof window !== 'undefined' &&
+      (window as unknown as { webkit?: { messageHandlers?: { openNativeFileDialog?: { postMessage: (msg: string) => void } } } }).webkit?.messageHandlers?.openNativeFileDialog
+    ) {
+      (window as unknown as { webkit: { messageHandlers: { openNativeFileDialog: { postMessage: (msg: string) => void } } } }).webkit.messageHandlers.openNativeFileDialog.postMessage('open');
+    }
+  };
+
   const handleFileDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
@@ -284,16 +305,24 @@ export const App: React.FC = () => {
               </div>
 
               <div className="flex flex-col sm:flex-row items-center gap-3 w-full mt-2">
-                <label className="flex-1 w-full flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs cursor-pointer transition-all shadow-xl shadow-sky-500/25 active:scale-95">
+                <button
+                  onClick={() => {
+                    handleOpenLocalFileDialog();
+                    const input = document.getElementById('miki-main-file-input') as HTMLInputElement | null;
+                    input?.click();
+                  }}
+                  className="flex-1 w-full flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs cursor-pointer transition-all shadow-xl shadow-sky-500/25 active:scale-95"
+                >
                   <FolderOpen className="w-4 h-4" />
-                  Browse Local Files
+                  <span>Browse Local Files</span>
                   <input
+                    id="miki-main-file-input"
                     type="file"
                     className="hidden"
                     accept="video/*,audio/*,.mkv,.mp4,.avi,.mov,.webm,.m3u8"
                     onChange={handleNativeFileSelect}
                   />
-                </label>
+                </button>
 
                 <button
                   onClick={() => setIsFileBrowserOpen(true)}

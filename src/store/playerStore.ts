@@ -110,6 +110,36 @@ export interface PlayerStoreState {
 
 const isTauriRuntime = () => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
+const STORAGE_KEY_RECENT = 'miki_recent_media';
+const STORAGE_KEY_BOOKMARKS = 'miki_bookmarks';
+
+const loadStoredRecentMedia = (): MediaHistoryItem[] => {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_RECENT);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveStoredRecentMedia = (items: MediaHistoryItem[]) => {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(STORAGE_KEY_RECENT, JSON.stringify(items.slice(0, 30)));
+  } catch {}
+};
+
+const loadStoredBookmarks = (): MediaBookmark[] => {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_BOOKMARKS);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+};
+
 let lastSqliteSyncMs = 0;
 
 export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
@@ -144,8 +174,8 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     upscaleMode: 'none',
   },
 
-  recentMedia: [],
-  bookmarks: [],
+  recentMedia: loadStoredRecentMedia(),
+  bookmarks: loadStoredBookmarks(),
   resumeBannerPositionMs: null,
 
   lastError: null,
@@ -262,6 +292,29 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
       });
       return;
     }
+
+    // Record and persist to recent media (both web/local & Tauri)
+    const existingRecent = get().recentMedia;
+    const mediaId = uri;
+    const newHistoryItem: MediaHistoryItem = {
+      mediaId,
+      uri,
+      title: resolvedTitle,
+      durationMs: 0,
+      lastPositionMs: startPos,
+      progressPercent: 0,
+      isCompleted: false,
+      playCount: ((existingRecent.find((m) => m.uri === uri)?.playCount) ?? 0) + 1,
+      lastPlayedAt: Date.now(),
+    };
+
+    const updatedRecent = [
+      newHistoryItem,
+      ...existingRecent.filter((m) => m.uri !== uri),
+    ].slice(0, 30);
+
+    set({ recentMedia: updatedRecent });
+    saveStoredRecentMedia(updatedRecent);
 
     if (isTauriRuntime()) {
       try {
@@ -450,9 +503,13 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
   },
 
   refreshRecentMedia: async () => {
-    if (!isTauriRuntime()) return;
-    const items = await invoke<MediaHistoryItem[]>('db_get_recent_media', { limit: 25 });
-    set({ recentMedia: items });
+    if (isTauriRuntime()) {
+      const items = await invoke<MediaHistoryItem[]>('db_get_recent_media', { limit: 25 });
+      set({ recentMedia: items });
+      saveStoredRecentMedia(items);
+    } else {
+      set({ recentMedia: loadStoredRecentMedia() });
+    }
   },
 
   dismissError: () => set({ lastError: null }),

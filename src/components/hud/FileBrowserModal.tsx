@@ -94,16 +94,34 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({ isOpen, onCl
           </div>
 
           <div className="flex items-center gap-2">
-            <label className="flex items-center gap-2 px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold text-xs cursor-pointer transition-all shadow-lg shadow-sky-500/20">
+            <button
+              onClick={() => {
+                if (
+                  typeof window !== 'undefined' &&
+                  (window as unknown as { webkit?: { messageHandlers?: { openNativeFileDialog?: { postMessage: (msg: string) => void } } } }).webkit?.messageHandlers?.openNativeFileDialog
+                ) {
+                  (window as unknown as { webkit: { messageHandlers: { openNativeFileDialog: { postMessage: (msg: string) => void } } } }).webkit.messageHandlers.openNativeFileDialog.postMessage('open');
+                  onClose();
+                } else {
+                  const input = document.getElementById('miki-modal-file-input') as HTMLInputElement | null;
+                  input?.click();
+                }
+              }}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold text-xs cursor-pointer transition-all shadow-lg shadow-sky-500/20 active:scale-95"
+            >
               <FolderOpen className="w-4 h-4" />
-              Choose Local File
+              <span>Choose Local File</span>
               <input
+                id="miki-modal-file-input"
                 type="file"
                 className="hidden"
                 accept="video/*,audio/*,.mkv,.mp4,.avi,.mov,.webm,.m3u8"
-                onChange={handleOpenLocalFile}
+                onChange={(e) => {
+                  handleOpenLocalFile(e);
+                  onClose();
+                }}
               />
-            </label>
+            </button>
 
             <button
               onClick={onClose}
