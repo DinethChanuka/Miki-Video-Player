@@ -741,6 +741,10 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     const engine: IPlayerEngine =
       targetType === 'tauri-mpv' ? new TauriMpvEngine() : new WebMediaEngine();
 
+    if (engine && 'attachSpatialAudio' in engine) {
+      (engine as { attachSpatialAudio: (s: any) => void }).attachSpatialAudio(get().spatialAudio);
+    }
+
     engine.onTelemetry((telemetry: PlaybackTelemetry) => {
       set({
         positionMs: telemetry.positionMs,
@@ -992,6 +996,7 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
       retryCount: 0,
       lastError: null,
       resumeBannerPositionMs: null,
+      isBuffering: true,
     });
 
     // Restore any memorized subtitles for this video
@@ -1027,6 +1032,7 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
       positionMs: 0,
       durationMs: 0,
       isPaused: true,
+      isBuffering: false,
       resumeBannerPositionMs: null,
     });
   },

@@ -23,6 +23,7 @@ import {
   Film,
   Plus,
   Camera,
+  RefreshCw,
 } from 'lucide-react';
 
 export function parseYouTubeId(url: string | null): string | null {
@@ -93,6 +94,7 @@ export const App: React.FC = () => {
   const customBgBlur = usePlayerStore((s) => s.customBgBlur);
   const customBgBrightness = usePlayerStore((s) => s.customBgBrightness);
   const customBgTint = usePlayerStore((s) => s.customBgTint);
+  const isBuffering = usePlayerStore((s) => s.isBuffering);
   const positionMs = usePlayerStore((s) => s.positionMs);
   const activeSubtitleTrack = usePlayerStore((s) => s.activeSubtitleTrack);
   const isSubtitlesVisible = usePlayerStore((s) => s.isSubtitlesVisible);
@@ -223,7 +225,7 @@ export const App: React.FC = () => {
     bootEngine(undefined, videoRef.current ?? undefined);
   }, [bootEngine]);
 
-  // Ensure DOM video element is always attached
+  // Ensure DOM video element is always attached and spatial audio engine is connected
   useEffect(() => {
     if (videoRef.current) {
       const engine = usePlayerStore.getState().engine;
@@ -232,8 +234,22 @@ export const App: React.FC = () => {
           videoRef.current
         );
       }
+      if (engine && 'attachSpatialAudio' in engine) {
+        (engine as { attachSpatialAudio: (s: any) => void }).attachSpatialAudio(
+          usePlayerStore.getState().spatialAudio
+        );
+      }
     }
   }, [videoRef]);
+
+  // Disable default browser/WebView right-click context menu
+  useEffect(() => {
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener('contextmenu', handleContextMenu);
+    return () => window.removeEventListener('contextmenu', handleContextMenu);
+  }, []);
 
   // Listen to Cocoa native file picker event from BorderlessKeyWindow
   useEffect(() => {
@@ -397,6 +413,7 @@ export const App: React.FC = () => {
         handleTouchStart(e);
       }}
       onTouchEnd={handleTouchEnd}
+      onContextMenu={(e) => e.preventDefault()}
       className={`relative w-screen h-screen overflow-hidden bg-slate-950 select-none flex flex-col font-sans ${
         areControlsVisible || !currentUri ? 'cursor-default' : 'cursor-none'
       }`}
@@ -432,16 +449,12 @@ export const App: React.FC = () => {
         </div>
       )}
 
-      {/* Sleek, Clean Frameless Titlebar - Drag & 5s Inactivity Auto-Hide */}
+      {/* Sleek, Clean Frameless Titlebar - Drag & Always Visible Menubar */}
       <div
         onMouseDown={handleStartWindowDrag}
-        className={`w-full h-11 z-50 flex items-center justify-between px-4 backdrop-blur-xl border-b select-none transition-all duration-500 ${
+        className={`w-full h-11 z-50 flex items-center justify-between px-4 backdrop-blur-xl border-b select-none opacity-100 translate-y-0 transition-all duration-300 ${
           theme.glassBg
-        } ${theme.glassBorder} ${
-          areControlsVisible || !currentUri
-            ? 'opacity-100 translate-y-0'
-            : 'opacity-0 -translate-y-full pointer-events-none'
-        }`}
+        } ${theme.glassBorder}`}
         style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
       >
         {/* Left Branding & Return Button */}
@@ -554,17 +567,23 @@ export const App: React.FC = () => {
             <video
               id="aether-video-viewport"
               ref={videoRef}
+              crossOrigin="anonymous"
               className="w-full h-full object-contain z-10 cursor-pointer"
               playsInline
               preload="auto"
+              onWaiting={() => usePlayerStore.setState({ isBuffering: true })}
+              onPlaying={() => usePlayerStore.setState({ isBuffering: false })}
+              onCanPlay={() => usePlayerStore.setState({ isBuffering: false })}
+              onLoadedData={() => usePlayerStore.setState({ isBuffering: false })}
+              onLoadStart={() => usePlayerStore.setState({ isBuffering: true })}
               onClick={() => usePlayerStore.getState().togglePlay()}
-              onPlay={() => usePlayerStore.setState({ isPaused: false })}
+              onPlay={() => usePlayerStore.setState({ isPaused: false, isBuffering: false })}
               onPause={() => {
                 usePlayerStore.setState({ isPaused: true });
                 captureCurrentVideoFrame();
               }}
               onEnded={() => {
-                usePlayerStore.setState({ isPaused: true });
+                usePlayerStore.setState({ isPaused: true, isBuffering: false });
                 captureCurrentVideoFrame();
               }}
               onTimeUpdate={(e) => {
@@ -582,6 +601,44 @@ export const App: React.FC = () => {
                 }
               }}
             />
+
+            {/* High-Performance Loading / Buffering HUD Animation Indicator */}
+            {isBuffering && currentUri && (
+              <div className="absolute inset-0 pointer-events-none z-20 flex flex-col items-center justify-center bg-black/45 backdrop-blur-sm animate-in fade-in duration-200">
+                <div className="relative flex items-center justify-center">
+                  {/* Outer Pulsing Aura */}
+                  <div
+                    className={`absolute -inset-6 rounded-full bg-gradient-to-r ${theme.accentGradient} opacity-35 blur-xl animate-pulse`}
+                  />
+                  {/* Outer Spinning Ring */}
+                  <div
+                    className="w-16 h-16 rounded-full border-4 border-transparent border-t-cyan-400 border-r-fuchsia-400 animate-spin"
+                    style={{ animationDuration: '0.85s' }}
+                  />
+                  {/* Inner Counter-Spinning Ring */}
+                  <div
+                    className="absolute w-10 h-10 rounded-full border-2 border-transparent border-b-cyan-300 border-l-purple-400 animate-spin"
+                    style={{ animationDirection: 'reverse', animationDuration: '1.2s' }}
+                  />
+                  {/* Center Spinning Icon */}
+                  <div className="absolute flex items-center justify-center">
+                    <RefreshCw className="w-5 h-5 text-white animate-spin opacity-85" />
+                  </div>
+                </div>
+
+                <div className="mt-4 flex flex-col items-center gap-1">
+                  <span className="text-xs font-bold text-white tracking-wider uppercase drop-shadow flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+                    Loading Media Stream...
+                  </span>
+                  {currentTitle && (
+                    <span className="text-[11px] text-white/70 font-medium max-w-sm truncate drop-shadow px-2">
+                      {currentTitle}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Subtitle Caption Overlay */}
             {activeSubtitleTrack && (
