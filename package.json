@@ -11,6 +11,9 @@
     "tauri": "tauri",
     "package:mac": "./scripts/package-mac.sh",
     "package:win": "tauri build --target x86_64-pc-windows-msvc",
+    "package:android": "./scripts/package-android.sh",
+    "package:ios": "./scripts/package-ios.sh",
+    "generate:ico": "node scripts/generate-windows-ico.cjs",
     "validate:media": "java AetherPlayerLauncher --validate"
   },
   "dependencies": {

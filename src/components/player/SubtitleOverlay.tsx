@@ -58,3 +58,4 @@ export const SubtitleOverlay: React.FC<SubtitleOverlayProps> = ({
     </div>
   );
 };
+

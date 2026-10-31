@@ -27,8 +27,14 @@ call npm run build
 echo [Miki Player] Building standalone Windows executable with Tauri...
 call npx tauri build
 
+if not exist "Build\windows" mkdir "Build\windows"
+copy /y src-tauri\target\release\*.exe Build\windows\ 2>nul
+copy /y src-tauri\target\release\bundle\nsis\*.exe Build\windows\ 2>nul
+copy /y src-tauri\target\release\bundle\msi\*.msi Build\windows\ 2>nul
+
 echo =========================================================================
 echo  Build Complete! Windows .exe is located in:
+echo    Build\windows\
 echo    src-tauri\target\release\
 echo    src-tauri\target\release\bundle\nsis\
 echo =========================================================================
