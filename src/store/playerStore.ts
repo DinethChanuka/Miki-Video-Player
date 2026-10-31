@@ -32,6 +32,8 @@ export interface MediaHistoryItem {
   playCount: number;
   thumbnailUri?: string;
   lastPlayedAt: number;
+  isYouTube?: boolean;
+  youtubeId?: string;
 }
 
 export interface MediaBookmark {
@@ -143,6 +145,16 @@ export interface PlayerStoreState {
   updateShaderConfig: (config: Partial<VideoShaderConfig>) => Promise<void>;
   toggleLoop: () => void;
   takeSnapshot: () => void;
+  screenshotDirectory: string;
+  setScreenshotDirectory: (dir: string) => void;
+  snapshotNotification: string | null;
+  setSnapshotNotification: (msg: string | null) => void;
+  customBgImage: string | null;
+  customBgOpacity: number;
+  customBgBlur: number;
+  setCustomBgImage: (url: string | null) => void;
+  setCustomBgOpacity: (opacity: number) => void;
+  setCustomBgBlur: (blur: number) => void;
   addBookmark: (label?: string) => Promise<void>;
   removeRecentMedia: (uri: string) => void;
   addYouTubeHistory: (url: string, title?: string) => void;
@@ -160,7 +172,32 @@ const loadStoredRecentMedia = (): MediaHistoryItem[] => {
   if (typeof window === 'undefined') return [];
   try {
     const raw = localStorage.getItem(STORAGE_KEY_RECENT);
-    return raw ? JSON.parse(raw) : [];
+    const recents: MediaHistoryItem[] = raw ? JSON.parse(raw) : [];
+
+    // Merge any previous YouTube history items into recents
+    const rawYt = localStorage.getItem(STORAGE_KEY_YOUTUBE);
+    const yts: YouTubeHistoryItem[] = rawYt ? JSON.parse(rawYt) : [];
+
+    for (const yt of yts) {
+      if (!recents.some((r) => r.uri === yt.url || r.youtubeId === yt.id)) {
+        recents.push({
+          mediaId: yt.url,
+          uri: yt.url,
+          title: yt.title,
+          durationMs: 0,
+          lastPositionMs: 0,
+          progressPercent: 100,
+          isCompleted: false,
+          playCount: 1,
+          lastPlayedAt: yt.timestamp,
+          thumbnailUri: `https://img.youtube.com/vi/${yt.id}/mqdefault.jpg`,
+          isYouTube: true,
+          youtubeId: yt.id,
+        });
+      }
+    }
+
+    return recents.sort((a, b) => (b.lastPlayedAt || 0) - (a.lastPlayedAt || 0)).slice(0, 30);
   } catch {
     return [];
   }
@@ -225,6 +262,58 @@ const saveStoredYouTubeHistory = (items: YouTubeHistoryItem[]) => {
   try {
     localStorage.setItem(STORAGE_KEY_YOUTUBE, JSON.stringify(items.slice(0, 30)));
   } catch {}
+};
+
+const STORAGE_KEY_SCREENSHOT_DIR = 'miki_screenshot_directory';
+export const DEFAULT_SCREENSHOT_DIR = '~/Pictures/Miki Player/Screenshots';
+
+const loadStoredScreenshotDirectory = (): string => {
+  if (typeof window === 'undefined') return DEFAULT_SCREENSHOT_DIR;
+  try {
+    return localStorage.getItem(STORAGE_KEY_SCREENSHOT_DIR) || DEFAULT_SCREENSHOT_DIR;
+  } catch {
+    return DEFAULT_SCREENSHOT_DIR;
+  }
+};
+
+const saveStoredScreenshotDirectory = (dir: string) => {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(STORAGE_KEY_SCREENSHOT_DIR, dir);
+  } catch {}
+};
+
+const STORAGE_KEY_BG_IMAGE = 'miki_custom_bg_image';
+const STORAGE_KEY_BG_OPACITY = 'miki_custom_bg_opacity';
+const STORAGE_KEY_BG_BLUR = 'miki_custom_bg_blur';
+
+const loadStoredBgImage = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  try {
+    return localStorage.getItem(STORAGE_KEY_BG_IMAGE);
+  } catch {
+    return null;
+  }
+};
+
+const loadStoredBgOpacity = (): number => {
+  if (typeof window === 'undefined') return 0.6;
+  try {
+    const v = localStorage.getItem(STORAGE_KEY_BG_OPACITY);
+    return v !== null ? parseFloat(v) : 0.6;
+  } catch {
+    return 0.6;
+  }
+};
+
+const loadStoredBgBlur = (): number => {
+  if (typeof window === 'undefined') return 0;
+  try {
+    const v = localStorage.getItem(STORAGE_KEY_BG_BLUR);
+    return v !== null ? parseFloat(v) : 0;
+  } catch {
+    return 0;
+  }
 };
 
 let lastSqliteSyncMs = 0;
@@ -351,6 +440,40 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
   bookmarks: loadStoredBookmarks(),
   youtubeHistory: loadStoredYouTubeHistory(),
   resumeBannerPositionMs: null,
+  screenshotDirectory: loadStoredScreenshotDirectory(),
+  setScreenshotDirectory: (dir) => {
+    set({ screenshotDirectory: dir });
+    saveStoredScreenshotDirectory(dir);
+  },
+  snapshotNotification: null,
+  setSnapshotNotification: (msg) => set({ snapshotNotification: msg }),
+  customBgImage: loadStoredBgImage(),
+  customBgOpacity: loadStoredBgOpacity(),
+  customBgBlur: loadStoredBgBlur(),
+  setCustomBgImage: (url) => {
+    set({ customBgImage: url });
+    if (url) {
+      try {
+        localStorage.setItem(STORAGE_KEY_BG_IMAGE, url);
+      } catch {}
+    } else {
+      try {
+        localStorage.removeItem(STORAGE_KEY_BG_IMAGE);
+      } catch {}
+    }
+  },
+  setCustomBgOpacity: (opacity) => {
+    set({ customBgOpacity: opacity });
+    try {
+      localStorage.setItem(STORAGE_KEY_BG_OPACITY, opacity.toString());
+    } catch {}
+  },
+  setCustomBgBlur: (blur) => {
+    set({ customBgBlur: blur });
+    try {
+      localStorage.setItem(STORAGE_KEY_BG_BLUR, blur.toString());
+    } catch {}
+  },
 
   addYouTubeHistory: (url, title) => {
     const parsedId = url.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/)?.[1] || '';
@@ -491,8 +614,37 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
 
     // Check if it's a YouTube URL! If so, don't pass to HTML5 <video>
     const isYouTube = /(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/.test(uri);
+    const ytMatch = uri.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+    const ytId = ytMatch ? ytMatch[1] : null;
+
     if (isYouTube) {
       get().addYouTubeHistory(uri, resolvedTitle);
+
+      // Record YouTube media in recentMedia so it appears in "Jump Back In"
+      const existingRecent = get().recentMedia;
+      const ytThumb = ytId ? `https://img.youtube.com/vi/${ytId}/mqdefault.jpg` : undefined;
+      const ytHistoryItem: MediaHistoryItem = {
+        mediaId: uri,
+        uri,
+        title: resolvedTitle,
+        durationMs: 0,
+        lastPositionMs: 0,
+        progressPercent: 100,
+        isCompleted: false,
+        playCount: ((existingRecent.find((m) => m.uri === uri || (ytId && m.youtubeId === ytId))?.playCount) ?? 0) + 1,
+        lastPlayedAt: Date.now(),
+        thumbnailUri: ytThumb,
+        isYouTube: true,
+        youtubeId: ytId || undefined,
+      };
+
+      const updatedRecent = [
+        ytHistoryItem,
+        ...existingRecent.filter((m) => m.uri !== uri && (!ytId || m.youtubeId !== ytId)),
+      ].slice(0, 30);
+      set({ recentMedia: updatedRecent });
+      saveStoredRecentMedia(updatedRecent);
+
       const video = document.getElementById('aether-video-viewport') as HTMLVideoElement | null;
       if (video) {
         video.pause();
@@ -505,6 +657,7 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
         retryCount: 0,
         lastError: null,
         isPaused: false,
+        resumeBannerPositionMs: null,
       });
       return;
     }
@@ -708,10 +861,34 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     if (engine?.captureSnapshot) {
       const dataUrl = engine.captureSnapshot();
       if (dataUrl) {
+        const titleClean = (get().currentTitle || 'Media').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 30);
+        const filename = `Miki_${titleClean}_${Date.now()}.png`;
+        const dir = get().screenshotDirectory || DEFAULT_SCREENSHOT_DIR;
+
+        // 1. macOS Cocoa native WebKit bridge
+        if (
+          typeof window !== 'undefined' &&
+          (window as unknown as { webkit?: { messageHandlers?: { saveScreenshot?: { postMessage: (msg: unknown) => void } } } })
+            .webkit?.messageHandlers?.saveScreenshot
+        ) {
+          (window as unknown as { webkit: { messageHandlers: { saveScreenshot: { postMessage: (msg: unknown) => void } } } })
+            .webkit.messageHandlers.saveScreenshot.postMessage({
+              base64Data: dataUrl,
+              filename,
+              directory: dir,
+            });
+          set({ snapshotNotification: `Snapshot saved to ${dir}/${filename}` });
+          setTimeout(() => set({ snapshotNotification: null }), 4000);
+          return;
+        }
+
+        // 2. Web / Browser download fallback
         const a = document.createElement('a');
         a.href = dataUrl;
-        a.download = `aether-snapshot-${Date.now()}.png`;
+        a.download = filename;
         a.click();
+        set({ snapshotNotification: `Snapshot saved: ${filename}` });
+        setTimeout(() => set({ snapshotNotification: null }), 4000);
       }
     }
   },

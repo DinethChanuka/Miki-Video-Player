@@ -85,8 +85,8 @@ export const TimelineScrubber: React.FC = () => {
     window.addEventListener('mouseup', onMouseUp);
   };
 
-  const progressPct = durationMs > 0 ? (positionMs / durationMs) * 100 : 0;
-  const bufferedPct = durationMs > 0 ? (bufferedMs / durationMs) * 100 : 0;
+  const progressPct = durationMs > 0 ? Math.min(100, Math.max(0, (positionMs / durationMs) * 100)) : 0;
+  const bufferedPct = durationMs > 0 ? Math.min(100, Math.max(0, (bufferedMs / durationMs) * 100)) : 0;
 
   // Find active chapter under hover
   const activeHoverChapter =
@@ -110,9 +110,9 @@ export const TimelineScrubber: React.FC = () => {
           style={{ width: `${bufferedPct}%` }}
         />
 
-        {/* Active Progress Fill with Theme Gradient */}
+        {/* Active Progress Fill with Theme Gradient - 0ms lag synchronization */}
         <div
-          className={`absolute top-0 bottom-0 left-0 bg-gradient-to-r ${activeTheme.timelineTrack} rounded-full transition-all duration-75`}
+          className={`absolute top-0 bottom-0 left-0 bg-gradient-to-r ${activeTheme.timelineTrack} rounded-full`}
           style={{
             width: `${progressPct}%`,
             boxShadow: `0 0 12px ${activeTheme.haloGlow}`,
@@ -128,18 +128,18 @@ export const TimelineScrubber: React.FC = () => {
         />
       )}
 
-      {/* Premium Scrubber Thumb Knob */}
+      {/* Premium Scrubber Thumb Knob - Always locked to progress head */}
       <div
-        className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-4 h-4 rounded-full transition-all duration-200 pointer-events-none flex items-center justify-center ${
-          isScrubbing ? 'scale-125' : 'scale-0 group-hover:scale-100'
+        className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-4 h-4 rounded-full transition-transform duration-150 pointer-events-none flex items-center justify-center ${
+          isScrubbing ? 'scale-125' : 'scale-100 group-hover:scale-125'
         }`}
         style={{
           left: `${progressPct}%`,
           backgroundColor: activeTheme.primaryHex,
-          boxShadow: `0 0 16px ${activeTheme.haloGlow}, 0 2px 6px rgba(0,0,0,0.5)`,
+          boxShadow: `0 0 14px ${activeTheme.haloGlow}, 0 2px 6px rgba(0,0,0,0.6)`,
         }}
       >
-        <div className="w-1.5 h-1.5 bg-white rounded-full" />
+        <div className="w-1.5 h-1.5 bg-white rounded-full shadow-sm" />
       </div>
 
       {/* Chapter Marker Ticks */}

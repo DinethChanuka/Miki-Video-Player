@@ -28,6 +28,7 @@ pnpm-debug.log*
 # Native binaries & App bundles
 MikiPlayer
 Miki Player.app/
+Build/MacOs/*.app/
 *.class
 
 # Agent scratch & internal plans

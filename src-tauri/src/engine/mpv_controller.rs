@@ -1,7 +1,7 @@
-use crate::engine::mpv_ffi::{MpvFormat, MpvHandle, MpvLib};
+use crate::engine::mpv_ffi::{MpvHandle, MpvLib};
 use crate::engine::types::{ChapterInfo, PlaybackState, TrackInfo, TrackKind};
 use crate::error::{PlayerError, PlayerResult};
-use std::ffi::{c_char, c_void, CStr, CString};
+use std::ffi::{c_void, CStr, CString};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
