@@ -77,6 +77,9 @@ touch "Build/windows/.gitkeep" "Build/Android/.gitkeep" "Build/ios/.gitkeep" "Bu
 
 rm -rf "Build/MacOs/Miki Player.app"
 cp -R "Miki Player.app" "Build/MacOs/Miki Player.app"
-ditto -c -k --sequesterRsrc --keepParent "Miki Player.app" "Build/MacOs/Miki-Player-macOS.zip"
+ditto -c -k --sequesterRsrc --keepParent "Build/MacOs/Miki Player.app" "Build/MacOs/Miki-Player-macOS.zip"
+
+# Clean up root working directory artifacts so root stays pristine
+rm -rf "Miki Player.app" "MikiPlayer"
 
 echo "✅ [Miki Player] Miki Player.app ready in Build/MacOs/! Double-click to run or open 'Build/MacOs/Miki Player.app'."

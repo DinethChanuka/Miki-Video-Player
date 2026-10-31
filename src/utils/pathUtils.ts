@@ -167,3 +167,4 @@ export function extractCleanFileName(uriOrPath: string): string {
 
   return cleanName || 'Untitled Media';
 }
+

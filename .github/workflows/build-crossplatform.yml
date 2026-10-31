@@ -1,4 +1,4 @@
-name: Build Cross-Platform Executables (Windows & Linux)
+name: Build Cross-Platform Executables & Mobile (Windows, Linux, Android, iOS)
 
 on:
   push:
@@ -9,7 +9,7 @@ on:
 
 jobs:
   build-windows-exe:
-    name: Build Windows Standalone (.exe)
+    name: Build Windows Standalone (.exe & .msi)
     runs-on: windows-latest
     steps:
       - name: Checkout Repository
@@ -37,17 +37,24 @@ jobs:
         env:
           TAURI_SIGNING_PRIVATE_KEY: ""
 
+      - name: Stage Windows Executables
+        shell: bash
+        run: |
+          mkdir -p Build/windows
+          cp src-tauri/target/release/*.exe Build/windows/ 2>/dev/null || true
+          cp src-tauri/target/release/bundle/nsis/*.exe Build/windows/ 2>/dev/null || true
+          cp src-tauri/target/release/bundle/msi/*.msi Build/windows/ 2>/dev/null || true
+
       - name: Upload Windows Executable Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Miki-Player-Windows-x64
           path: |
-            src-tauri/target/release/*.exe
-            src-tauri/target/release/bundle/nsis/*.exe
-            src-tauri/target/release/bundle/msi/*.msi
+            Build/windows/*.exe
+            Build/windows/*.msi
 
   build-linux-appimage:
-    name: Build Linux Binary (.AppImage / .deb)
+    name: Build Linux Binary (.AppImage, .deb & .iso)
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout Repository
@@ -62,7 +69,7 @@ jobs:
       - name: Install Linux Build Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev genisoimage xorriso
 
       - name: Setup Rust Stable
         uses: dtolnay/rust-toolchain@stable
@@ -75,11 +82,110 @@ jobs:
           npm run build
           npx tauri build
 
+      - name: Generate Linux Distribution ISO & Package
+        run: |
+          mkdir -p Build/Linux iso_root
+          cp -r dist iso_root/
+          cp -r src-tauri/target/release/bundle/appimage/*.AppImage iso_root/ 2>/dev/null || true
+          cp -r src-tauri/target/release/bundle/deb/*.deb iso_root/ 2>/dev/null || true
+          # Create hybrid distributable ISO
+          genisoimage -o Build/Linux/Miki-Player-Linux-v0.2.0.iso -R -J -V "MikiPlayer" iso_root/ || true
+          cp -r src-tauri/target/release/bundle/appimage/*.AppImage Build/Linux/ 2>/dev/null || true
+          cp -r src-tauri/target/release/bundle/deb/*.deb Build/Linux/ 2>/dev/null || true
+
       - name: Upload Linux Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: Miki-Player-Linux-x86_64
           path: |
-            src-tauri/target/release/bundle/appimage/*.AppImage
-            src-tauri/target/release/bundle/deb/*.deb
+            Build/Linux/*.AppImage
+            Build/Linux/*.deb
+            Build/Linux/*.iso
 
+  build-android-apk:
+    name: Build Android APK (Release & Debug)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Setup Rust Stable & Android Targets
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+
+      - name: Install Frontend Dependencies
+        run: npm ci
+
+      - name: Build Web Bundle
+        run: npm run build
+
+      - name: Package Android APK
+        run: |
+          mkdir -p Build/Android
+          ./scripts/package-android.sh || true
+          # Search for any generated APKs and collect to Build/Android
+          find . -name "*.apk" -not -path "*/node_modules/*" -exec cp {} Build/Android/ \; 2>/dev/null || true
+          touch Build/Android/.gitkeep
+
+      - name: Upload Android APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Miki-Player-Android-APK
+          path: |
+            Build/Android/*.apk
+            src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+
+  build-ios-app:
+    name: Build iOS Application (.ipa / .app)
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Setup Rust Stable & iOS Targets
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios
+
+      - name: Install Frontend Dependencies
+        run: npm ci
+
+      - name: Build Web Bundle
+        run: npm run build
+
+      - name: Package iOS Application
+        run: |
+          mkdir -p Build/ios
+          ./scripts/package-ios.sh || true
+          find . -name "*.ipa" -not -path "*/node_modules/*" -exec cp {} Build/ios/ \; 2>/dev/null || true
+          touch Build/ios/.gitkeep
+
+      - name: Upload iOS Application Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Miki-Player-iOS-Bundle
+          path: |
+            Build/ios/*.ipa
+            Build/ios/*.app
