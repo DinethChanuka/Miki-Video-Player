@@ -19,6 +19,7 @@ import {
   Subtitles,
   Activity,
   Sliders,
+  Sun,
 } from 'lucide-react';
 import { detectOperatingSystem, getOSPresetDirectories } from '../../utils/pathUtils';
 
@@ -53,10 +54,12 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
   const customBgImage = usePlayerStore((s) => s.customBgImage);
   const customBgOpacity = usePlayerStore((s) => s.customBgOpacity);
   const customBgBlur = usePlayerStore((s) => s.customBgBlur);
+  const customBgBrightness = usePlayerStore((s) => s.customBgBrightness);
   const customBgTint = usePlayerStore((s) => s.customBgTint);
   const setCustomBgImage = usePlayerStore((s) => s.setCustomBgImage);
   const setCustomBgOpacity = usePlayerStore((s) => s.setCustomBgOpacity);
   const setCustomBgBlur = usePlayerStore((s) => s.setCustomBgBlur);
+  const setCustomBgBrightness = usePlayerStore((s) => s.setCustomBgBrightness);
   const setCustomBgTint = usePlayerStore((s) => s.setCustomBgTint);
 
   const spatialAudio = usePlayerStore((s) => s.spatialAudio);
@@ -232,46 +235,86 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
 
   if (!isOpen) return null;
 
-  const WALLPAPERS = [
+  const WALLPAPERS: {
+    name: string;
+    url: string;
+    badge: string;
+    opacity: number;
+    blur: number;
+    brightness: number;
+    tint: 'obsidian' | 'navy' | 'aurora' | 'amethyst' | 'clear';
+  }[] = [
     {
       name: 'Deep Nebula',
       url: 'https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?auto=format&fit=crop&w=1200&q=80',
       badge: 'Deep Space',
+      opacity: 0.85,
+      blur: 0,
+      brightness: 1.0,
+      tint: 'obsidian',
     },
     {
       name: 'Liquid Glass',
       url: 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?auto=format&fit=crop&w=1200&q=80',
       badge: 'Prismatic',
+      opacity: 0.95,
+      blur: 8,
+      brightness: 1.1,
+      tint: 'clear',
     },
     {
       name: 'Cyberpunk Neon',
       url: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=1200&q=80',
       badge: 'Neon Glow',
+      opacity: 1.0,
+      blur: 0,
+      brightness: 1.15,
+      tint: 'amethyst',
     },
     {
       name: 'Aurora Borealis',
       url: 'https://images.unsplash.com/photo-1531366936337-7c912a4589a7?auto=format&fit=crop&w=1200&q=80',
       badge: 'Northern Light',
+      opacity: 0.9,
+      blur: 4,
+      brightness: 1.05,
+      tint: 'aurora',
     },
     {
       name: 'Dark Abstract',
       url: 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=80',
       badge: 'Silicon Grid',
+      opacity: 0.8,
+      blur: 0,
+      brightness: 0.95,
+      tint: 'navy',
     },
     {
       name: 'Synthwave Sunset',
       url: 'https://images.unsplash.com/photo-1508739773434-c26b3d09e071?auto=format&fit=crop&w=1200&q=80',
       badge: 'Retro 80s',
+      opacity: 1.0,
+      blur: 0,
+      brightness: 1.2,
+      tint: 'amethyst',
     },
     {
       name: 'Obsidian Velvet',
       url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
       badge: 'Luxury Dark',
+      opacity: 0.75,
+      blur: 10,
+      brightness: 0.85,
+      tint: 'obsidian',
     },
     {
       name: 'Cyber Horizon',
       url: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=1200&q=80',
       badge: 'Matrix Wave',
+      opacity: 0.95,
+      blur: 0,
+      brightness: 1.1,
+      tint: 'aurora',
     },
   ];
 
@@ -337,7 +380,9 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md animate-in fade-in duration-200 select-none p-4">
+    <div className={`fixed inset-0 z-50 flex items-center justify-center animate-in fade-in duration-200 select-none p-4 ${
+      customBgImage ? 'bg-black/45' : 'bg-black/80 backdrop-blur-md'
+    }`}>
       <div className="glass-panel w-full max-w-3xl p-6 rounded-3xl flex flex-col gap-4 border border-white/20 shadow-2xl max-h-[90vh] overflow-hidden bg-slate-950/95">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-white/10 pb-3">
@@ -501,7 +546,13 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
                     return (
                       <button
                         key={bg.name}
-                        onClick={() => setCustomBgImage(bg.url)}
+                        onClick={() => {
+                          setCustomBgImage(bg.url);
+                          setCustomBgOpacity(bg.opacity);
+                          setCustomBgBlur(bg.blur);
+                          setCustomBgBrightness(bg.brightness);
+                          setCustomBgTint(bg.tint);
+                        }}
                         className={`group relative h-20 rounded-2xl overflow-hidden border transition-all text-left flex flex-col justify-between p-2.5 shadow-md ${
                           isSelected
                             ? 'border-fuchsia-400 ring-2 ring-fuchsia-400/50 shadow-fuchsia-500/20 scale-[1.02]'
@@ -552,6 +603,10 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
                           reader.onload = (event) => {
                             if (typeof event.target?.result === 'string') {
                               setCustomBgImage(event.target.result);
+                              setCustomBgOpacity(1.0);
+                              setCustomBgBlur(0);
+                              setCustomBgBrightness(1.0);
+                              setCustomBgTint('clear');
                             }
                           };
                           reader.readAsDataURL(file);
@@ -561,30 +616,59 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
                   </label>
                 </div>
 
-                {/* Extended Sliders: Opacity (0-100%) & Blur (0-80px) & Tint */}
+                {/* Extended Sliders: Opacity (0-100%), Blur (0-80px), Brightness (20-200%) & Tint Filters */}
                 {customBgImage && (
-                  <div className="flex flex-col gap-3 p-3.5 rounded-2xl bg-white/5 border border-white/10 mt-1">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div className="flex flex-col gap-1.5">
-                        <div className="flex justify-between text-[11px] text-white/70">
-                          <span>Background Opacity / Transparency</span>
-                          <span className="font-mono text-fuchsia-300 font-bold">{Math.round(customBgOpacity * 100)}%</span>
+                  <div className="flex flex-col gap-4 p-4 rounded-2xl bg-white/5 border border-white/10 mt-1">
+                    {/* Header showing active style filter info */}
+                    <div className="flex items-center justify-between text-xs border-b border-white/10 pb-2.5">
+                      <span className="font-semibold text-white/90 flex items-center gap-2">
+                        <Sliders className="w-3.5 h-3.5 text-fuchsia-400" />
+                        Background Overlay Properties & Live Filters
+                      </span>
+                      <span className="text-[10px] font-mono text-cyan-400/80">
+                        Live GPU Rendered
+                      </span>
+                    </div>
+
+                    <div className="flex flex-col gap-3.5">
+                      {/* Property 1: Opacity / Transparency */}
+                      <div className="flex flex-col gap-1.5 p-2.5 rounded-xl bg-white/[0.03] border border-white/5">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-white/80 font-medium flex items-center gap-1.5">
+                            <Eye className="w-3.5 h-3.5 text-fuchsia-400" />
+                            Background Opacity / Transparency
+                          </span>
+                          <span className="font-mono text-fuchsia-300 font-bold px-2 py-0.5 rounded-md bg-fuchsia-500/10 border border-fuchsia-500/20 text-[11px]">
+                            {Math.round(customBgOpacity * 100)}%
+                          </span>
                         </div>
                         <input
                           type="range"
                           min={0.0}
                           max={1.0}
-                          step={0.05}
+                          step={0.01}
                           value={customBgOpacity}
                           onChange={(e) => setCustomBgOpacity(parseFloat(e.target.value))}
-                          className="w-full h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-fuchsia-400"
+                          className="w-full h-2 bg-white/15 rounded-lg appearance-none cursor-pointer accent-fuchsia-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-400/50"
+                          aria-label="Background Opacity"
                         />
+                        <div className="flex justify-between text-[10px] text-white/40 font-mono">
+                          <span>0% (Transparent)</span>
+                          <span>50%</span>
+                          <span>100% (Solid Wallpaper)</span>
+                        </div>
                       </div>
 
-                      <div className="flex flex-col gap-1.5">
-                        <div className="flex justify-between text-[11px] text-white/70">
-                          <span>Background Blur Spread</span>
-                          <span className="font-mono text-cyan-300 font-bold">{customBgBlur}px</span>
+                      {/* Property 2: Blur Spread */}
+                      <div className="flex flex-col gap-1.5 p-2.5 rounded-xl bg-white/[0.03] border border-white/5">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-white/80 font-medium flex items-center gap-1.5">
+                            <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                            Background Blur Spread
+                          </span>
+                          <span className="font-mono text-cyan-300 font-bold px-2 py-0.5 rounded-md bg-cyan-500/10 border border-cyan-500/20 text-[11px]">
+                            {customBgBlur}px
+                          </span>
                         </div>
                         <input
                           type="range"
@@ -593,34 +677,77 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
                           step={1}
                           value={customBgBlur}
                           onChange={(e) => setCustomBgBlur(parseInt(e.target.value, 10))}
-                          className="w-full h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-cyan-400"
+                          className="w-full h-2 bg-white/15 rounded-lg appearance-none cursor-pointer accent-cyan-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50"
+                          aria-label="Background Blur Spread"
                         />
+                        <div className="flex justify-between text-[10px] text-white/40 font-mono">
+                          <span>0px (Crisp Sharp)</span>
+                          <span>40px</span>
+                          <span>80px (Soft Spread)</span>
+                        </div>
+                      </div>
+
+                      {/* Property 3: Overlay Brightness */}
+                      <div className="flex flex-col gap-1.5 p-2.5 rounded-xl bg-white/[0.03] border border-white/5">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-white/80 font-medium flex items-center gap-1.5">
+                            <Sun className="w-3.5 h-3.5 text-amber-400" />
+                            Background Overlay Brightness
+                          </span>
+                          <span className="font-mono text-amber-300 font-bold px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/20 text-[11px]">
+                            {Math.round((customBgBrightness ?? 1.0) * 100)}%
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min={0.2}
+                          max={2.0}
+                          step={0.02}
+                          value={customBgBrightness ?? 1.0}
+                          onChange={(e) => setCustomBgBrightness(parseFloat(e.target.value))}
+                          className="w-full h-2 bg-white/15 rounded-lg appearance-none cursor-pointer accent-amber-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/50"
+                          aria-label="Background Overlay Brightness"
+                        />
+                        <div className="flex justify-between text-[10px] text-white/40 font-mono">
+                          <span>20% (Dim Cinematic)</span>
+                          <span>100% (Standard)</span>
+                          <span>200% (Ultra Bright)</span>
+                        </div>
                       </div>
                     </div>
 
-                    {/* Tint Selector */}
-                    <div className="flex flex-col gap-1.5 pt-2 border-t border-white/10">
-                      <span className="text-[11px] text-white/70">Glass Overlay Tint:</span>
-                      <div className="grid grid-cols-5 gap-1.5">
+                    {/* Tint & Filter Buttons */}
+                    <div className="flex flex-col gap-2 pt-2 border-t border-white/10">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-semibold text-white/80">Glass Overlay Tint & Style Filters:</span>
+                        <span className="text-[10px] font-mono text-white/40 capitalize">
+                          Current: {customBgTint}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-5 gap-2">
                         {[
-                          { id: 'obsidian', label: 'Dark Obsidian' },
-                          { id: 'navy', label: 'Midnight Navy' },
-                          { id: 'aurora', label: 'Emerald Aurora' },
-                          { id: 'amethyst', label: 'Amethyst' },
-                          { id: 'clear', label: 'Pure Clear' },
-                        ].map((t) => (
-                          <button
-                            key={t.id}
-                            onClick={() => setCustomBgTint(t.id as 'obsidian' | 'navy' | 'aurora' | 'amethyst' | 'clear')}
-                            className={`py-1.5 px-2 rounded-xl text-[10px] font-semibold transition-all truncate text-center ${
-                              customBgTint === t.id
-                                ? 'bg-white/20 text-white border border-white/40 shadow-sm font-bold'
-                                : 'bg-white/5 text-white/50 hover:text-white border border-white/5'
-                            }`}
-                          >
-                            {t.label}
-                          </button>
-                        ))}
+                          { id: 'obsidian', label: 'Dark Obsidian', color: 'bg-black/80 border-slate-700' },
+                          { id: 'navy', label: 'Midnight Navy', color: 'bg-blue-950/80 border-blue-800' },
+                          { id: 'aurora', label: 'Emerald Aurora', color: 'bg-emerald-950/80 border-emerald-800' },
+                          { id: 'amethyst', label: 'Amethyst', color: 'bg-purple-950/80 border-purple-800' },
+                          { id: 'clear', label: 'Pure Clear', color: 'bg-white/10 border-white/20' },
+                        ].map((t) => {
+                          const isActive = customBgTint === t.id;
+                          return (
+                            <button
+                              key={t.id}
+                              onClick={() => setCustomBgTint(t.id as 'obsidian' | 'navy' | 'aurora' | 'amethyst' | 'clear')}
+                              className={`py-2 px-2 rounded-xl text-[10px] font-semibold transition-all truncate text-center flex flex-col items-center gap-1 border ${
+                                isActive
+                                  ? 'bg-white/20 text-white border-white/60 shadow-md ring-1 ring-white/40 scale-[1.02]'
+                                  : 'bg-white/5 text-white/50 hover:text-white border-white/10 hover:border-white/20'
+                              }`}
+                            >
+                              <div className={`w-3.5 h-3.5 rounded-full border ${t.color}`} />
+                              <span className="truncate">{t.label}</span>
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
                   </div>

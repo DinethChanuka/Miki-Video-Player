@@ -9,6 +9,7 @@ import { FileBrowserModal } from './components/hud/FileBrowserModal';
 import { ResumeChoiceModal } from './components/hud/ResumeChoiceModal';
 import { ErrorToast } from './components/hud/ErrorToast';
 import { SplashScreen } from './components/splash/SplashScreen';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { usePlayerGestures } from './hooks/usePlayerGestures';
 import { YouTubePlayer } from './components/player/YouTubePlayer';
 import { SubtitleOverlay } from './components/player/SubtitleOverlay';
@@ -90,6 +91,7 @@ export const App: React.FC = () => {
   const customBgImage = usePlayerStore((s) => s.customBgImage);
   const customBgOpacity = usePlayerStore((s) => s.customBgOpacity);
   const customBgBlur = usePlayerStore((s) => s.customBgBlur);
+  const customBgBrightness = usePlayerStore((s) => s.customBgBrightness);
   const customBgTint = usePlayerStore((s) => s.customBgTint);
   const positionMs = usePlayerStore((s) => s.positionMs);
   const activeSubtitleTrack = usePlayerStore((s) => s.activeSubtitleTrack);
@@ -403,16 +405,16 @@ export const App: React.FC = () => {
       {customBgImage && (
         <div className="absolute -inset-10 z-0 pointer-events-none overflow-hidden">
           <div
-            className="w-full h-full bg-cover bg-center transition-all duration-700 ease-out transform scale-105"
+            className="w-full h-full bg-cover bg-center transition-all duration-300 ease-out transform scale-105"
             style={{
               backgroundImage: `url(${customBgImage})`,
               opacity: customBgOpacity,
-              filter: `blur(${customBgBlur}px)`,
+              filter: `blur(${customBgBlur}px) brightness(${customBgBrightness ?? 1.0})`,
             }}
           />
           {/* Dynamic Tint Overlay Layer */}
           <div
-            className={`absolute inset-0 pointer-events-none transition-colors duration-500 ${
+            className={`absolute inset-0 pointer-events-none transition-colors duration-300 ${
               customBgTint === 'navy'
                 ? 'bg-blue-950/40'
                 : customBgTint === 'aurora'
@@ -423,6 +425,9 @@ export const App: React.FC = () => {
                       ? 'bg-transparent'
                       : 'bg-black/40'
             }`}
+            style={{
+              opacity: customBgTint === 'clear' ? 0 : Math.min(1, (customBgOpacity ?? 1) * 0.9),
+            }}
           />
         </div>
       )}
@@ -645,7 +650,11 @@ export const App: React.FC = () => {
 
         {/* Home View / Top-Aligned Jump Back In & Card Previews */}
         {!currentUri && (
-          <div className="absolute inset-0 z-30 flex flex-col items-center justify-start pt-6 sm:pt-8 pb-12 px-6 sm:px-10 pointer-events-auto bg-black/75 backdrop-blur-md animate-in fade-in duration-300 overflow-y-auto">
+          <div
+            className={`absolute inset-0 z-30 flex flex-col items-center justify-start pt-6 sm:pt-8 pb-12 px-6 sm:px-10 pointer-events-auto animate-in fade-in duration-300 overflow-y-auto ${
+              customBgImage ? 'bg-black/25' : 'bg-black/75 backdrop-blur-md'
+            }`}
+          >
             {recentMedia.length > 0 ? (
               /* Rich Card Grid: Stopped-Point Video Preview Thumbnail, No Paths/URLs */
               <div className="w-full max-w-6xl flex flex-col gap-6">
@@ -933,24 +942,36 @@ export const App: React.FC = () => {
         )}
       </div>
 
-      {/* Modals */}
-      <EqualizerModal isOpen={isEqOpen} onClose={() => setIsEqOpen(false)} />
-      <VideoSettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        onOpenEq={() => setIsEqOpen(true)}
-      />
-      <FileBrowserModal isOpen={isFileBrowserOpen} onClose={() => setIsFileBrowserOpen(false)} />
-      <ResumeChoiceModal
-        isOpen={isResumeChoiceOpen}
-        item={pendingResumeItem}
-        onClose={() => {
-          setIsResumeChoiceOpen(false);
-          setPendingResumeItem(null);
-        }}
-        onResume={handleConfirmResume}
-        onRestart={handleConfirmRestart}
-      />
+      {/* Modals wrapped in ErrorBoundary to guarantee uninterrupted UI */}
+      <ErrorBoundary onReset={() => setIsFileBrowserOpen(false)}>
+        <FileBrowserModal isOpen={isFileBrowserOpen} onClose={() => setIsFileBrowserOpen(false)} />
+      </ErrorBoundary>
+
+      <ErrorBoundary onReset={() => setIsSettingsOpen(false)}>
+        <VideoSettingsModal
+          isOpen={isSettingsOpen}
+          onClose={() => setIsSettingsOpen(false)}
+          onOpenEq={() => setIsEqOpen(true)}
+        />
+      </ErrorBoundary>
+
+      <ErrorBoundary onReset={() => setIsEqOpen(false)}>
+        <EqualizerModal isOpen={isEqOpen} onClose={() => setIsEqOpen(false)} />
+      </ErrorBoundary>
+
+      <ErrorBoundary onReset={() => setIsResumeChoiceOpen(false)}>
+        <ResumeChoiceModal
+          isOpen={isResumeChoiceOpen}
+          item={pendingResumeItem}
+          onClose={() => {
+            setIsResumeChoiceOpen(false);
+            setPendingResumeItem(null);
+          }}
+          onResume={handleConfirmResume}
+          onRestart={handleConfirmRestart}
+        />
+      </ErrorBoundary>
+
       <ErrorToast />
 
       {/* Cinematic Startup Video Splash Loader */}
