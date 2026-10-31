@@ -20,6 +20,18 @@ import {
   SpatialProfileId,
   DEFAULT_SPATIAL_STATE,
 } from '../core/SpatialAudioEngine';
+import {
+  SubtitleTrackData,
+  SubtitleStyleConfig,
+  DEFAULT_SUBTITLE_STYLE,
+  parseSubtitleText,
+  memorizeSubtitleForVideo,
+  getMemorizedSubtitleForVideo,
+} from '../core/SubtitleManager';
+import {
+  getOSPresetDirectories,
+  extractCleanFileName,
+} from '../utils/pathUtils';
 
 export interface MediaHistoryItem {
   mediaId: string;
@@ -50,6 +62,9 @@ export interface YouTubeHistoryItem {
   url: string;
   title: string;
   timestamp: number;
+  lastPositionMs?: number;
+  durationMs?: number;
+  progressPercent?: number;
 }
 
 export interface MediaPreferences {
@@ -135,7 +150,7 @@ export interface PlayerStoreState {
 
   // Actions
   bootEngine: (preferred?: EngineType, videoEl?: HTMLVideoElement) => Promise<void>;
-  openMedia: (uri: string, title?: string, autoResume?: boolean) => Promise<void>;
+  openMedia: (uri: string, title?: string, autoResume?: boolean, startPositionMs?: number) => Promise<void>;
   closeMedia: () => Promise<void>;
   togglePlay: () => Promise<void>;
   seek: (timestampMs: number, exact?: boolean) => Promise<void>;
@@ -152,9 +167,33 @@ export interface PlayerStoreState {
   customBgImage: string | null;
   customBgOpacity: number;
   customBgBlur: number;
+  customBgTint: 'obsidian' | 'navy' | 'aurora' | 'amethyst' | 'clear';
   setCustomBgImage: (url: string | null) => void;
   setCustomBgOpacity: (opacity: number) => void;
   setCustomBgBlur: (blur: number) => void;
+  setCustomBgTint: (tint: 'obsidian' | 'navy' | 'aurora' | 'amethyst' | 'clear') => void;
+  
+  // Sound System Advanced Controls
+  preampGain: number;
+  stereoPan: number;
+  setPreampGain: (gain: number) => void;
+  setStereoPan: (pan: number) => void;
+  playAudioTestChime: () => void;
+
+  // Subtitle & Caption Management
+  activeSubtitleTrack: SubtitleTrackData | null;
+  isSubtitlesVisible: boolean;
+  subtitleStyle: SubtitleStyleConfig;
+  loadSubtitleFromFile: (file: File) => Promise<void>;
+  loadSubtitleFromText: (fileName: string, content: string, syncOffset?: number) => void;
+  setSubtitleSyncOffset: (offsetSec: number) => void;
+  toggleSubtitles: () => void;
+  updateSubtitleStyle: (style: Partial<SubtitleStyleConfig>) => void;
+  clearSubtitle: () => void;
+
+  // YouTube stopped place persistence
+  saveYouTubeProgress: (youtubeId: string, positionMs: number, durationMs: number) => void;
+
   addBookmark: (label?: string) => Promise<void>;
   removeRecentMedia: (uri: string) => void;
   addYouTubeHistory: (url: string, title?: string) => void;
@@ -265,7 +304,7 @@ const saveStoredYouTubeHistory = (items: YouTubeHistoryItem[]) => {
 };
 
 const STORAGE_KEY_SCREENSHOT_DIR = 'miki_screenshot_directory';
-export const DEFAULT_SCREENSHOT_DIR = '~/Pictures/Miki Player/Screenshots';
+export const DEFAULT_SCREENSHOT_DIR = getOSPresetDirectories()[0]?.path || '~/Pictures/Miki Player/Screenshots';
 
 const loadStoredScreenshotDirectory = (): string => {
   if (typeof window === 'undefined') return DEFAULT_SCREENSHOT_DIR;
@@ -286,33 +325,47 @@ const saveStoredScreenshotDirectory = (dir: string) => {
 const STORAGE_KEY_BG_IMAGE = 'miki_custom_bg_image';
 const STORAGE_KEY_BG_OPACITY = 'miki_custom_bg_opacity';
 const STORAGE_KEY_BG_BLUR = 'miki_custom_bg_blur';
+const STORAGE_KEY_BG_TINT = 'miki_custom_bg_tint';
+
+export const DEFAULT_BG_IMAGE = 'https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?auto=format&fit=crop&w=1920&q=80'; // Deep Nebula
 
 const loadStoredBgImage = (): string | null => {
-  if (typeof window === 'undefined') return null;
+  if (typeof window === 'undefined') return DEFAULT_BG_IMAGE;
   try {
-    return localStorage.getItem(STORAGE_KEY_BG_IMAGE);
+    const v = localStorage.getItem(STORAGE_KEY_BG_IMAGE);
+    return v !== null ? v : DEFAULT_BG_IMAGE;
   } catch {
-    return null;
+    return DEFAULT_BG_IMAGE;
   }
 };
 
 const loadStoredBgOpacity = (): number => {
-  if (typeof window === 'undefined') return 0.6;
+  if (typeof window === 'undefined') return 0.55;
   try {
     const v = localStorage.getItem(STORAGE_KEY_BG_OPACITY);
-    return v !== null ? parseFloat(v) : 0.6;
+    return v !== null ? parseFloat(v) : 0.55;
   } catch {
-    return 0.6;
+    return 0.55;
   }
 };
 
 const loadStoredBgBlur = (): number => {
-  if (typeof window === 'undefined') return 0;
+  if (typeof window === 'undefined') return 22;
   try {
     const v = localStorage.getItem(STORAGE_KEY_BG_BLUR);
-    return v !== null ? parseFloat(v) : 0;
+    return v !== null ? parseFloat(v) : 22;
   } catch {
-    return 0;
+    return 22;
+  }
+};
+
+const loadStoredBgTint = (): 'obsidian' | 'navy' | 'aurora' | 'amethyst' | 'clear' => {
+  if (typeof window === 'undefined') return 'obsidian';
+  try {
+    const v = localStorage.getItem(STORAGE_KEY_BG_TINT);
+    return (v as 'obsidian' | 'navy' | 'aurora' | 'amethyst' | 'clear') || 'obsidian';
+  } catch {
+    return 'obsidian';
   }
 };
 
@@ -475,6 +528,159 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     } catch {}
   },
 
+  customBgTint: loadStoredBgTint(),
+  setCustomBgTint: (tint) => {
+    set({ customBgTint: tint });
+    try {
+      localStorage.setItem(STORAGE_KEY_BG_TINT, tint);
+    } catch {}
+  },
+
+  // Sound System Advanced Controls
+  preampGain: 1.0,
+  stereoPan: 0.0,
+  setPreampGain: (gain) => {
+    const clamped = Math.max(0.5, Math.min(2.5, gain));
+    get().spatialAudio.setPreampGain(clamped);
+    set({ preampGain: clamped });
+  },
+  setStereoPan: (pan) => {
+    const clamped = Math.max(-1.0, Math.min(1.0, pan));
+    get().spatialAudio.setStereoPan(clamped);
+    set({ stereoPan: clamped });
+  },
+  playAudioTestChime: () => {
+    get().spatialAudio.playTestChime();
+  },
+
+  // Subtitle & Caption Management
+  activeSubtitleTrack: null,
+  isSubtitlesVisible: true,
+  subtitleStyle: { ...DEFAULT_SUBTITLE_STYLE },
+
+  loadSubtitleFromFile: async (file: File) => {
+    try {
+      const text = await file.text();
+      const cues = parseSubtitleText(text);
+      const curUri = get().currentUri || file.name;
+      const track: SubtitleTrackData = {
+        id: `sub-${Date.now()}`,
+        fileName: file.name,
+        sourceUri: curUri,
+        cues,
+        syncOffsetSec: 0,
+        rawContent: text,
+      };
+      set({
+        activeSubtitleTrack: track,
+        isSubtitlesVisible: true,
+      });
+      memorizeSubtitleForVideo(curUri, file.name, text, 0);
+    } catch (e) {
+      console.warn('Failed to load subtitle file:', e);
+    }
+  },
+
+  loadSubtitleFromText: (fileName: string, content: string, syncOffset: number = 0) => {
+    const cues = parseSubtitleText(content);
+    const curUri = get().currentUri || fileName;
+    const track: SubtitleTrackData = {
+      id: `sub-${Date.now()}`,
+      fileName,
+      sourceUri: curUri,
+      cues,
+      syncOffsetSec: syncOffset,
+      rawContent: content,
+    };
+    set({
+      activeSubtitleTrack: track,
+      isSubtitlesVisible: true,
+    });
+    memorizeSubtitleForVideo(curUri, fileName, content, syncOffset);
+  },
+
+  setSubtitleSyncOffset: (offsetSec: number) => {
+    const active = get().activeSubtitleTrack;
+    if (!active) return;
+    const updated = { ...active, syncOffsetSec: offsetSec };
+    set({ activeSubtitleTrack: updated });
+    if (active.sourceUri && active.rawContent) {
+      memorizeSubtitleForVideo(active.sourceUri, active.fileName, active.rawContent, offsetSec);
+    }
+  },
+
+  toggleSubtitles: () => {
+    set((s) => ({ isSubtitlesVisible: !s.isSubtitlesVisible }));
+  },
+
+  updateSubtitleStyle: (style: Partial<SubtitleStyleConfig>) => {
+    set((s) => ({ subtitleStyle: { ...s.subtitleStyle, ...style } }));
+  },
+
+  clearSubtitle: () => {
+    set({ activeSubtitleTrack: null });
+  },
+
+  saveYouTubeProgress: (youtubeId: string, positionMs: number, durationMs: number) => {
+    if (!youtubeId || positionMs <= 0) return;
+    const progressPercent = durationMs > 0 ? Math.min(100, Math.round((positionMs / durationMs) * 100)) : 0;
+    const isCompleted = progressPercent >= 95;
+
+    // 1. Update youtubeHistory
+    const existingHistory = get().youtubeHistory;
+    const updatedHistory = existingHistory.map((item) => {
+      if (item.id === youtubeId || item.url.includes(youtubeId)) {
+        return {
+          ...item,
+          lastPositionMs: positionMs,
+          durationMs,
+          progressPercent,
+          timestamp: Date.now(),
+        };
+      }
+      return item;
+    });
+    set({ youtubeHistory: updatedHistory });
+    saveStoredYouTubeHistory(updatedHistory);
+
+    // 2. Update recentMedia so Jump Back In cards and Resume Choice Modal have the stopped position!
+    const recents = get().recentMedia;
+    const targetUrl = `https://www.youtube.com/watch?v=${youtubeId}`;
+    const foundIndex = recents.findIndex((r) => r.youtubeId === youtubeId || r.uri.includes(youtubeId));
+
+    if (foundIndex >= 0) {
+      const updatedRecents = [...recents];
+      updatedRecents[foundIndex] = {
+        ...updatedRecents[foundIndex],
+        lastPositionMs: positionMs,
+        durationMs: durationMs || updatedRecents[foundIndex].durationMs,
+        progressPercent,
+        isCompleted,
+        lastPlayedAt: Date.now(),
+      };
+      set({ recentMedia: updatedRecents });
+      saveStoredRecentMedia(updatedRecents);
+    } else {
+      const newRecent: MediaHistoryItem = {
+        mediaId: targetUrl,
+        uri: targetUrl,
+        title: `YouTube Video (${youtubeId})`,
+        durationMs,
+        lastPositionMs: positionMs,
+        progressPercent,
+        isCompleted,
+        playCount: 1,
+        lastPlayedAt: Date.now(),
+        thumbnailUri: `https://img.youtube.com/vi/${youtubeId}/mqdefault.jpg`,
+        isYouTube: true,
+        youtubeId,
+      };
+      const updatedRecents = [newRecent, ...recents].slice(0, 30);
+      set({ recentMedia: updatedRecents });
+      saveStoredRecentMedia(updatedRecents);
+    }
+  },
+
   addYouTubeHistory: (url, title) => {
     const parsedId = url.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/)?.[1] || '';
     if (!parsedId) return;
@@ -608,9 +814,9 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     }
   },
 
-  openMedia: async (uri, title, autoResume = true) => {
-    const resolvedTitle = title ?? uri.split(/[\\/]/).pop() ?? 'Untitled Media';
-    let startPos = 0;
+  openMedia: async (uri, title, autoResume = true, startPositionMs?: number) => {
+    const resolvedTitle = title ?? extractCleanFileName(uri);
+    let startPos = startPositionMs ?? 0;
 
     // Check if it's a YouTube URL! If so, don't pass to HTML5 <video>
     const isYouTube = /(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/.test(uri);
@@ -620,18 +826,24 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     if (isYouTube) {
       get().addYouTubeHistory(uri, resolvedTitle);
 
-      // Record YouTube media in recentMedia so it appears in "Jump Back In"
       const existingRecent = get().recentMedia;
+      const existingYt = existingRecent.find((m) => m.uri === uri || (ytId && m.youtubeId === ytId));
+      if (startPositionMs !== undefined) {
+        startPos = startPositionMs;
+      } else if (autoResume && existingYt?.lastPositionMs) {
+        startPos = existingYt.lastPositionMs;
+      }
+
       const ytThumb = ytId ? `https://img.youtube.com/vi/${ytId}/mqdefault.jpg` : undefined;
       const ytHistoryItem: MediaHistoryItem = {
         mediaId: uri,
         uri,
         title: resolvedTitle,
-        durationMs: 0,
-        lastPositionMs: 0,
-        progressPercent: 100,
+        durationMs: existingYt?.durationMs || 0,
+        lastPositionMs: startPos,
+        progressPercent: existingYt?.progressPercent || 0,
         isCompleted: false,
-        playCount: ((existingRecent.find((m) => m.uri === uri || (ytId && m.youtubeId === ytId))?.playCount) ?? 0) + 1,
+        playCount: ((existingYt?.playCount) ?? 0) + 1,
         lastPlayedAt: Date.now(),
         thumbnailUri: ytThumb,
         isYouTube: true,
@@ -654,11 +866,30 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
       set({
         currentUri: uri,
         currentTitle: resolvedTitle,
+        positionMs: startPos,
+        durationMs: existingYt?.durationMs || 0,
         retryCount: 0,
         lastError: null,
         isPaused: false,
         resumeBannerPositionMs: null,
       });
+
+      // Restore any memorized subtitles for this video
+      const memorizedSub = getMemorizedSubtitleForVideo(uri);
+      if (memorizedSub && memorizedSub.rawContent) {
+        const cues = parseSubtitleText(memorizedSub.rawContent);
+        set({
+          activeSubtitleTrack: {
+            id: 'memorized-sub',
+            fileName: memorizedSub.fileName,
+            sourceUri: uri,
+            cues,
+            syncOffsetSec: memorizedSub.syncOffsetSec || 0,
+            rawContent: memorizedSub.rawContent,
+          },
+          isSubtitlesVisible: true,
+        });
+      }
       return;
     }
 
@@ -666,7 +897,9 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     const existingRecent = get().recentMedia;
     const existingItem = existingRecent.find((m) => m.uri === uri);
     const savedPos = existingItem?.lastPositionMs ?? 0;
-    if (!isTauriRuntime()) {
+    if (startPositionMs !== undefined) {
+      startPos = startPositionMs;
+    } else if (!isTauriRuntime()) {
       startPos = autoResume ? savedPos : 0;
     }
     const mediaId = uri;
@@ -740,6 +973,24 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
       lastError: null,
       resumeBannerPositionMs: null,
     });
+
+    // Restore any memorized subtitles for this video
+    const memorizedSub = getMemorizedSubtitleForVideo(uri);
+    if (memorizedSub && memorizedSub.rawContent) {
+      const cues = parseSubtitleText(memorizedSub.rawContent);
+      set({
+        activeSubtitleTrack: {
+          id: 'memorized-sub',
+          fileName: memorizedSub.fileName,
+          sourceUri: uri,
+          cues,
+          syncOffsetSec: memorizedSub.syncOffsetSec || 0,
+          rawContent: memorizedSub.rawContent,
+        },
+        isSubtitlesVisible: true,
+      });
+    }
+
     await get().engine?.load(uri, startPos);
     await get().engine?.play();
   },

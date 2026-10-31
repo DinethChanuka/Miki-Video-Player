@@ -1,9 +1,10 @@
 /**
  * 3D Spatial Audio & Multi-Speaker Sound System Engine
  * 
- * Powered by Web Audio API HRTF (Head-Related Transfer Function) PannerNode
- * and discrete 6-channel multi-speaker virtualizer (Front Left, Center, Front Right,
- * Surround Left, Surround Right, Subwoofer LFE).
+ * Powered by Web Audio API HRTF (Head-Related Transfer Function) PannerNode,
+ * discrete 6-channel multi-speaker virtualizer (Front Left, Center, Front Right,
+ * Surround Left, Surround Right, Subwoofer LFE), Real-time Frequency Analyser,
+ * Stereo Balance, Preamp Gain Booster, and Binaural Spatialization.
  */
 
 export interface SpeakerLevels {
@@ -34,8 +35,10 @@ export interface SpatialAudioState {
   profile: SpatialProfileId;
   coordinates: SpatialCoordinates;
   speakers: SpeakerLevels;
-  lfeCrossoverHz: number; // 60 to 160Hz
+  lfeCrossoverHz: number; // 40 to 200Hz
   reverbAmount: number;   // 0.0 to 1.0
+  stereoPan: number;      // -1.0 (Left) to +1.0 (Right)
+  preampGain: number;     // 1.0 to 2.5 (100% to 250% Boost)
 }
 
 export const DEFAULT_SPATIAL_STATE: SpatialAudioState = {
@@ -44,19 +47,23 @@ export const DEFAULT_SPATIAL_STATE: SpatialAudioState = {
   coordinates: { x: 0, y: 0, z: 0.5 },
   speakers: {
     frontLeft: 1.0,
-    center: 1.2,
+    center: 1.25,
     frontRight: 1.0,
-    surroundLeft: 1.1,
-    surroundRight: 1.1,
-    subwoofer: 1.35,
+    surroundLeft: 1.15,
+    surroundRight: 1.15,
+    subwoofer: 1.4,
   },
   lfeCrossoverHz: 120,
   reverbAmount: 0.25,
+  stereoPan: 0.0,
+  preampGain: 1.0,
 };
 
 export class SpatialAudioEngine {
   private audioCtx: AudioContext | null = null;
   private pannerNode: PannerNode | null = null;
+  private stereoPanNode: StereoPannerNode | null = null;
+  private analyserNode: AnalyserNode | null = null;
   private flGain: GainNode | null = null;
   private cGain: GainNode | null = null;
   private frGain: GainNode | null = null;
@@ -65,6 +72,7 @@ export class SpatialAudioEngine {
   private lfeGain: GainNode | null = null;
   private lfeFilter: BiquadFilterNode | null = null;
   private masterGain: GainNode | null = null;
+  private dynamicsCompressor: DynamicsCompressorNode | null = null;
 
   private state: SpatialAudioState = { ...DEFAULT_SPATIAL_STATE };
 
@@ -72,7 +80,12 @@ export class SpatialAudioEngine {
     this.audioCtx = audioCtx;
 
     try {
-      // 1. HRTF 3D Spatial Panner Node
+      // 1. Real-time Analyser for visualizer
+      this.analyserNode = audioCtx.createAnalyser();
+      this.analyserNode.fftSize = 64;
+      this.analyserNode.smoothingTimeConstant = 0.8;
+
+      // 2. HRTF 3D Spatial Panner Node
       this.pannerNode = audioCtx.createPanner();
       this.pannerNode.panningModel = 'HRTF';
       this.pannerNode.distanceModel = 'inverse';
@@ -81,7 +94,12 @@ export class SpatialAudioEngine {
       this.pannerNode.rolloffFactor = 1;
       this.pannerNode.coneInnerAngle = 360;
 
-      // 2. Discrete Multi-Speaker Gain Nodes
+      // 3. Stereo Panner Node (channel balance)
+      if (typeof audioCtx.createStereoPanner === 'function') {
+        this.stereoPanNode = audioCtx.createStereoPanner();
+      }
+
+      // 4. Discrete Multi-Speaker Gain Nodes
       this.flGain = audioCtx.createGain();
       this.cGain = audioCtx.createGain();
       this.frGain = audioCtx.createGain();
@@ -89,18 +107,27 @@ export class SpatialAudioEngine {
       this.srGain = audioCtx.createGain();
       this.lfeGain = audioCtx.createGain();
 
-      // 3. Subwoofer Low-Pass Filter
+      // 5. Subwoofer Low-Pass Filter
       this.lfeFilter = audioCtx.createBiquadFilter();
       this.lfeFilter.type = 'lowpass';
       this.lfeFilter.frequency.setValueAtTime(this.state.lfeCrossoverHz, audioCtx.currentTime);
 
+      // 6. Master Preamp Gain & Limiter Compressor (prevents clipping distortion)
       this.masterGain = audioCtx.createGain();
-      this.masterGain.gain.setValueAtTime(1.0, audioCtx.currentTime);
+      this.masterGain.gain.setValueAtTime(this.state.preampGain, audioCtx.currentTime);
 
-      // Connect source into panner and multi-speaker graph
+      this.dynamicsCompressor = audioCtx.createDynamicsCompressor();
+      this.dynamicsCompressor.threshold.setValueAtTime(-12, audioCtx.currentTime);
+      this.dynamicsCompressor.knee.setValueAtTime(20, audioCtx.currentTime);
+      this.dynamicsCompressor.ratio.setValueAtTime(8, audioCtx.currentTime);
+      this.dynamicsCompressor.attack.setValueAtTime(0.003, audioCtx.currentTime);
+      this.dynamicsCompressor.release.setValueAtTime(0.25, audioCtx.currentTime);
+
+      // Connect source into analyser and panner
+      sourceNode.connect(this.analyserNode);
       sourceNode.connect(this.pannerNode);
 
-      // Connect speakers to destination
+      // Connect panner to speakers
       this.pannerNode.connect(this.flGain);
       this.pannerNode.connect(this.cGain);
       this.pannerNode.connect(this.frGain);
@@ -111,19 +138,26 @@ export class SpatialAudioEngine {
       this.pannerNode.connect(this.lfeFilter);
       this.lfeFilter.connect(this.lfeGain);
 
-      // Sum all speaker nodes into master
-      this.flGain.connect(this.masterGain);
-      this.cGain.connect(this.masterGain);
-      this.frGain.connect(this.masterGain);
-      this.slGain.connect(this.masterGain);
-      this.srGain.connect(this.masterGain);
-      this.lfeGain.connect(this.masterGain);
+      // Connect speaker gains to balance or master
+      const intermediateNode = this.stereoPanNode || this.masterGain;
 
-      this.masterGain.connect(destinationNode);
+      this.flGain.connect(intermediateNode);
+      this.cGain.connect(intermediateNode);
+      this.frGain.connect(intermediateNode);
+      this.slGain.connect(intermediateNode);
+      this.srGain.connect(intermediateNode);
+      this.lfeGain.connect(intermediateNode);
+
+      if (this.stereoPanNode) {
+        this.stereoPanNode.connect(this.masterGain);
+      }
+
+      this.masterGain.connect(this.dynamicsCompressor);
+      this.dynamicsCompressor.connect(destinationNode);
 
       this.applyState(this.state);
     } catch (e) {
-      console.warn('[SpatialAudioEngine] Failed to initialize WebAudio spatial nodes:', e);
+      console.warn('[SpatialAudioEngine] WebAudio spatial nodes init fallback:', e);
     }
   }
 
@@ -132,7 +166,6 @@ export class SpatialAudioEngine {
     if (!this.pannerNode || !this.audioCtx) return;
 
     const time = this.audioCtx.currentTime;
-    // Map -1..1 to 3D room coordinates
     if (this.pannerNode.positionX) {
       this.pannerNode.positionX.setValueAtTime(x * 5, time);
       this.pannerNode.positionY.setValueAtTime(y * 5, time);
@@ -167,6 +200,54 @@ export class SpatialAudioEngine {
         this.lfeGain?.gain.setTargetAtTime(this.state.speakers.subwoofer, time, 0.05);
         break;
     }
+  }
+
+  public setStereoPan(pan: number): void {
+    const clamped = Math.max(-1.0, Math.min(1.0, pan));
+    this.state.stereoPan = clamped;
+    if (this.stereoPanNode && this.audioCtx) {
+      this.stereoPanNode.pan.setValueAtTime(clamped, this.audioCtx.currentTime);
+    }
+  }
+
+  public setPreampGain(gainMultiplier: number): void {
+    const clamped = Math.max(0.5, Math.min(2.5, gainMultiplier));
+    this.state.preampGain = clamped;
+    if (this.masterGain && this.audioCtx) {
+      this.masterGain.gain.setValueAtTime(clamped, this.audioCtx.currentTime);
+    }
+  }
+
+  public getFrequencyData(buffer: Uint8Array): void {
+    if (this.analyserNode) {
+      this.analyserNode.getByteFrequencyData(buffer as any);
+    }
+  }
+
+  /**
+   * Plays a quick binaural 3D acoustic sweep to test speaker balance
+   */
+  public playTestChime(): void {
+    if (!this.audioCtx) return;
+    try {
+      const osc = this.audioCtx.createOscillator();
+      const gain = this.audioCtx.createGain();
+      const now = this.audioCtx.currentTime;
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(440, now);
+      osc.frequency.exponentialRampToValueAtTime(880, now + 0.3);
+
+      gain.gain.setValueAtTime(0.01, now);
+      gain.gain.linearRampToValueAtTime(0.2, now + 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+
+      osc.connect(gain);
+      gain.connect(this.masterGain || this.audioCtx.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.35);
+    } catch {}
   }
 
   public setProfile(profile: SpatialProfileId): void {
@@ -236,7 +317,7 @@ export class SpatialAudioEngine {
   public setEnabled(enabled: boolean): void {
     this.state.enabled = enabled;
     if (this.masterGain && this.audioCtx) {
-      this.masterGain.gain.setValueAtTime(enabled ? 1.0 : 0.0, this.audioCtx.currentTime);
+      this.masterGain.gain.setValueAtTime(enabled ? this.state.preampGain : 0.0, this.audioCtx.currentTime);
     }
   }
 
@@ -253,6 +334,7 @@ export class SpatialAudioEngine {
     if (this.lfeFilter && this.audioCtx) {
       this.lfeFilter.frequency.setValueAtTime(state.lfeCrossoverHz, this.audioCtx.currentTime);
     }
+    this.setStereoPan(state.stereoPan ?? 0.0);
+    this.setPreampGain(state.preampGain ?? 1.0);
   }
 }
-

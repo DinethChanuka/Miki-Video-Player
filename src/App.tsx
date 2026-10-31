@@ -10,6 +10,8 @@ import { ResumeChoiceModal } from './components/hud/ResumeChoiceModal';
 import { ErrorToast } from './components/hud/ErrorToast';
 import { SplashScreen } from './components/splash/SplashScreen';
 import { usePlayerGestures } from './hooks/usePlayerGestures';
+import { YouTubePlayer } from './components/player/YouTubePlayer';
+import { SubtitleOverlay } from './components/player/SubtitleOverlay';
 import {
   FolderOpen,
   Sparkles,
@@ -88,6 +90,11 @@ export const App: React.FC = () => {
   const customBgImage = usePlayerStore((s) => s.customBgImage);
   const customBgOpacity = usePlayerStore((s) => s.customBgOpacity);
   const customBgBlur = usePlayerStore((s) => s.customBgBlur);
+  const customBgTint = usePlayerStore((s) => s.customBgTint);
+  const positionMs = usePlayerStore((s) => s.positionMs);
+  const activeSubtitleTrack = usePlayerStore((s) => s.activeSubtitleTrack);
+  const isSubtitlesVisible = usePlayerStore((s) => s.isSubtitlesVisible);
+  const subtitleStyle = usePlayerStore((s) => s.subtitleStyle);
 
   const theme = PLAYER_THEMES[themeId] || PLAYER_THEMES.cyberpunk;
 
@@ -131,28 +138,24 @@ export const App: React.FC = () => {
   }, []);
 
   const handleCardClick = (item: MediaHistoryItem) => {
-    if (item.isYouTube || item.uri.includes('youtube.com') || item.uri.includes('youtu.be')) {
-      openMedia(item.uri, item.title, false);
-      return;
-    }
     if (item.lastPositionMs && item.lastPositionMs > 1000) {
       setPendingResumeItem(item);
       setIsResumeChoiceOpen(true);
     } else {
-      openMedia(item.uri, item.title, false);
+      openMedia(item.uri, item.title, false, 0);
     }
   };
 
   const handleConfirmResume = (item: MediaHistoryItem) => {
     setIsResumeChoiceOpen(false);
     setPendingResumeItem(null);
-    openMedia(item.uri, item.title, true);
+    openMedia(item.uri, item.title, true, item.lastPositionMs);
   };
 
   const handleConfirmRestart = (item: MediaHistoryItem) => {
     setIsResumeChoiceOpen(false);
     setPendingResumeItem(null);
-    openMedia(item.uri, item.title, false);
+    openMedia(item.uri, item.title, false, 0);
   };
 
   // Auto-capture video thumbnail of the stopped point
@@ -396,16 +399,32 @@ export const App: React.FC = () => {
         areControlsVisible || !currentUri ? 'cursor-default' : 'cursor-none'
       }`}
     >
-      {/* Custom Background Image Layer (Below all Glassmorphic Layers) */}
+      {/* Custom Background Image Layer (Below all Glassmorphic Layers with Extended Spread) */}
       {customBgImage && (
-        <div
-          className="absolute inset-0 z-0 pointer-events-none bg-cover bg-center transition-all duration-700 ease-out"
-          style={{
-            backgroundImage: `url(${customBgImage})`,
-            opacity: customBgOpacity,
-            filter: `blur(${customBgBlur}px)`,
-          }}
-        />
+        <div className="absolute -inset-10 z-0 pointer-events-none overflow-hidden">
+          <div
+            className="w-full h-full bg-cover bg-center transition-all duration-700 ease-out transform scale-105"
+            style={{
+              backgroundImage: `url(${customBgImage})`,
+              opacity: customBgOpacity,
+              filter: `blur(${customBgBlur}px)`,
+            }}
+          />
+          {/* Dynamic Tint Overlay Layer */}
+          <div
+            className={`absolute inset-0 pointer-events-none transition-colors duration-500 ${
+              customBgTint === 'navy'
+                ? 'bg-blue-950/40'
+                : customBgTint === 'aurora'
+                  ? 'bg-emerald-950/30'
+                  : customBgTint === 'amethyst'
+                    ? 'bg-purple-950/30'
+                    : customBgTint === 'clear'
+                      ? 'bg-transparent'
+                      : 'bg-black/40'
+            }`}
+          />
+        </div>
       )}
 
       {/* Sleek, Clean Frameless Titlebar - Drag & 5s Inactivity Auto-Hide */}
@@ -466,21 +485,6 @@ export const App: React.FC = () => {
           )}
         </div>
 
-        {/* Center Media Engine Indicator (Theme name removed for clean HUD) */}
-        <div className="hidden sm:flex items-center gap-2 text-[10px] font-mono tracking-wider uppercase text-white/70 bg-white/5 px-3 py-1 rounded-full border border-white/10">
-          <span
-            className="w-2 h-2 rounded-full animate-pulse"
-            style={{ backgroundColor: theme.primaryHex }}
-          />
-          <span>
-            {youtubeId
-              ? 'YouTube Stream Optimizer'
-              : activeEngineType === 'tauri-mpv'
-                ? 'Native Hardware GPU'
-                : 'Web Media Engine'}
-          </span>
-        </div>
-
         {/* Right Navigation & Window Controls */}
         <div
           className="flex items-center gap-2"
@@ -536,15 +540,10 @@ export const App: React.FC = () => {
 
         {/* YouTube Video Stream or Standard Video */}
         {youtubeId ? (
-          <div className="w-full h-full z-10 bg-black flex items-center justify-center">
-            <iframe
-              src={`https://www.youtube-nocookie.com/embed/${youtubeId}?autoplay=1&enablejsapi=1&rel=0&modestbranding=1`}
-              title="YouTube video player"
-              className="w-full h-full border-0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              allowFullScreen
-            />
-          </div>
+          <YouTubePlayer
+            youtubeId={youtubeId}
+            initialPositionMs={positionMs}
+          />
         ) : activeEngineType === 'web-media' ? (
           <div ref={viewportRef} className="relative w-full h-full flex items-center justify-center overflow-hidden">
             <video
@@ -578,6 +577,17 @@ export const App: React.FC = () => {
                 }
               }}
             />
+
+            {/* Subtitle Caption Overlay */}
+            {activeSubtitleTrack && (
+              <SubtitleOverlay
+                cues={activeSubtitleTrack.cues}
+                currentPositionSec={positionMs / 1000}
+                syncOffsetSec={activeSubtitleTrack.syncOffsetSec}
+                styleConfig={subtitleStyle}
+                isVisible={isSubtitlesVisible}
+              />
+            )}
 
             {/* Split-Screen Compare Mode: Draggable Divider & Unclipped Comparison */}
             {shaderConfig.splitCompareEnabled && (
@@ -744,7 +754,7 @@ export const App: React.FC = () => {
 
                           {/* Stopped Position & Duration Badge */}
                           <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded-lg bg-black/80 backdrop-blur-md text-[10px] font-mono font-bold text-white/90 border border-white/15">
-                            {item.isYouTube ? 'Live / Stream' : `${formatTime(item.lastPositionMs)} / ${formatTime(item.durationMs)}`}
+                            {item.isYouTube && !item.lastPositionMs ? 'YouTube Stream' : `${formatTime(item.lastPositionMs)} / ${item.durationMs > 0 ? formatTime(item.durationMs) : (item.isYouTube ? 'YouTube' : '0:00')}`}
                           </div>
                         </div>
 
@@ -756,14 +766,16 @@ export const App: React.FC = () => {
                             </h3>
                             <span
                               className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg shrink-0 ${
-                                item.isYouTube
+                                item.isYouTube && (!item.lastPositionMs || percent === 0)
                                   ? 'bg-red-500/20 text-red-300 border border-red-400/30'
                                   : percent > 80
                                     ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/30'
                                     : `${theme.badgeClass}`
                               }`}
                             >
-                              {item.isYouTube ? 'YouTube Stream' : `${percent.toFixed(0)}% watched`}
+                              {item.isYouTube && (!item.lastPositionMs || percent === 0)
+                                ? 'YouTube'
+                                : `${percent.toFixed(0)}% watched`}
                             </span>
                           </div>
                         </div>
@@ -772,7 +784,7 @@ export const App: React.FC = () => {
                         <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden p-0.5 border border-white/5">
                           <div
                             className={`h-full rounded-full bg-gradient-to-r ${item.isYouTube ? 'from-red-500 to-rose-600' : theme.timelineTrack} transition-all duration-300`}
-                            style={{ width: `${item.isYouTube ? 100 : percent}%` }}
+                            style={{ width: `${item.isYouTube && (!item.lastPositionMs || percent === 0) ? 100 : percent}%` }}
                           />
                         </div>
 
@@ -786,7 +798,7 @@ export const App: React.FC = () => {
                             className={`px-4 py-2 rounded-2xl bg-gradient-to-r ${item.isYouTube ? 'from-red-600 to-rose-600' : theme.accentGradient} text-white font-bold text-xs flex items-center gap-1.5 shadow-md hover:brightness-110 active:scale-95 transition-all`}
                           >
                             <Play className="w-3.5 h-3.5 fill-white" />
-                            <span>{item.isYouTube ? 'Play Stream' : 'Resume Playback'}</span>
+                            <span>{item.lastPositionMs > 1000 ? 'Resume Playback' : item.isYouTube ? 'Play Stream' : 'Play Now'}</span>
                           </button>
 
                           <button

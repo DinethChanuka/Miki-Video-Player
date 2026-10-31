@@ -58,6 +58,10 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
   const playPreviousMedia = usePlayerStore((s) => s.playPreviousMedia);
   const takeSnapshot = usePlayerStore((s) => s.takeSnapshot);
   const themeId = usePlayerStore((s) => s.themeId);
+  const activeSubtitleTrack = usePlayerStore((s) => s.activeSubtitleTrack);
+  const isSubtitlesVisible = usePlayerStore((s) => s.isSubtitlesVisible);
+  const toggleSubtitles = usePlayerStore((s) => s.toggleSubtitles);
+  const loadSubtitleFromFile = usePlayerStore((s) => s.loadSubtitleFromFile);
 
   const theme = PLAYER_THEMES[themeId] || PLAYER_THEMES.cyberpunk;
 
@@ -358,21 +362,69 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
             <div className="relative">
               <button
                 onClick={() => setShowTrackMenu(!showTrackMenu)}
-                className="p-2.5 rounded-2xl bg-white/5 hover:bg-white/15 border border-white/10 text-white/80 hover:text-white transition-all active:scale-95"
-                title="Tracks & Subtitles"
+                className={`p-2.5 rounded-2xl border transition-all active:scale-95 ${
+                  activeSubtitleTrack && isSubtitlesVisible
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-400/40 shadow-sm'
+                    : 'bg-white/5 hover:bg-white/15 border border-white/10 text-white/80 hover:text-white'
+                }`}
+                title="Tracks & Subtitles (CC)"
               >
-                <Subtitles className="w-4 h-4 text-purple-400" />
+                <Subtitles className={`w-4 h-4 ${activeSubtitleTrack ? 'text-amber-400' : 'text-purple-400'}`} />
               </button>
               {showTrackMenu && (
                 <div
-                  className={`absolute bottom-12 right-0 p-3.5 rounded-2xl flex flex-col gap-2 min-w-52 z-50 backdrop-blur-2xl border shadow-2xl ${theme.glassBg} ${theme.glassBorder}`}
+                  className={`absolute bottom-12 right-0 p-3.5 rounded-2xl flex flex-col gap-2.5 min-w-60 z-50 backdrop-blur-2xl border shadow-2xl ${theme.glassBg} ${theme.glassBorder}`}
                 >
-                  <span className="text-[10px] font-semibold text-white/50 uppercase tracking-wider">
-                    Audio & Subtitles
-                  </span>
+                  <div className="flex items-center justify-between border-b border-white/10 pb-1.5">
+                    <span className="text-[10px] font-semibold text-white/50 uppercase tracking-wider">
+                      Audio & Subtitles
+                    </span>
+                    {activeSubtitleTrack && (
+                      <button
+                        onClick={toggleSubtitles}
+                        className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all ${
+                          isSubtitlesVisible
+                            ? 'bg-amber-500 text-slate-950 shadow-sm'
+                            : 'bg-white/10 text-white/40'
+                        }`}
+                      >
+                        {isSubtitlesVisible ? 'CC: ON' : 'CC: OFF'}
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Active Custom Subtitle Track */}
+                  {activeSubtitleTrack && (
+                    <div className="flex flex-col gap-1 p-2 rounded-xl bg-amber-500/10 border border-amber-400/30">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] text-amber-400 font-semibold uppercase">Active Captions</span>
+                        <span className="text-[9px] font-mono text-amber-300">{activeSubtitleTrack.cues.length} Cues</span>
+                      </div>
+                      <span className="text-xs text-white font-medium truncate">{activeSubtitleTrack.fileName}</span>
+                    </div>
+                  )}
+
+                  {/* Insert Subtitle Button */}
+                  <label className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold cursor-pointer transition-colors border border-white/10 active:scale-95">
+                    <Subtitles className="w-3.5 h-3.5 text-amber-400" />
+                    <span>{activeSubtitleTrack ? 'Replace Subtitles (.srt)...' : 'Load Subtitles (.srt, .vtt)...'}</span>
+                    <input
+                      type="file"
+                      accept=".srt,.vtt,.sub"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) {
+                          loadSubtitleFromFile(f);
+                          setShowTrackMenu(false);
+                        }
+                      }}
+                    />
+                  </label>
+
                   {audioTracks.length > 0 && (
-                    <div className="flex flex-col gap-1">
-                      <span className="text-[10px] text-cyan-400 font-semibold uppercase">Audio</span>
+                    <div className="flex flex-col gap-1 pt-1 border-t border-white/10">
+                      <span className="text-[10px] text-cyan-400 font-semibold uppercase">Audio Tracks</span>
                       {audioTracks.map((t) => (
                         <span key={t.id} className="text-xs text-white/90 truncate">
                           {t.label}
@@ -382,16 +434,13 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
                   )}
                   {subtitleTracks.length > 0 && (
                     <div className="flex flex-col gap-1">
-                      <span className="text-[10px] text-purple-400 font-semibold uppercase">Subtitles</span>
+                      <span className="text-[10px] text-purple-400 font-semibold uppercase">Embedded Tracks</span>
                       {subtitleTracks.map((t) => (
                         <span key={t.id} className="text-xs text-white/90 truncate">
                           {t.label}
                         </span>
                       ))}
                     </div>
-                  )}
-                  {audioTracks.length === 0 && subtitleTracks.length === 0 && (
-                    <span className="text-xs text-white/40 italic py-1">Embedded tracks auto-syncing</span>
                   )}
                 </div>
               )}
