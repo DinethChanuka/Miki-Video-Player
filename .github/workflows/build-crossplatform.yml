@@ -1,15 +1,88 @@
-name: Build Cross-Platform Executables & Mobile (Windows, Linux, Android, iOS)
+name: CI/CD Pipeline & Cross-Platform Distribution (Windows, Linux, Android, iOS)
 
 on:
   push:
-    branches: [ "main", "feat/*" ]
+    branches: [ "main", "master", "feat/*", "fix/*" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "master" ]
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  # =========================================================================
+  # 1. CI QUALITY & TEST GATE
+  # =========================================================================
+  ci-quality-gate:
+    name: 🧪 CI Quality Gate (TypeCheck, Tests & Web Build)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22 LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run TypeScript Type Check & Application Tests
+        run: npm test
+
+      - name: Build Web Production Bundle
+        run: npm run build
+
+      - name: Verify Build Artifacts
+        run: |
+          test -d dist || { echo "❌ dist folder missing"; exit 1; }
+          test -f dist/index.html || { echo "❌ dist/index.html missing"; exit 1; }
+          echo "✅ Web production bundle verified successfully!"
+
+  # =========================================================================
+  # 2. SECURITY AUDIT & INTEGRITY CHECKUP
+  # =========================================================================
+  security-checkup:
+    name: 🛡️ Security Audit & Vulnerability Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22 LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run Dependency Vulnerability Audit
+        run: npm audit --audit-level=high
+
+      - name: Scan Repository for Sensitive Files & Secrets
+        run: |
+          echo "🔍 Scanning for accidental secret leakage..."
+          FORBIDDEN_FILES=(".env" ".env.local" ".env.production" "id_rsa" "id_ed25519" "private.key")
+          for file in "${FORBIDDEN_FILES[@]}"; do
+            if [ -f "$file" ]; then
+              echo "❌ ERROR: Sensitive file '$file' found in repository root!"
+              exit 1
+            fi
+          done
+          echo "✅ Security integrity checkup passed!"
+
+  # =========================================================================
+  # 3. PLATFORM BUILDS (Gated behind CI Quality & Security)
+  # =========================================================================
   build-windows-exe:
     name: Build Windows Standalone (.exe & .msi)
+    needs: [ci-quality-gate, security-checkup]
     runs-on: windows-latest
     steps:
       - name: Checkout Repository
@@ -18,7 +91,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
 
       - name: Setup Rust Stable
@@ -26,7 +99,7 @@ jobs:
         with:
           targets: x86_64-pc-windows-msvc
 
-      - name: Install Frontend Dependencies
+      - name: Install Dependencies
         run: npm ci
 
       - name: Build Web Production Bundle
@@ -55,6 +128,7 @@ jobs:
 
   build-linux-appimage:
     name: Build Linux Binary (.AppImage, .deb & .iso)
+    needs: [ci-quality-gate, security-checkup]
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout Repository
@@ -63,7 +137,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
 
       - name: Install Linux Build Dependencies
@@ -74,7 +148,7 @@ jobs:
       - name: Setup Rust Stable
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Install Frontend Dependencies
+      - name: Install Dependencies
         run: npm ci
 
       - name: Build Web Bundle & Tauri Binary
@@ -88,7 +162,6 @@ jobs:
           cp -r dist iso_root/
           cp -r src-tauri/target/release/bundle/appimage/*.AppImage iso_root/ 2>/dev/null || true
           cp -r src-tauri/target/release/bundle/deb/*.deb iso_root/ 2>/dev/null || true
-          # Create hybrid distributable ISO
           genisoimage -o Build/Linux/Miki-Player-Linux-v0.2.0.iso -R -J -V "MikiPlayer" iso_root/ || true
           cp -r src-tauri/target/release/bundle/appimage/*.AppImage Build/Linux/ 2>/dev/null || true
           cp -r src-tauri/target/release/bundle/deb/*.deb Build/Linux/ 2>/dev/null || true
@@ -104,6 +177,7 @@ jobs:
 
   build-android-apk:
     name: Build Android APK (Release & Debug)
+    needs: [ci-quality-gate, security-checkup]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -116,12 +190,20 @@ jobs:
           java-version: '17'
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools'
+
+      - name: Configure Android SDK Environment & Licenses
+        run: |
+          echo "ANDROID_HOME=/usr/local/lib/android/sdk" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=/usr/local/lib/android/sdk" >> $GITHUB_ENV
+          yes | /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager --licenses 2>/dev/null || true
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
 
       - name: Setup Rust Stable & Android Targets
@@ -139,7 +221,6 @@ jobs:
         run: |
           mkdir -p Build/Android
           ./scripts/package-android.sh || true
-          # Search for any generated APKs and collect to Build/Android
           find . -name "*.apk" -not -path "*/node_modules/*" -exec cp {} Build/Android/ \; 2>/dev/null || true
           touch Build/Android/.gitkeep
 
@@ -153,6 +234,7 @@ jobs:
 
   build-ios-app:
     name: Build iOS Application (.ipa / .app)
+    needs: [ci-quality-gate, security-checkup]
     runs-on: macos-latest
     steps:
       - name: Checkout Repository
@@ -161,7 +243,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
 
       - name: Setup Rust Stable & iOS Targets
