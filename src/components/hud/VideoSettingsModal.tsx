@@ -6,9 +6,6 @@ import { VideoShaderConfig } from '../../core/PlayerEngine';
 import {
   X,
   Camera,
-  Repeat,
-  Tv,
-  SlidersHorizontal,
   Sparkles,
   Ratio,
   Palette,
@@ -16,14 +13,14 @@ import {
   ShieldCheck,
   Zap,
   Headphones,
-  Radio,
-  RotateCcw,
   Volume2,
-  VolumeX,
-  Split,
   Eye,
   FolderOpen,
+  Subtitles,
+  Activity,
+  Sliders,
 } from 'lucide-react';
+import { detectOperatingSystem, getOSPresetDirectories } from '../../utils/pathUtils';
 
 interface VideoSettingsModalProps {
   isOpen: boolean;
@@ -39,6 +36,7 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
   initialTab = 'themes',
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const visualizerCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const isDraggingRef = useRef(false);
 
   const themeId = usePlayerStore((s) => s.themeId);
@@ -47,8 +45,6 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
 
   const shaderConfig = usePlayerStore((s) => s.shaderConfig);
   const updateShaderConfig = usePlayerStore((s) => s.updateShaderConfig);
-  const isLooping = usePlayerStore((s) => s.isLooping);
-  const toggleLoop = usePlayerStore((s) => s.toggleLoop);
   const takeSnapshot = usePlayerStore((s) => s.takeSnapshot);
   const screenshotDirectory = usePlayerStore((s) => s.screenshotDirectory);
   const setScreenshotDirectory = usePlayerStore((s) => s.setScreenshotDirectory);
@@ -57,16 +53,34 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
   const customBgImage = usePlayerStore((s) => s.customBgImage);
   const customBgOpacity = usePlayerStore((s) => s.customBgOpacity);
   const customBgBlur = usePlayerStore((s) => s.customBgBlur);
+  const customBgTint = usePlayerStore((s) => s.customBgTint);
   const setCustomBgImage = usePlayerStore((s) => s.setCustomBgImage);
   const setCustomBgOpacity = usePlayerStore((s) => s.setCustomBgOpacity);
   const setCustomBgBlur = usePlayerStore((s) => s.setCustomBgBlur);
+  const setCustomBgTint = usePlayerStore((s) => s.setCustomBgTint);
 
+  const spatialAudio = usePlayerStore((s) => s.spatialAudio);
   const spatialState = usePlayerStore((s) => s.spatialState);
   const setSpatialAudioEnabled = usePlayerStore((s) => s.setSpatialAudioEnabled);
   const setSpatialProfile = usePlayerStore((s) => s.setSpatialProfile);
   const setSpatialCoordinates = usePlayerStore((s) => s.setSpatialCoordinates);
   const setSpeakerVolume = usePlayerStore((s) => s.setSpeakerVolume);
-  const setLfeCrossover = usePlayerStore((s) => s.setLfeCrossover);
+  const preampGain = usePlayerStore((s) => s.preampGain);
+  const stereoPan = usePlayerStore((s) => s.stereoPan);
+  const setPreampGain = usePlayerStore((s) => s.setPreampGain);
+  const setStereoPan = usePlayerStore((s) => s.setStereoPan);
+  const playAudioTestChime = usePlayerStore((s) => s.playAudioTestChime);
+
+  // Subtitles
+  const activeSubtitleTrack = usePlayerStore((s) => s.activeSubtitleTrack);
+  const isSubtitlesVisible = usePlayerStore((s) => s.isSubtitlesVisible);
+  const subtitleStyle = usePlayerStore((s) => s.subtitleStyle);
+  const toggleSubtitles = usePlayerStore((s) => s.toggleSubtitles);
+  const updateSubtitleStyle = usePlayerStore((s) => s.updateSubtitleStyle);
+  const setSubtitleSyncOffset = usePlayerStore((s) => s.setSubtitleSyncOffset);
+
+  const detectedOS = detectOperatingSystem();
+  const osPresetDirs = getOSPresetDirectories(detectedOS);
 
   const handleBrowseScreenshotDir = () => {
     if (
@@ -98,73 +112,35 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
 
     // Radial background
     const bgGrad = ctx.createRadialGradient(cx, cy, 10, cx, cy, r);
-    bgGrad.addColorStop(0, 'rgba(6, 182, 212, 0.08)');
-    bgGrad.addColorStop(1, 'rgba(2, 6, 23, 0.6)');
+    bgGrad.addColorStop(0, 'rgba(30, 41, 59, 0.7)');
+    bgGrad.addColorStop(1, 'rgba(15, 23, 42, 0.95)');
     ctx.fillStyle = bgGrad;
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.fill();
 
-    // Radar Concentric Circles
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+    // Radar rings
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
     ctx.lineWidth = 1;
-    [0.33, 0.66, 1.0].forEach((ratio) => {
+    [0.33, 0.66, 1.0].forEach((fraction) => {
       ctx.beginPath();
-      ctx.arc(cx, cy, r * ratio, 0, Math.PI * 2);
+      ctx.arc(cx, cy, r * fraction, 0, Math.PI * 2);
       ctx.stroke();
     });
 
     // Crosshairs
-    ctx.setLineDash([4, 4]);
     ctx.beginPath();
-    ctx.moveTo(cx - r, cy);
-    ctx.lineTo(cx + r, cy);
     ctx.moveTo(cx, cy - r);
     ctx.lineTo(cx, cy + r);
+    ctx.moveTo(cx - r, cy);
+    ctx.lineTo(cx + r, cy);
     ctx.stroke();
-    ctx.setLineDash([]);
 
-    // Speaker Positions around perimeter
-    const speakers = [
-      { label: 'FL', angle: -Math.PI / 4, color: '#38bdf8' },
-      { label: 'C', angle: -Math.PI / 2, color: '#a855f7' },
-      { label: 'FR', angle: -3 * Math.PI / 4, color: '#38bdf8' },
-      { label: 'SR', angle: 3 * Math.PI / 4, color: '#06b6d4' },
-      { label: 'SL', angle: Math.PI / 4, color: '#06b6d4' },
-    ];
-
-    speakers.forEach((spk) => {
-      const sx = cx + Math.cos(spk.angle) * (r - 12);
-      const sy = cy + Math.sin(spk.angle) * (r - 12);
-
-      ctx.fillStyle = spk.color;
-      ctx.beginPath();
-      ctx.arc(sx, sy, 6, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-      ctx.font = 'bold 9px monospace';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(spk.label, sx, sy - 12);
-    });
-
-    // Subwoofer LFE box in corner
-    ctx.fillStyle = '#f59e0b';
-    ctx.beginPath();
-    ctx.roundRect(14, h - 28, 42, 16, 4);
-    ctx.fill();
-    ctx.fillStyle = '#020617';
-    ctx.font = 'bold 8px monospace';
-    ctx.fillText('SUB LFE', 35, h - 20);
-
-    // Center Listener (Head + Ears)
+    // Center Listener Icon
     ctx.fillStyle = '#ffffff';
     ctx.beginPath();
-    ctx.arc(cx, cy, 14, 0, Math.PI * 2);
+    ctx.arc(cx, cy, 6, 0, Math.PI * 2);
     ctx.fill();
-
-    // Direction indicator
     ctx.fillStyle = currentTheme.primaryHex || '#06b6d4';
     ctx.beginPath();
     ctx.moveTo(cx - 5, cy - 12);
@@ -192,11 +168,50 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
     ctx.fill();
   }, [spatialState.coordinates, currentTheme.primaryHex]);
 
+  // Real-time Audio Visualizer Loop
   useEffect(() => {
-    if (isOpen && activeTab === 'spatial') {
-      drawSoundstage();
-    }
-  }, [isOpen, activeTab, drawSoundstage]);
+    if (!isOpen || activeTab !== 'spatial') return;
+    drawSoundstage();
+
+    let animId: number;
+    const canvas = visualizerCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const buffer = new Uint8Array(32);
+
+    const render = () => {
+      spatialAudio.getFrequencyData(buffer);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const numBars = buffer.length;
+      const barWidth = (canvas.width / numBars) * 0.75;
+      const gap = (canvas.width / numBars) * 0.25;
+
+      for (let i = 0; i < numBars; i++) {
+        const val = buffer[i] / 255;
+        const barHeight = Math.max(3, val * canvas.height * 0.9);
+        const x = i * (barWidth + gap);
+        const y = canvas.height - barHeight;
+
+        const grad = ctx.createLinearGradient(x, y, x, canvas.height);
+        grad.addColorStop(0, currentTheme.primaryHex || '#06b6d4');
+        grad.addColorStop(1, 'rgba(255, 255, 255, 0.15)');
+
+        ctx.fillStyle = grad;
+        ctx.fillRect(x, y, barWidth, barHeight);
+      }
+
+      animId = requestAnimationFrame(render);
+    };
+
+    render();
+
+    return () => {
+      cancelAnimationFrame(animId);
+    };
+  }, [isOpen, activeTab, drawSoundstage, spatialAudio, currentTheme.primaryHex]);
 
   const handleCanvasInteraction = (clientX: number, clientY: number) => {
     const canvas = canvasRef.current;
@@ -217,18 +232,48 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
 
   if (!isOpen) return null;
 
-  const togglePiP = async () => {
-    try {
-      const video = document.querySelector('video');
-      if (video) {
-        if (document.pictureInPictureElement) {
-          await document.exitPictureInPicture();
-        } else {
-          await video.requestPictureInPicture();
-        }
-      }
-    } catch {}
-  };
+  const WALLPAPERS = [
+    {
+      name: 'Deep Nebula',
+      url: 'https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?auto=format&fit=crop&w=1200&q=80',
+      badge: 'Deep Space',
+    },
+    {
+      name: 'Liquid Glass',
+      url: 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?auto=format&fit=crop&w=1200&q=80',
+      badge: 'Prismatic',
+    },
+    {
+      name: 'Cyberpunk Neon',
+      url: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=1200&q=80',
+      badge: 'Neon Glow',
+    },
+    {
+      name: 'Aurora Borealis',
+      url: 'https://images.unsplash.com/photo-1531366936337-7c912a4589a7?auto=format&fit=crop&w=1200&q=80',
+      badge: 'Northern Light',
+    },
+    {
+      name: 'Dark Abstract',
+      url: 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=80',
+      badge: 'Silicon Grid',
+    },
+    {
+      name: 'Synthwave Sunset',
+      url: 'https://images.unsplash.com/photo-1508739773434-c26b3d09e071?auto=format&fit=crop&w=1200&q=80',
+      badge: 'Retro 80s',
+    },
+    {
+      name: 'Obsidian Velvet',
+      url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
+      badge: 'Luxury Dark',
+    },
+    {
+      name: 'Cyber Horizon',
+      url: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=1200&q=80',
+      badge: 'Matrix Wave',
+    },
+  ];
 
   const RESOLUTION_PRESETS: {
     id: VideoShaderConfig['superResolution'];
@@ -293,9 +338,9 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md animate-in fade-in duration-200 select-none p-4">
-      <div className="glass-panel w-full max-w-3xl p-6 rounded-3xl flex flex-col gap-5 border border-white/20 shadow-2xl max-h-[90vh] overflow-hidden bg-slate-950/95">
+      <div className="glass-panel w-full max-w-3xl p-6 rounded-3xl flex flex-col gap-4 border border-white/20 shadow-2xl max-h-[90vh] overflow-hidden bg-slate-950/95">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-white/10 pb-4">
+        <div className="flex items-center justify-between border-b border-white/10 pb-3">
           <div className="flex items-center gap-3">
             <div
               className={`p-3 rounded-2xl bg-gradient-to-r ${currentTheme.accentGradient} text-white shadow-lg`}
@@ -317,7 +362,7 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
         </div>
 
         {/* 4 Unified Luxury Tabs */}
-        <div className="flex items-center gap-2 border-b border-white/10 pb-2.5 overflow-x-auto">
+        <div className="flex items-center gap-2 border-b border-white/10 pb-2 overflow-x-auto">
           <button
             onClick={() => setActiveTab('themes')}
             className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-semibold transition-all shrink-0 ${
@@ -327,7 +372,7 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
             }`}
           >
             <Palette className="w-3.5 h-3.5" />
-            10 Themes
+            10 Themes & Wallpapers
           </button>
 
           <button
@@ -363,13 +408,13 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
             }`}
           >
             <Ratio className="w-3.5 h-3.5" />
-            Aspect Ratio & Tools
+            Aspect, Subtitles & Paths
           </button>
         </div>
 
         {/* Tab Body */}
         <div className="flex-1 overflow-y-auto pr-1">
-          {/* TAB 1: 10 PLAYER THEMES */}
+          {/* TAB 1: 10 PLAYER THEMES & WALLPAPERS */}
           {activeTab === 'themes' && (
             <div className="flex flex-col gap-4">
               <div className="flex items-center justify-between">
@@ -381,7 +426,7 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 {(Object.keys(PLAYER_THEMES) as PlayerThemeId[]).map((tId) => {
                   const t = PLAYER_THEMES[tId];
                   const isSelected = tId === themeId;
@@ -390,7 +435,7 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
                     <button
                       key={tId}
                       onClick={() => setTheme(tId)}
-                      className={`p-3.5 rounded-2xl text-left border flex items-center justify-between gap-3 transition-all ${
+                      className={`p-3 rounded-2xl text-left border flex items-center justify-between gap-3 transition-all ${
                         isSelected
                           ? `bg-white/10 ${t.glassBorder} shadow-lg ring-1 ring-white/30 scale-[1.01]`
                           : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
@@ -430,7 +475,7 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
               </div>
 
               {/* Custom Glass Background & Wallpapers */}
-              <div className="flex flex-col gap-3 pt-4 border-t border-white/10">
+              <div className="flex flex-col gap-3 pt-3 border-t border-white/10">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-white/90 flex items-center gap-2">
                     <Palette className="w-4 h-4 text-fuchsia-400" />
@@ -446,46 +491,56 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
                   )}
                 </div>
                 <p className="text-[10px] text-white/50">
-                  Sets a background image rendered below the glassmorphic player interface with dynamic blur and opacity.
+                  Sets an ultra-wide panoramic wallpaper rendered below the glassmorphic player interface with dynamic blur, opacity, and tint.
                 </p>
 
-                {/* Curated Aesthetic Wallpaper Presets */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {[
-                    { name: 'Cyberpunk Neon', url: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=1200&q=80' },
-                    { name: 'Deep Nebula', url: 'https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?auto=format&fit=crop&w=1200&q=80' },
-                    { name: 'Aurora Borealis', url: 'https://images.unsplash.com/photo-1531366936337-7c912a4589a7?auto=format&fit=crop&w=1200&q=80' },
-                    { name: 'Dark Abstract', url: 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=80' },
-                    { name: 'Liquid Glass', url: 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?auto=format&fit=crop&w=1200&q=80' },
-                    { name: 'Synthwave Sunset', url: 'https://images.unsplash.com/photo-1508739773434-c26b3d09e071?auto=format&fit=crop&w=1200&q=80' },
-                  ].map((bg) => (
-                    <button
-                      key={bg.name}
-                      onClick={() => setCustomBgImage(bg.url)}
-                      className={`relative h-14 rounded-2xl overflow-hidden border transition-all text-left p-2 flex items-end group ${
-                        customBgImage === bg.url
-                          ? 'border-fuchsia-400 shadow-md shadow-fuchsia-500/30'
-                          : 'border-white/10 hover:border-white/30'
-                      }`}
-                      style={{
-                        backgroundImage: `url(${bg.url})`,
-                        backgroundSize: 'cover',
-                        backgroundPosition: 'center',
-                      }}
-                    >
-                      <div className="absolute inset-0 bg-black/50 group-hover:bg-black/30 transition-colors" />
-                      <span className="relative z-10 text-[10px] font-bold text-white drop-shadow">
-                        {bg.name}
-                      </span>
-                    </button>
-                  ))}
+                {/* Curated Aesthetic Wallpaper Cards */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  {WALLPAPERS.map((bg) => {
+                    const isSelected = customBgImage === bg.url;
+                    return (
+                      <button
+                        key={bg.name}
+                        onClick={() => setCustomBgImage(bg.url)}
+                        className={`group relative h-20 rounded-2xl overflow-hidden border transition-all text-left flex flex-col justify-between p-2.5 shadow-md ${
+                          isSelected
+                            ? 'border-fuchsia-400 ring-2 ring-fuchsia-400/50 shadow-fuchsia-500/20 scale-[1.02]'
+                            : 'border-white/15 hover:border-white/40'
+                        }`}
+                        style={{
+                          backgroundImage: `url(${bg.url})`,
+                          backgroundSize: 'cover',
+                          backgroundPosition: 'center',
+                        }}
+                      >
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/20 group-hover:from-black/60 transition-colors" />
+
+                        {/* Top Badge */}
+                        <div className="relative z-10 flex justify-between items-center w-full">
+                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-md bg-black/60 text-white/80 border border-white/10">
+                            {bg.badge}
+                          </span>
+                          {isSelected && (
+                            <div className="p-0.5 rounded-full bg-fuchsia-500 text-white">
+                              <Check className="w-3 h-3" />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Bottom Name Label */}
+                        <span className="relative z-10 text-[11px] font-bold text-white drop-shadow truncate">
+                          {bg.name}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
 
                 {/* Upload Custom Image & Controls */}
                 <div className="flex flex-col sm:flex-row items-center gap-2 pt-1">
                   <label className="flex-1 w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/15 text-xs text-white/80 hover:text-white cursor-pointer transition-all active:scale-95">
                     <FolderOpen className="w-3.5 h-3.5 text-cyan-400" />
-                    <span>Upload Image File...</span>
+                    <span>Upload Custom Image File...</span>
                     <input
                       type="file"
                       accept="image/*"
@@ -506,39 +561,67 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
                   </label>
                 </div>
 
-                {/* Sliders: Opacity & Blur */}
+                {/* Extended Sliders: Opacity (0-100%) & Blur (0-80px) & Tint */}
                 {customBgImage && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 rounded-2xl bg-white/5 border border-white/10">
-                    <div className="flex flex-col gap-1">
-                      <div className="flex justify-between text-[11px] text-white/70">
-                        <span>Background Opacity</span>
-                        <span className="font-mono text-fuchsia-300 font-bold">{Math.round(customBgOpacity * 100)}%</span>
+                  <div className="flex flex-col gap-3 p-3.5 rounded-2xl bg-white/5 border border-white/10 mt-1">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="flex flex-col gap-1.5">
+                        <div className="flex justify-between text-[11px] text-white/70">
+                          <span>Background Opacity / Transparency</span>
+                          <span className="font-mono text-fuchsia-300 font-bold">{Math.round(customBgOpacity * 100)}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min={0.0}
+                          max={1.0}
+                          step={0.05}
+                          value={customBgOpacity}
+                          onChange={(e) => setCustomBgOpacity(parseFloat(e.target.value))}
+                          className="w-full h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-fuchsia-400"
+                        />
                       </div>
-                      <input
-                        type="range"
-                        min={0.1}
-                        max={1.0}
-                        step={0.05}
-                        value={customBgOpacity}
-                        onChange={(e) => setCustomBgOpacity(parseFloat(e.target.value))}
-                        className="w-full h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-fuchsia-400"
-                      />
+
+                      <div className="flex flex-col gap-1.5">
+                        <div className="flex justify-between text-[11px] text-white/70">
+                          <span>Background Blur Spread</span>
+                          <span className="font-mono text-cyan-300 font-bold">{customBgBlur}px</span>
+                        </div>
+                        <input
+                          type="range"
+                          min={0}
+                          max={80}
+                          step={1}
+                          value={customBgBlur}
+                          onChange={(e) => setCustomBgBlur(parseInt(e.target.value, 10))}
+                          className="w-full h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-cyan-400"
+                        />
+                      </div>
                     </div>
 
-                    <div className="flex flex-col gap-1">
-                      <div className="flex justify-between text-[11px] text-white/70">
-                        <span>Background Blur</span>
-                        <span className="font-mono text-cyan-300 font-bold">{customBgBlur}px</span>
+                    {/* Tint Selector */}
+                    <div className="flex flex-col gap-1.5 pt-2 border-t border-white/10">
+                      <span className="text-[11px] text-white/70">Glass Overlay Tint:</span>
+                      <div className="grid grid-cols-5 gap-1.5">
+                        {[
+                          { id: 'obsidian', label: 'Dark Obsidian' },
+                          { id: 'navy', label: 'Midnight Navy' },
+                          { id: 'aurora', label: 'Emerald Aurora' },
+                          { id: 'amethyst', label: 'Amethyst' },
+                          { id: 'clear', label: 'Pure Clear' },
+                        ].map((t) => (
+                          <button
+                            key={t.id}
+                            onClick={() => setCustomBgTint(t.id as 'obsidian' | 'navy' | 'aurora' | 'amethyst' | 'clear')}
+                            className={`py-1.5 px-2 rounded-xl text-[10px] font-semibold transition-all truncate text-center ${
+                              customBgTint === t.id
+                                ? 'bg-white/20 text-white border border-white/40 shadow-sm font-bold'
+                                : 'bg-white/5 text-white/50 hover:text-white border border-white/5'
+                            }`}
+                          >
+                            {t.label}
+                          </button>
+                        ))}
                       </div>
-                      <input
-                        type="range"
-                        min={0}
-                        max={30}
-                        step={1}
-                        value={customBgBlur}
-                        onChange={(e) => setCustomBgBlur(parseInt(e.target.value, 10))}
-                        className="w-full h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-cyan-400"
-                      />
                     </div>
                   </div>
                 )}
@@ -548,333 +631,270 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
 
           {/* TAB 2: CLARITY AI & SUPER-RESOLUTION */}
           {activeTab === 'clarity' && (
-            <div className="flex flex-col gap-5">
-              <div className="flex flex-col gap-2.5">
-                <span className="text-xs font-semibold text-white/80 flex items-center gap-2">
-                  <Zap className="w-4 h-4 text-cyan-400" />
-                  1-Click Super-Resolution Modes
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-white/70">
+                  Super-Resolution & Clarity Filters
                 </span>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {RESOLUTION_PRESETS.map((preset) => {
-                    const isSelected = shaderConfig.superResolution === preset.id;
-                    return (
-                      <button
-                        key={preset.id}
-                        onClick={() => {
-                          updateShaderConfig({
-                            superResolution: preset.id,
-                            sharpness: preset.id === 'off' ? 0 : 0.8,
-                            clarityBoost: preset.id === 'off' ? 0 : 0.6,
-                            deNoise: preset.id === 'anime4k' ? 0.4 : 0.2,
-                            contrast: preset.id === 'cinematic-crisp' ? 1.25 : 1.1,
-                          });
-                        }}
-                        className={`p-3.5 rounded-2xl text-left border flex items-center justify-between gap-3 transition-all ${
-                          isSelected
-                            ? `bg-white/10 ${currentTheme.glassBorder} shadow-lg ring-1 ring-white/30 scale-[1.01]`
-                            : 'bg-white/5 border-white/10 hover:bg-white/10'
-                        }`}
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div
-                            className={`w-3.5 h-3.5 rounded-full shrink-0 bg-gradient-to-r ${preset.gradient}`}
-                          />
-                          <div className="flex flex-col min-w-0">
-                            <span className="text-xs font-bold text-white truncate">{preset.name}</span>
-                            <span className="text-[10px] text-white/50 truncate">{preset.desc}</span>
-                          </div>
-                        </div>
-                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-white/10 text-white/70 shrink-0">
-                          {preset.badge}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
+                <span className="text-[11px] font-mono text-purple-400 font-bold uppercase">
+                  Engine: {shaderConfig.superResolution}
+                </span>
               </div>
 
-              {/* Split Screen Compare Mode Toggle */}
-              <div className="p-4 rounded-3xl bg-white/5 border border-white/10 flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="p-2 rounded-xl bg-purple-500/20 text-purple-300">
-                      <Split className="w-4 h-4" />
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-xs font-bold text-white">Live Split-Screen Compare Mode</span>
-                      <span className="text-[10px] text-white/40">
-                        Shows an interactive draggable divider: Original (Left) vs Clarity AI (Right)
-                      </span>
-                    </div>
-                  </div>
+              {/* Super-Resolution Presets */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {RESOLUTION_PRESETS.map((p) => {
+                  const isSelected = shaderConfig.superResolution === p.id;
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => updateShaderConfig({ superResolution: p.id })}
+                      className={`p-3 rounded-2xl text-left border flex flex-col justify-between gap-1.5 transition-all ${
+                        isSelected
+                          ? 'bg-purple-950/40 border-purple-400 ring-1 ring-purple-400/40 shadow-lg shadow-purple-500/10'
+                          : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-white">{p.name}</span>
+                        <span className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded-full bg-gradient-to-r ${p.gradient} text-white`}>
+                          {p.badge}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-white/50">{p.desc}</p>
+                    </button>
+                  );
+                })}
+              </div>
 
+              {/* Sliders for Video Clarity & Sharpness */}
+              <div className="flex flex-col gap-3 p-3.5 rounded-2xl bg-white/5 border border-white/10">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-white/90 flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-purple-400" />
+                    Texture Detail & Edge Clarifier
+                  </span>
+                  <span className="text-xs font-mono font-bold text-purple-300">
+                    +{Math.round((shaderConfig.clarityBoost || 0) * 100)}%
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={0.0}
+                  max={2.0}
+                  step={0.1}
+                  value={shaderConfig.clarityBoost || 0}
+                  onChange={(e) => updateShaderConfig({ clarityBoost: parseFloat(e.target.value) })}
+                  className="w-full h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-purple-400"
+                />
+
+                <div className="flex items-center justify-between pt-2 border-t border-white/10">
+                  <span className="text-xs font-semibold text-white/90 flex items-center gap-2">
+                    <Eye className="w-4 h-4 text-cyan-400" />
+                    Interactive Split Compare Mode
+                  </span>
                   <button
-                    onClick={() =>
-                      updateShaderConfig({
-                        splitCompareEnabled: !shaderConfig.splitCompareEnabled,
-                      })
-                    }
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    onClick={() => updateShaderConfig({ splitCompareEnabled: !shaderConfig.splitCompareEnabled })}
+                    className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all ${
                       shaderConfig.splitCompareEnabled
-                        ? 'bg-purple-500/30 text-purple-200 border border-purple-400/40 shadow-sm'
-                        : 'bg-white/5 text-white/50 border border-white/10'
+                        ? 'bg-cyan-500 text-slate-950 font-bold'
+                        : 'bg-white/10 text-white/60'
                     }`}
                   >
-                    <Eye className="w-3.5 h-3.5" />
-                    <span>{shaderConfig.splitCompareEnabled ? 'Split: ON' : 'Split: OFF'}</span>
+                    {shaderConfig.splitCompareEnabled ? 'Split View: Active' : 'Off'}
                   </button>
-                </div>
-
-                {shaderConfig.splitCompareEnabled && (
-                  <div className="flex flex-col gap-1.5 pt-2 border-t border-white/10">
-                    <div className="flex items-center justify-between text-xs text-white/70 font-mono">
-                      <span>Divider Position (Drag directly on video or use slider)</span>
-                      <span className="text-purple-300 font-bold">{shaderConfig.splitComparePosition ?? 50}%</span>
-                    </div>
-                    <input
-                      type="range"
-                      min={10}
-                      max={90}
-                      step={1}
-                      value={shaderConfig.splitComparePosition ?? 50}
-                      onChange={(e) =>
-                        updateShaderConfig({ splitComparePosition: parseInt(e.target.value, 10) })
-                      }
-                      className="w-full h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-purple-400"
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* Fine-Tuning Sliders */}
-              <div className="flex flex-col gap-4 border-t border-white/10 pt-4">
-                <span className="text-xs font-semibold text-white/70 flex items-center gap-2">
-                  <SlidersHorizontal className="w-4 h-4 text-cyan-400" />
-                  Manual Clarity & Shader Tuning
-                </span>
-
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex items-center justify-between text-xs text-white/80">
-                    <span>Texture Detail & Clarity Extraction</span>
-                    <span className="font-mono text-cyan-400">{Math.round((shaderConfig.clarityBoost ?? 0) * 100)}%</span>
-                  </div>
-                  <input
-                    type="range"
-                    min={0}
-                    max={2.0}
-                    step={0.05}
-                    value={shaderConfig.clarityBoost ?? 0}
-                    onChange={(e) => updateShaderConfig({ clarityBoost: parseFloat(e.target.value) })}
-                    className="w-full h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-cyan-400"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex items-center justify-between text-xs text-white/80">
-                    <span>Edge Sharpening (Unsharp Masking)</span>
-                    <span className="font-mono text-cyan-400">{Math.round((shaderConfig.sharpness ?? 0) * 100)}%</span>
-                  </div>
-                  <input
-                    type="range"
-                    min={0}
-                    max={2.0}
-                    step={0.05}
-                    value={shaderConfig.sharpness ?? 0}
-                    onChange={(e) => updateShaderConfig({ sharpness: parseFloat(e.target.value) })}
-                    className="w-full h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-cyan-400"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex items-center justify-between text-xs text-white/80">
-                    <span>Compression Artifact Reduction & De-Noising</span>
-                    <span className="font-mono text-cyan-400">{Math.round((shaderConfig.deNoise ?? 0) * 100)}%</span>
-                  </div>
-                  <input
-                    type="range"
-                    min={0}
-                    max={1.0}
-                    step={0.05}
-                    value={shaderConfig.deNoise ?? 0}
-                    onChange={(e) => updateShaderConfig({ deNoise: parseFloat(e.target.value) })}
-                    className="w-full h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-cyan-400"
-                  />
                 </div>
               </div>
             </div>
           )}
 
-          {/* TAB 3: 3D SPATIAL AUDIO & MULTI-SPEAKER SYSTEM */}
+          {/* TAB 3: 3D SOUND & SPEAKERS */}
           {activeTab === 'spatial' && (
-            <div className="flex flex-col gap-5">
+            <div className="flex flex-col gap-4">
+              {/* Header Toggle & Profile */}
               <div className="flex items-center justify-between p-3.5 rounded-2xl bg-white/5 border border-white/10">
-                <div className="flex flex-col">
-                  <span className="text-xs font-bold text-white">3D Spatial Audio Virtualizer (HRTF)</span>
-                  <span className="text-[10px] text-white/40">Real-time binaural spherical audio for headphones & 5.1/7.1 sound</span>
-                </div>
-                <button
-                  onClick={() => setSpatialAudioEnabled(!spatialState.enabled)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-                    spatialState.enabled
-                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 shadow-sm'
-                      : 'bg-white/5 text-white/50 border border-white/10'
-                  }`}
-                >
-                  <Radio className="w-3.5 h-3.5" />
-                  <span>{spatialState.enabled ? '3D Active' : 'Bypass'}</span>
-                </button>
-              </div>
-
-              {/* Radar & Position Control */}
-              <div className="flex flex-col sm:flex-row items-center gap-6 p-4 rounded-3xl bg-white/5 border border-white/10">
-                <div className="relative">
-                  <canvas
-                    ref={canvasRef}
-                    width={240}
-                    height={240}
-                    onMouseDown={(e) => {
-                      isDraggingRef.current = true;
-                      handleCanvasInteraction(e.clientX, e.clientY);
-                    }}
-                    onMouseMove={(e) => {
-                      if (isDraggingRef.current) handleCanvasInteraction(e.clientX, e.clientY);
-                    }}
-                    onMouseUp={() => { isDraggingRef.current = false; }}
-                    onMouseLeave={() => { isDraggingRef.current = false; }}
-                    className="rounded-2xl cursor-grab active:cursor-grabbing border border-white/10 shadow-inner bg-slate-950"
-                  />
-                  <span className="absolute bottom-2 right-2 text-[10px] font-mono text-white/40">
-                    Drag sound orb
-                  </span>
-                </div>
-
-                <div className="flex-1 flex flex-col gap-2.5 min-w-0">
-                  <span className="text-xs font-bold text-white uppercase tracking-wider">
-                    Interactive 360° Soundstage
-                  </span>
-                  <p className="text-xs text-white/60 leading-relaxed">
-                    Drag the orb to physically move sound origin in virtual 3D space around your head.
-                  </p>
-
-                  <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-                    <div className="p-2 rounded-xl bg-black/40 border border-white/10">
-                      <span className="text-[10px] text-white/40 block">Azimuth (X)</span>
-                      <span className="text-cyan-400 font-bold">{(spatialState.coordinates.x * 100).toFixed(0)}%</span>
-                    </div>
-                    <div className="p-2 rounded-xl bg-black/40 border border-white/10">
-                      <span className="text-[10px] text-white/40 block">Elevation (Z)</span>
-                      <span className="text-purple-400 font-bold">{(spatialState.coordinates.z * 100).toFixed(0)}%</span>
-                    </div>
+                <div className="flex items-center gap-3">
+                  <div className={`p-2.5 rounded-xl ${spatialState.enabled ? 'bg-cyan-500/20 text-cyan-300' : 'bg-white/10 text-white/40'}`}>
+                    <Headphones className="w-5 h-5" />
                   </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-white">3D Spatial Audio & Multi-Speaker Sound System</h4>
+                    <p className="text-[10px] text-white/50">HRTF Acoustic Virtualizer, Preamp Booster & 6-Channel Matrix</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      onClose();
+                      onOpenEq();
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 text-purple-200 border border-purple-500/30 font-semibold text-[11px] flex items-center gap-1.5 transition-all active:scale-95"
+                    title="Open 10-Band Graphic Equalizer"
+                  >
+                    <Sliders className="w-3.5 h-3.5 text-purple-400" />
+                    <span>10-Band EQ</span>
+                  </button>
 
                   <button
-                    onClick={() => setSpatialCoordinates(0, 0, 0.5)}
-                    className="self-start text-[11px] text-white/60 hover:text-white px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 flex items-center gap-1.5 transition-colors"
+                    onClick={playAudioTestChime}
+                    className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-[11px] flex items-center gap-1.5 transition-all active:scale-95 border border-white/15"
+                    title="Play 3D audio test sweep"
                   >
-                    <RotateCcw className="w-3 h-3" />
-                    <span>Recenter Audio Source</span>
+                    <Volume2 className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Test Sweep</span>
+                  </button>
+
+                  <button
+                    onClick={() => setSpatialAudioEnabled(!spatialState.enabled)}
+                    className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all ${
+                      spatialState.enabled
+                        ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
+                        : 'bg-white/10 text-white/50'
+                    }`}
+                  >
+                    {spatialState.enabled ? 'Enabled' : 'Bypass'}
                   </button>
                 </div>
               </div>
 
-              {/* Spatial Profiles */}
-              <div className="flex flex-col gap-2">
-                <span className="text-xs font-semibold text-white/70">1-Click Sound Profiles</span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {PROFILES.map((p) => (
+              {/* Real-time Frequency Analyser Visualizer */}
+              <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 flex flex-col gap-1.5">
+                <div className="flex items-center justify-between text-xs text-white/70">
+                  <span className="flex items-center gap-2 font-semibold">
+                    <Activity className="w-4 h-4 text-cyan-400" />
+                    Live Audio Spectrum Analyser
+                  </span>
+                  <span className="text-[10px] font-mono text-cyan-300">32-Band FFT</span>
+                </div>
+                <canvas
+                  ref={visualizerCanvasRef}
+                  width={600}
+                  height={48}
+                  className="w-full h-12 rounded-xl bg-black/40 border border-white/5"
+                />
+              </div>
+
+              {/* Master Preamp Gain Booster & Stereo Channel Balance */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-2xl bg-white/5 border border-white/10">
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex justify-between text-xs text-white/80 font-semibold">
+                    <span className="flex items-center gap-1.5">
+                      <Zap className="w-3.5 h-3.5 text-amber-400" />
+                      Smart Preamp Volume Booster
+                    </span>
+                    <span className="font-mono text-amber-300 font-bold">{Math.round(preampGain * 100)}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={1.0}
+                    max={2.2}
+                    step={0.05}
+                    value={preampGain}
+                    onChange={(e) => setPreampGain(parseFloat(e.target.value))}
+                    className="w-full h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-amber-400"
+                  />
+                  <span className="text-[10px] text-white/40">Boost quiet movies & streams up to 220% cleanly</span>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex justify-between text-xs text-white/80 font-semibold">
+                    <span className="flex items-center gap-1.5">
+                      <Sliders className="w-3.5 h-3.5 text-cyan-400" />
+                      Stereo Balance (Pan)
+                    </span>
+                    <span className="font-mono text-cyan-300 font-bold">
+                      {stereoPan === 0 ? 'Center' : stereoPan < 0 ? `L ${Math.round(Math.abs(stereoPan) * 100)}%` : `R ${Math.round(stereoPan * 100)}%`}
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={-1.0}
+                    max={1.0}
+                    step={0.05}
+                    value={stereoPan}
+                    onChange={(e) => setStereoPan(parseFloat(e.target.value))}
+                    className="w-full h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-cyan-400"
+                  />
+                  <div className="flex justify-between text-[10px] text-white/40 font-mono">
+                    <span>Left</span>
+                    <span>Center</span>
+                    <span>Right</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Profiles */}
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                {PROFILES.map((p) => {
+                  const isSelected = spatialState.profile === p.id;
+                  return (
                     <button
                       key={p.id}
                       onClick={() => setSpatialProfile(p.id)}
-                      className={`p-3 rounded-2xl text-left border flex items-center gap-2.5 transition-all ${
-                        spatialState.profile === p.id
-                          ? `bg-white/10 ${currentTheme.glassBorder} shadow-lg ring-1 ring-white/30`
-                          : 'bg-white/5 border-white/10 hover:bg-white/10'
+                      className={`p-2.5 rounded-2xl text-center border flex flex-col items-center gap-1 transition-all ${
+                        isSelected
+                          ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300 font-bold shadow-md shadow-cyan-500/20'
+                          : 'bg-white/5 border-white/10 text-white/70 hover:text-white'
                       }`}
                     >
-                      <span className="text-xl">{p.icon}</span>
-                      <div className="flex flex-col min-w-0">
-                        <span className="text-xs font-bold text-white truncate">{p.name}</span>
-                        <span className="text-[10px] text-white/50 truncate">{p.desc}</span>
-                      </div>
+                      <span className="text-lg">{p.icon}</span>
+                      <span className="text-[11px] truncate w-full">{p.name}</span>
                     </button>
-                  ))}
-                </div>
+                  );
+                })}
               </div>
 
-              {/* Speaker Volume Matrix */}
-              <div className="flex flex-col gap-2.5 pt-2 border-t border-white/10">
-                <span className="text-xs font-semibold text-white/70">Individual Speaker Channel Levels</span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {SPEAKER_LABELS.map((spk) => {
-                    const vol = spatialState.speakers[spk.key];
-                    const percent = Math.round(vol * 100);
+              {/* Interactive Radar Canvas */}
+              <div className="flex flex-col items-center justify-center p-3 rounded-2xl bg-white/5 border border-white/10">
+                <canvas
+                  ref={canvasRef}
+                  width={240}
+                  height={180}
+                  onMouseDown={(e) => {
+                    isDraggingRef.current = true;
+                    handleCanvasInteraction(e.clientX, e.clientY);
+                  }}
+                  onMouseMove={(e) => {
+                    if (isDraggingRef.current) handleCanvasInteraction(e.clientX, e.clientY);
+                  }}
+                  onMouseUp={() => (isDraggingRef.current = false)}
+                  onMouseLeave={() => (isDraggingRef.current = false)}
+                  className="cursor-crosshair rounded-xl border border-white/10"
+                />
+                <span className="text-[10px] text-white/40 mt-1">Drag glowing orb to position 3D sound source in space</span>
+              </div>
 
-                    return (
-                      <div
-                        key={spk.key}
-                        className="p-3 rounded-2xl bg-white/5 border border-white/10 flex flex-col gap-1.5"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-white">{spk.name}</span>
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => setSpeakerVolume(spk.key, vol === 0 ? 1.0 : 0)}
-                              className="text-white/60 hover:text-white"
-                            >
-                              {vol === 0 ? <VolumeX className="w-3.5 h-3.5 text-rose-400" /> : <Volume2 className="w-3.5 h-3.5 text-cyan-400" />}
-                            </button>
-                            <span className="text-[11px] font-mono font-bold text-cyan-300">{percent}%</span>
-                          </div>
-                        </div>
-                        <input
-                          type="range"
-                          min={0}
-                          max={spk.max}
-                          step={0.05}
-                          value={vol}
-                          onChange={(e) => setSpeakerVolume(spk.key, parseFloat(e.target.value))}
-                          className="w-full h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-cyan-400"
-                        />
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* Subwoofer LFE Crossover */}
-                <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 flex flex-col gap-2 mt-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-white flex items-center gap-2">
-                      <Radio className="w-3.5 h-3.5 text-fuchsia-400" />
-                      Subwoofer Low-Pass LFE Crossover
-                    </span>
-                    <span className="text-xs font-mono font-bold text-fuchsia-300">
-                      {spatialState.lfeCrossoverHz || 80} Hz
-                    </span>
+              {/* 6 Discrete Speaker Volume Controls */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                {SPEAKER_LABELS.map((spk) => (
+                  <div key={spk.key} className="p-2.5 rounded-xl bg-white/5 border border-white/10 flex flex-col gap-1">
+                    <div className="flex justify-between text-[11px] text-white/80 font-semibold">
+                      <span>{spk.name}</span>
+                      <span className="font-mono text-cyan-300 font-bold">
+                        {Math.round((spatialState.speakers[spk.key] || 1.0) * 100)}%
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0.0}
+                      max={spk.max}
+                      step={0.05}
+                      value={spatialState.speakers[spk.key] || 1.0}
+                      onChange={(e) => setSpeakerVolume(spk.key, parseFloat(e.target.value))}
+                      className="w-full h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-cyan-400"
+                    />
                   </div>
-                  <input
-                    type="range"
-                    min={40}
-                    max={200}
-                    step={5}
-                    value={spatialState.lfeCrossoverHz || 80}
-                    onChange={(e) => setLfeCrossover(parseInt(e.target.value, 10))}
-                    className="w-full h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-fuchsia-400"
-                  />
-                  <div className="flex justify-between text-[10px] text-white/40 font-mono">
-                    <span>40 Hz (Deep Sub)</span>
-                    <span>80 Hz (THX Cinema)</span>
-                    <span>200 Hz (Punchy Bass)</span>
-                  </div>
-                </div>
+                ))}
               </div>
             </div>
           )}
 
-          {/* TAB 4: ASPECT RATIO & TOOLS */}
+          {/* TAB 4: ASPECT RATIO, SUBTITLES & PATHS */}
           {activeTab === 'tools' && (
-            <div className="flex flex-col gap-5">
-              <div className="flex flex-col gap-2.5">
+            <div className="flex flex-col gap-4">
+              {/* Aspect Ratio */}
+              <div className="flex flex-col gap-2">
                 <label className="text-xs font-semibold text-white/70 flex items-center gap-2">
                   <Ratio className="w-4 h-4 text-cyan-400" />
                   Aspect Ratio & Cropping
@@ -884,7 +904,7 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
                     <button
                       key={ratio}
                       onClick={() => updateShaderConfig({ aspectRatio: ratio })}
-                      className={`py-2.5 px-2 rounded-2xl text-xs font-mono font-semibold transition-all uppercase ${
+                      className={`py-2 px-2 rounded-2xl text-xs font-mono font-semibold transition-all uppercase ${
                         shaderConfig.aspectRatio === ratio
                           ? 'bg-cyan-500 text-slate-950 font-bold shadow-md shadow-cyan-500/30'
                           : 'bg-white/5 border border-white/10 text-white/70 hover:text-white'
@@ -896,83 +916,142 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
                 </div>
               </div>
 
-              <div className="flex flex-col gap-2.5 border-t border-white/10 pt-4">
-                <span className="text-xs font-semibold text-white/70">Quick Player Utilities</span>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              {/* Subtitle & Caption Customizer */}
+              <div className="flex flex-col gap-3 p-3.5 rounded-2xl bg-white/5 border border-white/10">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-white/90 flex items-center gap-2">
+                    <Subtitles className="w-4 h-4 text-amber-400" />
+                    Video Subtitles & Closed Captions (CC)
+                  </span>
                   <button
-                    onClick={takeSnapshot}
-                    className="flex flex-col items-center justify-center gap-2 p-3.5 rounded-2xl bg-white/5 border border-white/10 hover:border-cyan-400/40 transition-all text-center"
-                    title="Lossless Frame Snapshot"
-                  >
-                    <Camera className="w-5 h-5 text-cyan-400" />
-                    <span className="text-[11px] font-semibold text-white/80">Snapshot</span>
-                  </button>
-
-                  <button
-                    onClick={togglePiP}
-                    className="flex flex-col items-center justify-center gap-2 p-3.5 rounded-2xl bg-white/5 border border-white/10 hover:border-cyan-400/40 transition-all text-center"
-                    title="Picture in Picture"
-                  >
-                    <Tv className="w-5 h-5 text-purple-400" />
-                    <span className="text-[11px] font-semibold text-white/80">PiP Mode</span>
-                  </button>
-
-                  <button
-                    onClick={toggleLoop}
-                    className={`flex flex-col items-center justify-center gap-2 p-3.5 rounded-2xl transition-all text-center ${
-                      isLooping
-                        ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 shadow-lg shadow-cyan-500/20'
-                        : 'bg-white/5 border border-white/10 text-white/80'
+                    onClick={toggleSubtitles}
+                    className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all ${
+                      isSubtitlesVisible
+                        ? 'bg-amber-500 text-slate-950 font-bold'
+                        : 'bg-white/10 text-white/40'
                     }`}
-                    title="Toggle Repeat"
                   >
-                    <Repeat className="w-5 h-5" />
-                    <span className="text-[11px] font-semibold">{isLooping ? 'Loop: On' : 'Loop: Off'}</span>
+                    {isSubtitlesVisible ? 'Captions: Visible' : 'Hidden'}
                   </button>
+                </div>
 
-                  <button
-                    onClick={() => {
-                      onClose();
-                      onOpenEq();
-                    }}
-                    className="flex flex-col items-center justify-center gap-2 p-3.5 rounded-2xl bg-white/5 border border-white/10 hover:border-cyan-400/40 transition-all text-center"
-                    title="Audio Equalizer"
-                  >
-                    <SlidersHorizontal className="w-5 h-5 text-emerald-400" />
-                    <span className="text-[11px] font-semibold text-white/80">Audio DSP</span>
-                  </button>
+                {activeSubtitleTrack && (
+                  <div className="flex items-center justify-between text-xs text-white/60 bg-black/30 p-2 rounded-xl">
+                    <span className="truncate">Loaded: {activeSubtitleTrack.fileName}</span>
+                    <span className="font-mono text-amber-300">{activeSubtitleTrack.cues.length} Cues</span>
+                  </div>
+                )}
+
+                {/* Subtitle Style Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[10px] text-white/60 font-semibold">Font Size:</span>
+                    <div className="grid grid-cols-4 gap-1">
+                      {(['small', 'medium', 'large', 'extra-large'] as const).map((sz) => (
+                        <button
+                          key={sz}
+                          onClick={() => updateSubtitleStyle({ fontSize: sz })}
+                          className={`py-1 rounded-lg text-[10px] font-semibold uppercase ${
+                            subtitleStyle.fontSize === sz
+                              ? 'bg-amber-500/30 text-amber-300 border border-amber-400/50'
+                              : 'bg-white/5 text-white/50'
+                          }`}
+                        >
+                          {sz === 'extra-large' ? 'XL' : sz[0].toUpperCase()}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <div className="flex justify-between text-[10px] text-white/60">
+                      <span>Box Opacity</span>
+                      <span className="font-mono text-amber-300">{Math.round(subtitleStyle.backgroundOpacity * 100)}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0.0}
+                      max={1.0}
+                      step={0.05}
+                      value={subtitleStyle.backgroundOpacity}
+                      onChange={(e) => updateSubtitleStyle({ backgroundOpacity: parseFloat(e.target.value) })}
+                      className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-amber-400"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <div className="flex justify-between text-[10px] text-white/60">
+                      <span>Vertical Offset</span>
+                      <span className="font-mono text-amber-300">{subtitleStyle.bottomOffsetPercent}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={5}
+                      max={35}
+                      step={1}
+                      value={subtitleStyle.bottomOffsetPercent}
+                      onChange={(e) => updateSubtitleStyle({ bottomOffsetPercent: parseInt(e.target.value, 10) })}
+                      className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-amber-400"
+                    />
+                  </div>
+                </div>
+
+                {/* Lip-Sync Sync Offset */}
+                <div className="flex flex-col gap-1 pt-1 border-t border-white/10">
+                  <div className="flex justify-between text-[11px] text-white/70">
+                    <span>Subtitle Lip-Sync Offset:</span>
+                    <span className="font-mono text-amber-300 font-bold">
+                      {(activeSubtitleTrack?.syncOffsetSec || 0) > 0 ? `+${(activeSubtitleTrack?.syncOffsetSec || 0).toFixed(1)}s` : `${(activeSubtitleTrack?.syncOffsetSec || 0).toFixed(1)}s`}
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={-5.0}
+                    max={5.0}
+                    step={0.1}
+                    value={activeSubtitleTrack?.syncOffsetSec || 0}
+                    onChange={(e) => setSubtitleSyncOffset(parseFloat(e.target.value))}
+                    className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-amber-400"
+                  />
+                  <div className="flex justify-between text-[9px] text-white/40 font-mono">
+                    <span>-5.0s (Earlier)</span>
+                    <span>0.0s (Exact)</span>
+                    <span>+5.0s (Later)</span>
+                  </div>
                 </div>
               </div>
 
-              {/* Screenshot Saving Path Configuration */}
-              <div className="flex flex-col gap-3 border-t border-white/10 pt-4">
+              {/* OS-Aware Screenshot Saving Path Configuration */}
+              <div className="flex flex-col gap-3 p-3.5 rounded-2xl bg-white/5 border border-white/10">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-white/90 flex items-center gap-2">
                     <Camera className="w-4 h-4 text-cyan-400" />
                     Screenshot Storage Location
                   </span>
-                  {snapshotNotification && (
-                    <span className="text-[11px] font-mono text-cyan-300 bg-cyan-950/80 px-2.5 py-0.5 rounded-lg border border-cyan-400/40 animate-pulse">
-                      {snapshotNotification}
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-white/10 text-cyan-300 border border-white/10 uppercase">
+                      OS: {detectedOS}
                     </span>
-                  )}
+                    {snapshotNotification && (
+                      <span className="text-[11px] font-mono text-cyan-300 bg-cyan-950/80 px-2.5 py-0.5 rounded-lg border border-cyan-400/40 animate-pulse">
+                        {snapshotNotification}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
-                {/* Preset Directory Selectors */}
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { label: 'Pictures (Default)', path: '~/Pictures/Miki Player/Screenshots' },
-                    { label: 'Downloads', path: '~/Downloads' },
-                    { label: 'Desktop', path: '~/Desktop' },
-                  ].map((preset) => (
+                {/* Preset Directory Selectors for detected OS */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {osPresetDirs.map((preset) => (
                     <button
                       key={preset.path}
                       onClick={() => setScreenshotDirectory(preset.path)}
-                      className={`py-2 px-3 rounded-xl text-xs font-medium transition-all text-center truncate ${
+                      className={`py-2 px-2.5 rounded-xl text-xs font-medium transition-all text-center truncate ${
                         screenshotDirectory === preset.path
                           ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/50 shadow-md shadow-cyan-500/20 font-bold'
                           : 'bg-white/5 border border-white/10 text-white/70 hover:text-white hover:bg-white/10'
                       }`}
+                      title={preset.description}
                     >
                       {preset.label}
                     </button>
@@ -981,20 +1060,20 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
 
                 {/* Custom Path Input + Native Browse Button */}
                 <div className="flex items-center gap-2">
-                  <div className="flex-1 flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-black/40 border border-white/15 focus-within:border-cyan-400/60 transition-colors">
+                  <div className="flex-1 flex items-center gap-2 px-3 py-2 rounded-2xl bg-black/40 border border-white/15 focus-within:border-cyan-400/60 transition-colors">
                     <FolderOpen className="w-4 h-4 text-white/40 shrink-0" />
                     <input
                       type="text"
                       value={screenshotDirectory}
                       onChange={(e) => setScreenshotDirectory(e.target.value)}
-                      placeholder="~/Pictures/Miki Player/Screenshots"
+                      placeholder={osPresetDirs[0]?.path || '~/Pictures/Miki Player/Screenshots'}
                       className="w-full bg-transparent text-xs text-white placeholder-white/30 focus:outline-none font-mono"
                     />
                   </div>
 
                   <button
                     onClick={handleBrowseScreenshotDir}
-                    className="px-4 py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/15 text-xs font-semibold text-white transition-all active:scale-95 shrink-0 flex items-center gap-1.5"
+                    className="px-4 py-2 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/15 text-xs font-semibold text-white transition-all active:scale-95 shrink-0 flex items-center gap-1.5"
                     title="Choose custom folder on disk"
                   >
                     <FolderOpen className="w-3.5 h-3.5 text-cyan-400" />
@@ -1003,43 +1082,39 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
 
                   <button
                     onClick={takeSnapshot}
-                    className="px-3.5 py-2.5 rounded-2xl bg-gradient-to-r from-cyan-500 to-fuchsia-500 text-white text-xs font-bold shadow-md hover:brightness-110 active:scale-95 transition-all shrink-0 flex items-center gap-1.5"
+                    className="px-3.5 py-2 rounded-2xl bg-gradient-to-r from-cyan-500 to-fuchsia-500 text-white text-xs font-bold shadow-md hover:brightness-110 active:scale-95 transition-all shrink-0 flex items-center gap-1.5"
                     title="Capture test frame now"
                   >
                     <Camera className="w-3.5 h-3.5" />
                     <span>Capture</span>
                   </button>
                 </div>
-                <p className="text-[10px] text-white/40">
-                  Lossless PNG snapshots will be automatically saved to this configured folder.
-                </p>
               </div>
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="flex justify-between items-center pt-3 border-t border-white/10">
+        <div className="flex justify-between items-center pt-2 border-t border-white/10">
           <span className="text-[11px] text-white/40 flex items-center gap-1.5">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
             All settings, audio profiles & themes stored in database
           </span>
           <button
-            onClick={() =>
+            onClick={() => {
               updateShaderConfig({
+                superResolution: 'off',
+                clarityBoost: 0,
                 brightness: 0,
                 contrast: 1.0,
                 saturation: 1.0,
                 aspectRatio: 'auto',
-                ambientGlowEnabled: true,
-                superResolution: 'off',
-                sharpness: 0,
-                clarityBoost: 0,
-                deNoise: 0,
                 splitCompareEnabled: false,
-              })
-            }
-            className="text-xs text-white/60 hover:text-white px-4 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
+              });
+              setPreampGain(1.0);
+              setStereoPan(0.0);
+            }}
+            className="text-[11px] text-white/40 hover:text-white/80 transition-colors"
           >
             Reset All Settings
           </button>

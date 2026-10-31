@@ -60,6 +60,13 @@ declare module 'lucide-react' {
   export const Layers: LucideIcon;
   export const Split: LucideIcon;
   export const Eye: LucideIcon;
+  export const Activity: LucideIcon;
+  export const ArrowUpDown: LucideIcon;
+  export const ArrowDownUp: LucideIcon;
+  export const CheckCircle: LucideIcon;
+  export const CheckCircle2: LucideIcon;
+  export const Filter: LucideIcon;
+  export const Monitor: LucideIcon;
 
   // Fallback index signature so any other Lucide icon is also typed
   const icons: { [key: string]: LucideIcon };
