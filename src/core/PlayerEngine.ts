@@ -586,6 +586,12 @@ export class WebMediaEngine implements IPlayerEngine {
 
   private notifyTelemetry(): void {
     if (!this.videoEl) return;
+    // If no media source is attached to the video element, do not emit spurious paused telemetry
+    const elSrc = this.videoEl.currentSrc || this.videoEl.src || '';
+    if (!elSrc || (typeof window !== 'undefined' && elSrc === window.location.href)) {
+      return;
+    }
+
     const bufferedEnd =
       this.videoEl.buffered.length > 0
         ? this.videoEl.buffered.end(this.videoEl.buffered.length - 1) * 1000

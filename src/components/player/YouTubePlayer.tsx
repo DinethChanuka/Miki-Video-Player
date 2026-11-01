@@ -153,8 +153,19 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
   }, [youtubeId, onTimeUpdate, onEnded, setPlayerState, sendListeningPing]);
 
   // Sync pause/play state to iframe with loop prevention
+  const isInitialSyncRef = useRef<boolean>(true);
   useEffect(() => {
     if (!iframeRef.current?.contentWindow) return;
+
+    // Skip sending initial pauseVideo on first mount to let YouTube autoplay without interference
+    if (isInitialSyncRef.current) {
+      isInitialSyncRef.current = false;
+      if (!isPaused) {
+        lastCommandRef.current = 'playVideo';
+      }
+      return;
+    }
+
     const command = isPaused ? 'pauseVideo' : 'playVideo';
 
     // Prevent echoing command if already in that state

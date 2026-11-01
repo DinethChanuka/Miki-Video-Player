@@ -81,6 +81,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         mainMenu.addItem(appMenuItem)
         let appMenu = NSMenu()
         appMenuItem.submenu = appMenu
+        let prefItem = NSMenuItem(title: "Google / Gmail Account...", action: #selector(openGmailSignIn), keyEquivalent: ",")
+        prefItem.target = self
+        appMenu.addItem(prefItem)
+        appMenu.addItem(NSMenuItem.separator())
         appMenu.addItem(withTitle: "Quit Miki Player", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
 
         // Edit menu to allow Cmd+C, Cmd+V, Cmd+A, Cmd+Z in text inputs
@@ -96,7 +100,51 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         editMenu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
         editMenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
 
+        // Account & Services Menu
+        let accountMenuItem = NSMenuItem()
+        mainMenu.addItem(accountMenuItem)
+        let accountMenu = NSMenu(title: "Account")
+        accountMenuItem.submenu = accountMenu
+        let signInItem = NSMenuItem(title: "Sign in with Google / Gmail...", action: #selector(openGmailSignIn), keyEquivalent: "g")
+        signInItem.target = self
+        accountMenu.addItem(signInItem)
+
+        // Web Streams Menu (YouTube, TikTok, Instagram)
+        let streamMenuItem = NSMenuItem()
+        mainMenu.addItem(streamMenuItem)
+        let streamMenu = NSMenu(title: "Streams")
+        streamMenuItem.submenu = streamMenu
+        let ytItem = NSMenuItem(title: "YouTube Web Stream...", action: #selector(openYouTubeStream), keyEquivalent: "y")
+        ytItem.target = self
+        streamMenu.addItem(ytItem)
+        let ttItem = NSMenuItem(title: "TikTok Web Stream...", action: #selector(openTikTokStream), keyEquivalent: "t")
+        ttItem.target = self
+        streamMenu.addItem(ttItem)
+        let igItem = NSMenuItem(title: "Instagram Web Stream...", action: #selector(openInstagramStream), keyEquivalent: "i")
+        igItem.target = self
+        streamMenu.addItem(igItem)
+
         NSApp.mainMenu = mainMenu
+    }
+
+    @objc func openGmailSignIn() {
+        let js = "window.dispatchEvent(new CustomEvent('miki:open-gmail-signin'));"
+        webView.evaluateJavaScript(js, completionHandler: nil)
+    }
+
+    @objc func openYouTubeStream() {
+        let js = "window.dispatchEvent(new CustomEvent('miki:open-web-stream', { detail: { tab: 'youtube' } }));"
+        webView.evaluateJavaScript(js, completionHandler: nil)
+    }
+
+    @objc func openTikTokStream() {
+        let js = "window.dispatchEvent(new CustomEvent('miki:open-web-stream', { detail: { tab: 'tiktok' } }));"
+        webView.evaluateJavaScript(js, completionHandler: nil)
+    }
+
+    @objc func openInstagramStream() {
+        let js = "window.dispatchEvent(new CustomEvent('miki:open-web-stream', { detail: { tab: 'instagram' } }));"
+        webView.evaluateJavaScript(js, completionHandler: nil)
     }
 
     // WKUIDelegate: native file picker when <input type="file"> is clicked

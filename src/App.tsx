@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { usePlayerStore, MediaHistoryItem } from './store/playerStore';
 import { PLAYER_THEMES } from './types/theme';
 import { AmbientCanvas } from './components/ambient/AmbientCanvas';
@@ -13,7 +13,11 @@ import { SplashScreen } from './components/splash/SplashScreen';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { usePlayerGestures } from './hooks/usePlayerGestures';
 import { YouTubePlayer } from './components/player/YouTubePlayer';
+import { WebEmbedPlayer } from './components/player/WebEmbedPlayer';
 import { SubtitleOverlay } from './components/player/SubtitleOverlay';
+import { ApplicationMenu } from './components/hud/ApplicationMenu';
+import { GmailSignInModal } from './components/hud/GmailSignInModal';
+import { parseWebStream } from './utils/webStreamUtils';
 import {
   FolderOpen,
   Sparkles,
@@ -106,7 +110,9 @@ export const App: React.FC = () => {
   const [isEqOpen, setIsEqOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isFileBrowserOpen, setIsFileBrowserOpen] = useState(false);
+  const [fileBrowserInitialTab, setFileBrowserInitialTab] = useState<'youtube' | 'tiktok' | 'instagram' | 'demos' | 'recent' | 'bookmarks'>('youtube');
   const [isSystemAccessOpen, setIsSystemAccessOpen] = useState(false);
+  const [isGmailSignInOpen, setIsGmailSignInOpen] = useState(false);
   const [pendingResumeItem, setPendingResumeItem] = useState<MediaHistoryItem | null>(null);
   const [isResumeChoiceOpen, setIsResumeChoiceOpen] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
@@ -220,7 +226,24 @@ export const App: React.FC = () => {
 
   const { handleTouchStart, handleTouchEnd } = usePlayerGestures(containerRef);
 
-  const youtubeId = parseYouTubeId(currentUri);
+  const webStream = useMemo(() => (currentUri ? parseWebStream(currentUri) : null), [currentUri]);
+  const youtubeId = webStream?.platform === 'youtube' ? webStream.id : null;
+
+  // Listen for native / global triggers for Gmail signin & web streams
+  useEffect(() => {
+    const handleOpenGmail = () => setIsGmailSignInOpen(true);
+    const handleOpenStream = (e: Event) => {
+      const detail = (e as CustomEvent<{ tab?: 'youtube' | 'tiktok' | 'instagram' }>).detail;
+      if (detail?.tab) setFileBrowserInitialTab(detail.tab);
+      setIsFileBrowserOpen(true);
+    };
+    window.addEventListener('miki:open-gmail-signin', handleOpenGmail);
+    window.addEventListener('miki:open-web-stream', handleOpenStream);
+    return () => {
+      window.removeEventListener('miki:open-gmail-signin', handleOpenGmail);
+      window.removeEventListener('miki:open-web-stream', handleOpenStream);
+    };
+  }, []);
 
   // Initialize playback engine on mount
   useEffect(() => {
@@ -509,6 +532,23 @@ export const App: React.FC = () => {
             </div>
           )}
 
+          {/* Application Menu: Google/Gmail Sign-in, Web Streams, Quick Tools */}
+          <ApplicationMenu
+            onOpenGmailSignIn={() => setIsGmailSignInOpen(true)}
+            onOpenLibrary={(tab) => {
+              if (tab) setFileBrowserInitialTab(tab);
+              setIsFileBrowserOpen(true);
+            }}
+            onOpenSettings={() => setIsSettingsOpen(true)}
+            onOpenEq={() => setIsEqOpen(true)}
+            onOpenLocalFile={() => {
+              handleOpenLocalFileDialog();
+              const input = document.getElementById('miki-main-file-input') as HTMLInputElement | null;
+              input?.click();
+            }}
+            onOpenSystemAccess={() => setIsSystemAccessOpen(true)}
+          />
+
           {currentUri && (
             <div className="flex items-center gap-2">
               <img
@@ -574,13 +614,20 @@ export const App: React.FC = () => {
       {/* Main Viewport Area */}
       <div className="relative flex-1 w-full h-full overflow-hidden flex items-center justify-center">
         {/* Ambient Lighting Canvas Layer */}
-        {!youtubeId && <AmbientCanvas videoRef={videoRef} />}
+        {!youtubeId && !webStream && <AmbientCanvas videoRef={videoRef} />}
 
-        {/* YouTube Video Stream or Standard Video */}
+        {/* Web Stream (YouTube, TikTok, Instagram) or Standard Video */}
         {youtubeId ? (
           <YouTubePlayer
             youtubeId={youtubeId}
             initialPositionMs={usePlayerStore.getState().positionMs}
+          />
+        ) : webStream ? (
+          <WebEmbedPlayer
+            platform={webStream.platform}
+            embedUrl={webStream.embedUrl}
+            originalUrl={webStream.originalUrl}
+            title={currentTitle}
           />
         ) : activeEngineType === 'web-media' ? (
           <div ref={viewportRef} className="relative w-full h-full flex items-center justify-center overflow-hidden">
@@ -1049,7 +1096,7 @@ export const App: React.FC = () => {
         )}
 
         {/* Glassmorphic Controls Overlay (for native/local/HLS video) */}
-        {currentUri && !youtubeId && (
+        {currentUri && !youtubeId && !webStream && (
           <ControlsOverlay
             onOpenEq={() => setIsEqOpen(true)}
             onOpenSettings={() => setIsSettingsOpen(true)}
@@ -1062,7 +1109,18 @@ export const App: React.FC = () => {
 
       {/* Modals wrapped in ErrorBoundary to guarantee uninterrupted UI */}
       <ErrorBoundary onReset={() => setIsFileBrowserOpen(false)}>
-        <FileBrowserModal isOpen={isFileBrowserOpen} onClose={() => setIsFileBrowserOpen(false)} />
+        <FileBrowserModal
+          isOpen={isFileBrowserOpen}
+          onClose={() => setIsFileBrowserOpen(false)}
+          initialTab={fileBrowserInitialTab}
+        />
+      </ErrorBoundary>
+
+      <ErrorBoundary onReset={() => setIsGmailSignInOpen(false)}>
+        <GmailSignInModal
+          isOpen={isGmailSignInOpen}
+          onClose={() => setIsGmailSignInOpen(false)}
+        />
       </ErrorBoundary>
 
       <ErrorBoundary onReset={() => setIsSettingsOpen(false)}>

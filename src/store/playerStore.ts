@@ -46,6 +46,8 @@ export interface MediaHistoryItem {
   lastPlayedAt: number;
   isYouTube?: boolean;
   youtubeId?: string;
+  webPlatform?: 'youtube' | 'tiktok' | 'instagram';
+  webStreamId?: string;
 }
 
 export interface MediaBookmark {
@@ -746,6 +748,17 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     }
 
     engine.onTelemetry((telemetry: PlaybackTelemetry) => {
+      // If an external web stream (YouTube, TikTok, Instagram) is actively playing,
+      // completely IGNORE telemetry from the background idle/paused HTML5 <video> element!
+      const activeUri = get().currentUri;
+      const isExternalStream =
+        activeUri && /(?:youtube\.com|youtu\.be|tiktok\.com|instagram\.com)/i.test(activeUri);
+
+      if (isExternalStream) {
+        // Do not let background paused video element overwrite external player state!
+        return;
+      }
+
       set({
         positionMs: telemetry.positionMs,
         durationMs: telemetry.durationMs,
@@ -842,41 +855,69 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     const resolvedTitle = title ?? extractCleanFileName(uri);
     let startPos = startPositionMs ?? 0;
 
-    // Check if it's a YouTube URL! If so, don't pass to HTML5 <video>
+    // Check if it's an external web stream (YouTube, TikTok, Instagram)
     const isYouTube = /(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/.test(uri);
     const ytMatch = uri.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
     const ytId = ytMatch ? ytMatch[1] : null;
 
-    if (isYouTube) {
-      get().addYouTubeHistory(uri, resolvedTitle);
+    const isTikTok = /tiktok\.com/i.test(uri);
+    const ttMatch = uri.match(/(?:video\/|v\/|embed\/v2\/|embed\/|item\/)(\d{15,22})/i);
+    const ttId = ttMatch ? ttMatch[1] : null;
 
-      const existingRecent = get().recentMedia;
-      const existingYt = existingRecent.find((m) => m.uri === uri || (ytId && m.youtubeId === ytId));
-      if (startPositionMs !== undefined) {
-        startPos = startPositionMs;
-      } else if (autoResume && existingYt?.lastPositionMs) {
-        startPos = existingYt.lastPositionMs;
+    const isInstagram = /instagram\.com/i.test(uri);
+    const igMatch = uri.match(/(?:instagram\.com\/(?:p|reel|tv)\/([a-zA-Z0-9_-]+))/i);
+    const igCode = igMatch ? igMatch[1] : null;
+
+    if (isYouTube || isTikTok || isInstagram) {
+      if (isYouTube) {
+        get().addYouTubeHistory(uri, resolvedTitle);
       }
 
-      const ytThumb = ytId ? `https://img.youtube.com/vi/${ytId}/mqdefault.jpg` : undefined;
-      const ytHistoryItem: MediaHistoryItem = {
+      const platform: 'youtube' | 'tiktok' | 'instagram' = isYouTube
+        ? 'youtube'
+        : isTikTok
+        ? 'tiktok'
+        : 'instagram';
+      const streamId = ytId || ttId || igCode || undefined;
+
+      const existingRecent = get().recentMedia;
+      const existingWeb = existingRecent.find(
+        (m) => m.uri === uri || (streamId && (m.youtubeId === streamId || m.webStreamId === streamId))
+      );
+      if (startPositionMs !== undefined) {
+        startPos = startPositionMs;
+      } else if (autoResume && existingWeb?.lastPositionMs) {
+        startPos = existingWeb.lastPositionMs;
+      }
+
+      const defaultThumb = isYouTube && ytId
+        ? `https://img.youtube.com/vi/${ytId}/mqdefault.jpg`
+        : undefined;
+
+      const webHistoryItem: MediaHistoryItem = {
         mediaId: uri,
         uri,
-        title: resolvedTitle,
-        durationMs: existingYt?.durationMs || 0,
+        title:
+          resolvedTitle ||
+          (isTikTok ? `TikTok Video (${ttId || 'Web'})` : isInstagram ? `Instagram Reel (${igCode || 'Web'})` : `YouTube (${ytId || 'Web'})`),
+        durationMs: existingWeb?.durationMs || 0,
         lastPositionMs: startPos,
-        progressPercent: existingYt?.progressPercent || 0,
+        progressPercent: existingWeb?.progressPercent || 0,
         isCompleted: false,
-        playCount: ((existingYt?.playCount) ?? 0) + 1,
+        playCount: (existingWeb?.playCount ?? 0) + 1,
         lastPlayedAt: Date.now(),
-        thumbnailUri: ytThumb,
-        isYouTube: true,
+        thumbnailUri: defaultThumb,
+        isYouTube: !!isYouTube,
         youtubeId: ytId || undefined,
+        webPlatform: platform,
+        webStreamId: streamId,
       };
 
       const updatedRecent = [
-        ytHistoryItem,
-        ...existingRecent.filter((m) => m.uri !== uri && (!ytId || m.youtubeId !== ytId)),
+        webHistoryItem,
+        ...existingRecent.filter(
+          (m) => m.uri !== uri && (!streamId || (m.youtubeId !== streamId && m.webStreamId !== streamId))
+        ),
       ].slice(0, 30);
       set({ recentMedia: updatedRecent });
       saveStoredRecentMedia(updatedRecent);
@@ -889,9 +930,9 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
       }
       set({
         currentUri: uri,
-        currentTitle: resolvedTitle,
+        currentTitle: webHistoryItem.title,
         positionMs: startPos,
-        durationMs: existingYt?.durationMs || 0,
+        durationMs: existingWeb?.durationMs || 0,
         retryCount: 0,
         lastError: null,
         isPaused: false,
