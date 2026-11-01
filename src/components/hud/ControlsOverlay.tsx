@@ -248,9 +248,17 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
             </button>
 
             {/* VLC-Style 200% Overdrive Volume Slider */}
-            <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-2xl bg-white/5 border border-white/10 ml-1">
+            <div
+              className="flex items-center gap-2.5 px-3 py-1.5 rounded-2xl bg-white/5 border border-white/10 ml-1"
+              onMouseDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+            >
               <button
-                onClick={() => setVolume(volume === 0 ? 100 : 0)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setVolume(volume === 0 ? 100 : 0);
+                }}
                 className="text-white/70 hover:text-white transition-colors"
                 title={volume > 100 ? `VLC Overdrive (${volume}%)` : `Volume (${volume}%)`}
               >
@@ -273,7 +281,9 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
                   step={1}
                   value={volume}
                   onChange={(e) => setVolume(parseInt(e.target.value, 10))}
-                  className="w-20 sm:w-24 h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-cyan-400"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onTouchStart={(e) => e.stopPropagation()}
+                  className="w-20 sm:w-24 h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-cyan-400 hover:accent-cyan-300"
                 />
               </div>
 

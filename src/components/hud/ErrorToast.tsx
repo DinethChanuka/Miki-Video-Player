@@ -101,9 +101,9 @@ export const ErrorToast: React.FC = () => {
               {isBookmark ? 'SAVED' : lastError.severity}
             </span>
           </div>
-          <p className="text-sm font-medium text-white">{lastError.message}</p>
+          <p className="text-sm font-semibold text-white">{lastError.message}</p>
           {lastError.details && (
-            <p className="text-xs text-white/60 line-clamp-2 font-mono">{lastError.details}</p>
+            <p className="text-xs text-slate-300 line-clamp-2 font-mono">{lastError.details}</p>
           )}
           {lastError.recovery !== 'none' && (
             <div className="mt-1 flex items-center gap-1.5 text-xs text-sky-400">

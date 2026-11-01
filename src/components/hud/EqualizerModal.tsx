@@ -36,9 +36,9 @@ export const EqualizerModal: React.FC<EqualizerModalProps> = ({ isOpen, onClose 
         {/* Header */}
         <div className="flex items-center justify-between border-b border-white/10 pb-4">
           <div className="flex items-center gap-3">
-            <h2 className="text-xl font-bold tracking-tight text-white">Parametric Audio DSP</h2>
+            <h2 className="text-xl font-bold tracking-tight text-white">Equalizer</h2>
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-400/30">
-              10-Band EQ
+              10-Band
             </span>
           </div>
           <button

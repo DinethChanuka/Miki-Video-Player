@@ -576,6 +576,47 @@ export const App: React.FC = () => {
               onCanPlay={() => usePlayerStore.setState({ isBuffering: false })}
               onLoadedData={() => usePlayerStore.setState({ isBuffering: false })}
               onLoadStart={() => usePlayerStore.setState({ isBuffering: true })}
+              onError={(e) => {
+                const err = e.currentTarget.error;
+                let code: 'STREAM_ERROR' | 'MEDIA_NOT_FOUND' | 'CODEC_UNSUPPORTED' | 'STREAM_TIMEOUT' = 'STREAM_ERROR';
+                let message = 'Failed to load video stream or file.';
+                let details = err?.message || 'Media source unreachable or unsupported format.';
+                let severity: 'warning' | 'recoverable' | 'critical' = 'recoverable';
+                let recovery: 'none' | 'retry_with_backoff' | 'retry_software_decode' = 'retry_with_backoff';
+
+                if (err?.code === 1) {
+                  code = 'STREAM_ERROR';
+                  message = 'Media playback was aborted.';
+                  severity = 'warning';
+                  recovery = 'none';
+                } else if (err?.code === 2) {
+                  code = 'STREAM_TIMEOUT';
+                  message = 'A network error occurred while downloading the media.';
+                  severity = 'recoverable';
+                  recovery = 'retry_with_backoff';
+                } else if (err?.code === 3) {
+                  code = 'CODEC_UNSUPPORTED';
+                  message = 'Video decoding failed: media format or codec is corrupted or unsupported.';
+                  severity = 'recoverable';
+                  recovery = 'retry_software_decode';
+                } else if (err?.code === 4) {
+                  code = 'MEDIA_NOT_FOUND';
+                  message = 'Media file or stream not supported or source could not be found.';
+                  severity = 'critical';
+                  recovery = 'none';
+                }
+                usePlayerStore.setState({
+                  isBuffering: false,
+                  lastError: {
+                    code,
+                    message,
+                    details,
+                    severity,
+                    recovery,
+                    timestampMs: Date.now(),
+                  },
+                });
+              }}
               onClick={() => usePlayerStore.getState().togglePlay()}
               onPlay={() => usePlayerStore.setState({ isPaused: false, isBuffering: false })}
               onPause={() => {
@@ -726,9 +767,9 @@ export const App: React.FC = () => {
                     </div>
                     <div>
                       <h2 className="text-2xl font-extrabold text-white tracking-tight">
-                        Jump Back In
+                        Resume
                       </h2>
-                      <p className="text-xs text-white/50">
+                      <p className="text-xs text-slate-300">
                         Pick up right where you left off with stopped-point frame previews
                       </p>
                     </div>
@@ -745,7 +786,7 @@ export const App: React.FC = () => {
                       style={{ boxShadow: `0 4px 15px ${theme.haloGlow}` }}
                     >
                       <Plus className="w-4 h-4" />
-                      <span>Open File</span>
+                      <span>Open</span>
                       <input
                         id="miki-main-file-input"
                         type="file"
@@ -760,7 +801,7 @@ export const App: React.FC = () => {
                       className="px-4 py-2.5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-semibold text-xs transition-all active:scale-95 flex items-center gap-1.5"
                     >
                       <Sparkles className="w-4 h-4 text-cyan-400" />
-                      <span>Library & Streams</span>
+                      <span>Library</span>
                     </button>
                   </div>
                 </div>

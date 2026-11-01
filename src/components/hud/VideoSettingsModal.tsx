@@ -383,7 +383,7 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
     <div className={`fixed inset-0 z-50 flex items-center justify-center animate-in fade-in duration-200 select-none p-4 ${
       customBgImage ? 'bg-black/45' : 'bg-black/80 backdrop-blur-md'
     }`}>
-      <div className="glass-panel w-full max-w-3xl p-6 rounded-3xl flex flex-col gap-4 border border-white/20 shadow-2xl max-h-[90vh] overflow-hidden bg-slate-950/95">
+      <div className="glass-panel w-full max-w-3xl h-[680px] max-h-[90vh] min-h-[540px] p-6 rounded-3xl flex flex-col gap-4 border border-white/20 shadow-2xl overflow-hidden bg-slate-950/98">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-white/10 pb-3">
           <div className="flex items-center gap-3">
@@ -394,8 +394,8 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
               <Palette className="w-5 h-5 fill-white" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-white tracking-tight">Player Settings & Audio/Video DSP</h2>
-              <p className="text-xs text-white/50">Themes, Clarity Super-Resolution, 3D Spatial Audio & Speaker Matrix</p>
+              <h2 className="text-lg font-bold text-white tracking-tight">Settings</h2>
+              <p className="text-xs text-slate-300">Themes, Clarity, Audio & Display</p>
             </div>
           </div>
           <button
@@ -406,18 +406,18 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
           </button>
         </div>
 
-        {/* 4 Unified Luxury Tabs */}
+        {/* 4 Unified Luxury Tabs with Minimal One-Word Names */}
         <div className="flex items-center gap-2 border-b border-white/10 pb-2 overflow-x-auto">
           <button
             onClick={() => setActiveTab('themes')}
             className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-semibold transition-all shrink-0 ${
               activeTab === 'themes'
                 ? `${currentTheme.badgeClass} shadow-md`
-                : 'text-white/60 hover:text-white hover:bg-white/5'
+                : 'text-white/70 hover:text-white hover:bg-white/5'
             }`}
           >
             <Palette className="w-3.5 h-3.5" />
-            10 Themes & Wallpapers
+            Themes
           </button>
 
           <button
@@ -425,11 +425,11 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
             className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-semibold transition-all shrink-0 ${
               activeTab === 'clarity'
                 ? `${currentTheme.badgeClass} shadow-md`
-                : 'text-white/60 hover:text-white hover:bg-white/5'
+                : 'text-white/70 hover:text-white hover:bg-white/5'
             }`}
           >
             <Sparkles className="w-3.5 h-3.5" />
-            Clarity AI & Super-Res
+            Clarity
           </button>
 
           <button
@@ -437,11 +437,11 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
             className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-semibold transition-all shrink-0 ${
               activeTab === 'spatial'
                 ? `${currentTheme.badgeClass} shadow-md`
-                : 'text-white/60 hover:text-white hover:bg-white/5'
+                : 'text-white/70 hover:text-white hover:bg-white/5'
             }`}
           >
             <Headphones className="w-3.5 h-3.5" />
-            3D Sound & Speakers
+            Audio
           </button>
 
           <button
@@ -449,22 +449,22 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
             className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-semibold transition-all shrink-0 ${
               activeTab === 'tools'
                 ? `${currentTheme.badgeClass} shadow-md`
-                : 'text-white/60 hover:text-white hover:bg-white/5'
+                : 'text-white/70 hover:text-white hover:bg-white/5'
             }`}
           >
             <Ratio className="w-3.5 h-3.5" />
-            Aspect, Subtitles & Paths
+            Display
           </button>
         </div>
 
         {/* Tab Body */}
         <div className="flex-1 overflow-y-auto pr-1">
-          {/* TAB 1: 10 PLAYER THEMES & WALLPAPERS */}
+          {/* TAB 1: THEMES */}
           {activeTab === 'themes' && (
             <div className="flex flex-col gap-4">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-white/70">
-                  Select Theme (Automatically Saved in Database)
+                <span className="text-xs font-semibold text-slate-200">
+                  Presets
                 </span>
                 <span className="text-[11px] font-mono text-cyan-400 font-bold uppercase">
                   Active: {currentTheme.name}
@@ -503,7 +503,7 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
 
                         <div className="flex flex-col min-w-0">
                           <span className="text-xs font-bold text-white truncate">{t.name}</span>
-                          <span className="text-[10px] text-white/50 truncate">{t.tagline}</span>
+                          <span className="text-[10px] text-slate-300 truncate">{t.tagline}</span>
                         </div>
                       </div>
 
@@ -512,7 +512,9 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
                           <Check className="w-3.5 h-3.5" />
                         </div>
                       ) : (
-                        <span className="text-[10px] font-mono text-white/30 shrink-0">Select</span>
+                        <span className="text-[10px] font-semibold text-white/90 bg-white/10 hover:bg-white/20 px-2 py-0.5 rounded-lg shrink-0">
+                          Select
+                        </span>
                       )}
                     </button>
                   );
@@ -524,19 +526,19 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-white/90 flex items-center gap-2">
                     <Palette className="w-4 h-4 text-fuchsia-400" />
-                    Custom Glass Background Layer
+                    Background
                   </span>
                   {customBgImage && (
                     <button
                       onClick={() => setCustomBgImage(null)}
                       className="text-[11px] font-semibold text-rose-300 hover:text-rose-200 transition-colors"
                     >
-                      Clear Background
+                      Reset
                     </button>
                   )}
                 </div>
-                <p className="text-[10px] text-white/50">
-                  Sets an ultra-wide panoramic wallpaper rendered below the glassmorphic player interface with dynamic blur, opacity, and tint.
+                <p className="text-[10px] text-slate-300">
+                  Custom panoramic wallpaper rendered below the player interface with dynamic blur, opacity, and tint.
                 </p>
 
                 {/* Curated Aesthetic Wallpaper Cards */}
@@ -756,12 +758,12 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
             </div>
           )}
 
-          {/* TAB 2: CLARITY AI & SUPER-RESOLUTION */}
+          {/* TAB 2: CLARITY */}
           {activeTab === 'clarity' && (
             <div className="flex flex-col gap-4">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-white/70">
-                  Super-Resolution & Clarity Filters
+                <span className="text-xs font-semibold text-slate-200">
+                  Filters
                 </span>
                 <span className="text-[11px] font-mono text-purple-400 font-bold uppercase">
                   Engine: {shaderConfig.superResolution}
@@ -788,7 +790,7 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
                           {p.badge}
                         </span>
                       </div>
-                      <p className="text-[10px] text-white/50">{p.desc}</p>
+                      <p className="text-[11px] text-slate-300">{p.desc}</p>
                     </button>
                   );
                 })}
@@ -799,7 +801,7 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-white/90 flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-purple-400" />
-                    Texture Detail & Edge Clarifier
+                    Sharpness
                   </span>
                   <span className="text-xs font-mono font-bold text-purple-300">
                     +{Math.round((shaderConfig.clarityBoost || 0) * 100)}%
@@ -818,14 +820,14 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
                 <div className="flex items-center justify-between pt-2 border-t border-white/10">
                   <span className="text-xs font-semibold text-white/90 flex items-center gap-2">
                     <Eye className="w-4 h-4 text-cyan-400" />
-                    Interactive Split Compare Mode
+                    Compare
                   </span>
                   <button
                     onClick={() => updateShaderConfig({ splitCompareEnabled: !shaderConfig.splitCompareEnabled })}
                     className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all ${
                       shaderConfig.splitCompareEnabled
                         ? 'bg-cyan-500 text-slate-950 font-bold'
-                        : 'bg-white/10 text-white/60'
+                        : 'bg-white/10 text-white/70 hover:text-white'
                     }`}
                   >
                     {shaderConfig.splitCompareEnabled ? 'Split View: Active' : 'Off'}
@@ -835,18 +837,18 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
             </div>
           )}
 
-          {/* TAB 3: 3D SOUND & SPEAKERS */}
+          {/* TAB 3: AUDIO */}
           {activeTab === 'spatial' && (
             <div className="flex flex-col gap-4">
               {/* Header Toggle & Profile */}
               <div className="flex items-center justify-between p-3.5 rounded-2xl bg-white/5 border border-white/10">
                 <div className="flex items-center gap-3">
-                  <div className={`p-2.5 rounded-xl ${spatialState.enabled ? 'bg-cyan-500/20 text-cyan-300' : 'bg-white/10 text-white/40'}`}>
+                  <div className={`p-2.5 rounded-xl ${spatialState.enabled ? 'bg-cyan-500/20 text-cyan-300' : 'bg-white/10 text-white/70'}`}>
                     <Headphones className="w-5 h-5" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-white">3D Spatial Audio & Multi-Speaker Sound System</h4>
-                    <p className="text-[10px] text-white/50">HRTF Acoustic Virtualizer, Preamp Booster & 6-Channel Matrix</p>
+                    <h4 className="text-xs font-bold text-white">Spatial</h4>
+                    <p className="text-[10px] text-slate-300">HRTF Acoustic Virtualizer, Preamp Booster & 6-Channel Matrix</p>
                   </div>
                 </div>
 
@@ -860,7 +862,7 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
                     title="Open 10-Band Graphic Equalizer"
                   >
                     <Sliders className="w-3.5 h-3.5 text-purple-400" />
-                    <span>10-Band EQ</span>
+                    <span>Equalizer</span>
                   </button>
 
                   <button
@@ -869,7 +871,7 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
                     title="Play 3D audio test sweep"
                   >
                     <Volume2 className="w-3.5 h-3.5 text-cyan-400" />
-                    <span>Test Sweep</span>
+                    <span>Test</span>
                   </button>
 
                   <button
@@ -877,7 +879,7 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
                     className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all ${
                       spatialState.enabled
                         ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20'
-                        : 'bg-white/10 text-white/50'
+                        : 'bg-white/10 text-white/70'
                     }`}
                   >
                     {spatialState.enabled ? 'Enabled' : 'Bypass'}
@@ -887,10 +889,10 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
 
               {/* Real-time Frequency Analyser Visualizer */}
               <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 flex flex-col gap-1.5">
-                <div className="flex items-center justify-between text-xs text-white/70">
+                <div className="flex items-center justify-between text-xs text-slate-200">
                   <span className="flex items-center gap-2 font-semibold">
                     <Activity className="w-4 h-4 text-cyan-400" />
-                    Live Audio Spectrum Analyser
+                    Spectrum
                   </span>
                   <span className="text-[10px] font-mono text-cyan-300">32-Band FFT</span>
                 </div>
@@ -905,10 +907,10 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
               {/* Master Preamp Gain Booster & Stereo Channel Balance */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-2xl bg-white/5 border border-white/10">
                 <div className="flex flex-col gap-1.5">
-                  <div className="flex justify-between text-xs text-white/80 font-semibold">
+                  <div className="flex justify-between text-xs text-white/90 font-semibold">
                     <span className="flex items-center gap-1.5">
                       <Zap className="w-3.5 h-3.5 text-amber-400" />
-                      Smart Preamp Volume Booster
+                      Preamp
                     </span>
                     <span className="font-mono text-amber-300 font-bold">{Math.round(preampGain * 100)}%</span>
                   </div>
@@ -921,14 +923,14 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
                     onChange={(e) => setPreampGain(parseFloat(e.target.value))}
                     className="w-full h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-amber-400"
                   />
-                  <span className="text-[10px] text-white/40">Boost quiet movies & streams up to 220% cleanly</span>
+                  <span className="text-[10px] text-slate-300">Boost quiet movies & streams up to 220% cleanly</span>
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <div className="flex justify-between text-xs text-white/80 font-semibold">
+                  <div className="flex justify-between text-xs text-white/90 font-semibold">
                     <span className="flex items-center gap-1.5">
                       <Sliders className="w-3.5 h-3.5 text-cyan-400" />
-                      Stereo Balance (Pan)
+                      Balance
                     </span>
                     <span className="font-mono text-cyan-300 font-bold">
                       {stereoPan === 0 ? 'Center' : stereoPan < 0 ? `L ${Math.round(Math.abs(stereoPan) * 100)}%` : `R ${Math.round(stereoPan * 100)}%`}
@@ -943,7 +945,7 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
                     onChange={(e) => setStereoPan(parseFloat(e.target.value))}
                     className="w-full h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-cyan-400"
                   />
-                  <div className="flex justify-between text-[10px] text-white/40 font-mono">
+                  <div className="flex justify-between text-[10px] text-slate-300 font-mono">
                     <span>Left</span>
                     <span>Center</span>
                     <span>Right</span>
@@ -962,11 +964,11 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
                       className={`p-2.5 rounded-2xl text-center border flex flex-col items-center gap-1 transition-all ${
                         isSelected
                           ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300 font-bold shadow-md shadow-cyan-500/20'
-                          : 'bg-white/5 border-white/10 text-white/70 hover:text-white'
+                          : 'bg-white/5 border-white/10 text-white/80 hover:text-white'
                       }`}
                     >
                       <span className="text-lg">{p.icon}</span>
-                      <span className="text-[11px] truncate w-full">{p.name}</span>
+                      <span className="text-[11px] truncate w-full font-medium">{p.name}</span>
                     </button>
                   );
                 })}
@@ -989,14 +991,14 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
                   onMouseLeave={() => (isDraggingRef.current = false)}
                   className="cursor-crosshair rounded-xl border border-white/10"
                 />
-                <span className="text-[10px] text-white/40 mt-1">Drag glowing orb to position 3D sound source in space</span>
+                <span className="text-[10px] text-slate-300 mt-1">Drag glowing orb to position 3D sound source in space</span>
               </div>
 
               {/* 6 Discrete Speaker Volume Controls */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                 {SPEAKER_LABELS.map((spk) => (
                   <div key={spk.key} className="p-2.5 rounded-xl bg-white/5 border border-white/10 flex flex-col gap-1">
-                    <div className="flex justify-between text-[11px] text-white/80 font-semibold">
+                    <div className="flex justify-between text-[11px] text-white/90 font-semibold">
                       <span>{spk.name}</span>
                       <span className="font-mono text-cyan-300 font-bold">
                         {Math.round((spatialState.speakers[spk.key] || 1.0) * 100)}%
@@ -1017,14 +1019,14 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
             </div>
           )}
 
-          {/* TAB 4: ASPECT RATIO, SUBTITLES & PATHS */}
+          {/* TAB 4: DISPLAY */}
           {activeTab === 'tools' && (
             <div className="flex flex-col gap-4">
               {/* Aspect Ratio */}
               <div className="flex flex-col gap-2">
-                <label className="text-xs font-semibold text-white/70 flex items-center gap-2">
+                <label className="text-xs font-semibold text-slate-200 flex items-center gap-2">
                   <Ratio className="w-4 h-4 text-cyan-400" />
-                  Aspect Ratio & Cropping
+                  Aspect
                 </label>
                 <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
                   {(['auto', '16:9', '4:3', '21:9', '1:1', 'fill'] as const).map((ratio) => (
@@ -1034,7 +1036,7 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
                       className={`py-2 px-2 rounded-2xl text-xs font-mono font-semibold transition-all uppercase ${
                         shaderConfig.aspectRatio === ratio
                           ? 'bg-cyan-500 text-slate-950 font-bold shadow-md shadow-cyan-500/30'
-                          : 'bg-white/5 border border-white/10 text-white/70 hover:text-white'
+                          : 'bg-white/5 border border-white/10 text-white/80 hover:text-white'
                       }`}
                     >
                       {ratio}
@@ -1048,14 +1050,14 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-white/90 flex items-center gap-2">
                     <Subtitles className="w-4 h-4 text-amber-400" />
-                    Video Subtitles & Closed Captions (CC)
+                    Subtitles
                   </span>
                   <button
                     onClick={toggleSubtitles}
                     className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all ${
                       isSubtitlesVisible
                         ? 'bg-amber-500 text-slate-950 font-bold'
-                        : 'bg-white/10 text-white/40'
+                        : 'bg-white/10 text-white/70 hover:text-white'
                     }`}
                   >
                     {isSubtitlesVisible ? 'Captions: Visible' : 'Hidden'}
@@ -1063,16 +1065,16 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
                 </div>
 
                 {activeSubtitleTrack && (
-                  <div className="flex items-center justify-between text-xs text-white/60 bg-black/30 p-2 rounded-xl">
-                    <span className="truncate">Loaded: {activeSubtitleTrack.fileName}</span>
-                    <span className="font-mono text-amber-300">{activeSubtitleTrack.cues.length} Cues</span>
+                  <div className="flex items-center justify-between text-xs text-slate-200 bg-black/40 p-2.5 rounded-xl border border-white/10">
+                    <span className="truncate font-medium">Loaded: {activeSubtitleTrack.fileName}</span>
+                    <span className="font-mono text-amber-300 font-bold">{activeSubtitleTrack.cues.length} Cues</span>
                   </div>
                 )}
 
                 {/* Subtitle Style Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
                   <div className="flex flex-col gap-1">
-                    <span className="text-[10px] text-white/60 font-semibold">Font Size:</span>
+                    <span className="text-[10px] text-slate-300 font-semibold">Size:</span>
                     <div className="grid grid-cols-4 gap-1">
                       {(['small', 'medium', 'large', 'extra-large'] as const).map((sz) => (
                         <button
@@ -1081,7 +1083,7 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
                           className={`py-1 rounded-lg text-[10px] font-semibold uppercase ${
                             subtitleStyle.fontSize === sz
                               ? 'bg-amber-500/30 text-amber-300 border border-amber-400/50'
-                              : 'bg-white/5 text-white/50'
+                              : 'bg-white/5 text-white/70 hover:text-white'
                           }`}
                         >
                           {sz === 'extra-large' ? 'XL' : sz[0].toUpperCase()}
@@ -1091,9 +1093,9 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
                   </div>
 
                   <div className="flex flex-col gap-1">
-                    <div className="flex justify-between text-[10px] text-white/60">
-                      <span>Box Opacity</span>
-                      <span className="font-mono text-amber-300">{Math.round(subtitleStyle.backgroundOpacity * 100)}%</span>
+                    <div className="flex justify-between text-[10px] text-slate-300 font-medium">
+                      <span>Opacity</span>
+                      <span className="font-mono text-amber-300 font-bold">{Math.round(subtitleStyle.backgroundOpacity * 100)}%</span>
                     </div>
                     <input
                       type="range"
@@ -1107,9 +1109,9 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
                   </div>
 
                   <div className="flex flex-col gap-1">
-                    <div className="flex justify-between text-[10px] text-white/60">
-                      <span>Vertical Offset</span>
-                      <span className="font-mono text-amber-300">{subtitleStyle.bottomOffsetPercent}%</span>
+                    <div className="flex justify-between text-[10px] text-slate-300 font-medium">
+                      <span>Offset</span>
+                      <span className="font-mono text-amber-300 font-bold">{subtitleStyle.bottomOffsetPercent}%</span>
                     </div>
                     <input
                       type="range"
@@ -1125,8 +1127,8 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
 
                 {/* Lip-Sync Sync Offset */}
                 <div className="flex flex-col gap-1 pt-1 border-t border-white/10">
-                  <div className="flex justify-between text-[11px] text-white/70">
-                    <span>Subtitle Lip-Sync Offset:</span>
+                  <div className="flex justify-between text-[11px] text-slate-200 font-medium">
+                    <span>Sync:</span>
                     <span className="font-mono text-amber-300 font-bold">
                       {(activeSubtitleTrack?.syncOffsetSec || 0) > 0 ? `+${(activeSubtitleTrack?.syncOffsetSec || 0).toFixed(1)}s` : `${(activeSubtitleTrack?.syncOffsetSec || 0).toFixed(1)}s`}
                     </span>
@@ -1140,7 +1142,7 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
                     onChange={(e) => setSubtitleSyncOffset(parseFloat(e.target.value))}
                     className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-amber-400"
                   />
-                  <div className="flex justify-between text-[9px] text-white/40 font-mono">
+                  <div className="flex justify-between text-[9px] text-slate-400 font-mono">
                     <span>-5.0s (Earlier)</span>
                     <span>0.0s (Exact)</span>
                     <span>+5.0s (Later)</span>
@@ -1153,7 +1155,7 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-white/90 flex items-center gap-2">
                     <Camera className="w-4 h-4 text-cyan-400" />
-                    Screenshot Storage Location
+                    Storage
                   </span>
                   <div className="flex items-center gap-2">
                     <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-white/10 text-cyan-300 border border-white/10 uppercase">
@@ -1176,7 +1178,7 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
                       className={`py-2 px-2.5 rounded-xl text-xs font-medium transition-all text-center truncate ${
                         screenshotDirectory === preset.path
                           ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/50 shadow-md shadow-cyan-500/20 font-bold'
-                          : 'bg-white/5 border border-white/10 text-white/70 hover:text-white hover:bg-white/10'
+                          : 'bg-white/5 border border-white/10 text-white/80 hover:text-white hover:bg-white/10'
                       }`}
                       title={preset.description}
                     >
@@ -1188,13 +1190,13 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
                 {/* Custom Path Input + Native Browse Button */}
                 <div className="flex items-center gap-2">
                   <div className="flex-1 flex items-center gap-2 px-3 py-2 rounded-2xl bg-black/40 border border-white/15 focus-within:border-cyan-400/60 transition-colors">
-                    <FolderOpen className="w-4 h-4 text-white/40 shrink-0" />
+                    <FolderOpen className="w-4 h-4 text-white/50 shrink-0" />
                     <input
                       type="text"
                       value={screenshotDirectory}
                       onChange={(e) => setScreenshotDirectory(e.target.value)}
                       placeholder={osPresetDirs[0]?.path || '~/Pictures/Miki Player/Screenshots'}
-                      className="w-full bg-transparent text-xs text-white placeholder-white/30 focus:outline-none font-mono"
+                      className="w-full bg-transparent text-xs text-white placeholder-white/40 focus:outline-none font-mono"
                     />
                   </div>
 

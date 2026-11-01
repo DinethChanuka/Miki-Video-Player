@@ -1038,7 +1038,14 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
   },
 
   togglePlay: async () => {
-    const { engine, isPaused, currentMediaId, positionMs, durationMs } = get();
+    const { engine, isPaused, currentMediaId, currentUri, positionMs, durationMs } = get();
+
+    // Check if currently playing YouTube
+    const isYouTube = /(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/.test(currentUri || '');
+    if (isYouTube) {
+      set({ isPaused: !isPaused });
+      return;
+    }
 
     // Direct DOM element control for 100% reliable local video playback
     const video = (document.getElementById('aether-video-viewport') as HTMLVideoElement) || null;
@@ -1085,7 +1092,15 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
 
   seek: async (timestampMs, exact = false) => {
     set({ positionMs: timestampMs });
-    await get().engine?.seek(timestampMs, exact);
+    const { currentUri, engine } = get();
+    const isYouTube = /(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/.test(currentUri || '');
+    if (isYouTube) {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('miki:youtube-seek', { detail: { positionSec: timestampMs / 1000 } }));
+      }
+      return;
+    }
+    await engine?.seek(timestampMs, exact);
   },
 
   setVolume: async (volume) => {

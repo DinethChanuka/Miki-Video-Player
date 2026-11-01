@@ -73,6 +73,7 @@ export class SpatialAudioEngine {
   private lfeFilter: BiquadFilterNode | null = null;
   private masterGain: GainNode | null = null;
   private dynamicsCompressor: DynamicsCompressorNode | null = null;
+  private masterVolume: number = 1.0; // 0.0 to 2.0 (supports 200% overdrive)
 
   private state: SpatialAudioState = { ...DEFAULT_SPATIAL_STATE };
 
@@ -210,11 +211,22 @@ export class SpatialAudioEngine {
     }
   }
 
+  public setMasterVolume(multiplier: number): void {
+    const clamped = Math.max(0, Math.min(2.0, multiplier));
+    this.masterVolume = clamped;
+    this.updateMasterGain();
+  }
+
   public setPreampGain(gainMultiplier: number): void {
     const clamped = Math.max(0.5, Math.min(2.5, gainMultiplier));
     this.state.preampGain = clamped;
+    this.updateMasterGain();
+  }
+
+  private updateMasterGain(): void {
     if (this.masterGain && this.audioCtx) {
-      this.masterGain.gain.setValueAtTime(clamped, this.audioCtx.currentTime);
+      const totalGain = this.masterVolume * (this.state.preampGain ?? 1.0);
+      this.masterGain.gain.setValueAtTime(totalGain, this.audioCtx.currentTime);
     }
   }
 
@@ -362,9 +374,7 @@ export class SpatialAudioEngine {
       (Object.keys(neutralSpeakers) as (keyof SpeakerLevels)[]).forEach((spk) => {
         this.setSpeakerVolume(spk, neutralSpeakers[spk]);
       });
-      if (this.masterGain) {
-        this.masterGain.gain.setValueAtTime(this.state.preampGain ?? 1.0, this.audioCtx.currentTime);
-      }
+      this.updateMasterGain();
     }
   }
 

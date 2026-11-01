@@ -2,6 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   DEFAULT_SPATIAL_STATE,
+  SpatialAudioEngine,
 } from '../src/core/SpatialAudioEngine.ts';
 
 describe('Spatial Audio Configuration (SpatialAudioEngine)', () => {
@@ -34,4 +35,13 @@ describe('Spatial Audio Configuration (SpatialAudioEngine)', () => {
     assert.ok(DEFAULT_SPATIAL_STATE.stereoPan >= -1.0 && DEFAULT_SPATIAL_STATE.stereoPan <= 1.0);
     assert.ok(DEFAULT_SPATIAL_STATE.preampGain >= 1.0 && DEFAULT_SPATIAL_STATE.preampGain <= 2.5);
   });
+
+  it('supports setMasterVolume from 0.0 (mute) to 2.0 (200% overdrive) without throwing', () => {
+    const engine = new SpatialAudioEngine();
+    assert.doesNotThrow(() => engine.setMasterVolume(0));
+    assert.doesNotThrow(() => engine.setMasterVolume(1.0));
+    assert.doesNotThrow(() => engine.setMasterVolume(2.0));
+  });
 });
+
+

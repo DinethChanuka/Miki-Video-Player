@@ -16,6 +16,7 @@ export type ErrorCode =
   | 'DB_QUERY_FAILED'
   | 'THUMBNAIL_EXTRACT_FAILED'
   | 'IPC_CHANNEL_CLOSED'
+  | 'STREAM_ERROR'
   | 'BOOKMARK_SAVED';
 
 export type RecoveryStrategy =
@@ -478,17 +479,24 @@ export class WebMediaEngine implements IPlayerEngine {
       this.videoEl.volume = Math.min(1, clamped / 100);
     }
 
+    if (this.gainNode && this.audioCtx) {
+      this.gainNode.gain.setValueAtTime(clamped / 100, this.audioCtx.currentTime);
+    }
+
     if (this.spatialAudio) {
-      this.spatialAudio.setPreampGain(Math.max(1, clamped / 100));
-    } else if (this.gainNode) {
-      // Gain node delivers the amplified 101% - 200% volume boost
-      this.gainNode.gain.value = clamped / 100;
+      this.spatialAudio.setMasterVolume(clamped / 100);
     }
   }
 
   async setMuted(muted: boolean): Promise<void> {
     if (this.videoEl) {
       this.videoEl.muted = muted;
+    }
+    const targetVolume = muted ? 0 : this.currentVolumePercent / 100;
+    if (this.spatialAudio) {
+      this.spatialAudio.setMasterVolume(targetVolume);
+    } else if (this.gainNode && this.audioCtx) {
+      this.gainNode.gain.setValueAtTime(targetVolume, this.audioCtx.currentTime);
     }
   }
 
