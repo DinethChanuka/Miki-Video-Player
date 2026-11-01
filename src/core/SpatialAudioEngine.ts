@@ -73,6 +73,7 @@ export class SpatialAudioEngine {
   private lfeFilter: BiquadFilterNode | null = null;
   private masterGain: GainNode | null = null;
   private dynamicsCompressor: DynamicsCompressorNode | null = null;
+  private masterVolume: number = 1.0; // 0.0 to 2.0 (supports 200% overdrive)
 
   private state: SpatialAudioState = { ...DEFAULT_SPATIAL_STATE };
 
@@ -210,11 +211,22 @@ export class SpatialAudioEngine {
     }
   }
 
+  public setMasterVolume(multiplier: number): void {
+    const clamped = Math.max(0, Math.min(2.0, multiplier));
+    this.masterVolume = clamped;
+    this.updateMasterGain();
+  }
+
   public setPreampGain(gainMultiplier: number): void {
     const clamped = Math.max(0.5, Math.min(2.5, gainMultiplier));
     this.state.preampGain = clamped;
+    this.updateMasterGain();
+  }
+
+  private updateMasterGain(): void {
     if (this.masterGain && this.audioCtx) {
-      this.masterGain.gain.setValueAtTime(clamped, this.audioCtx.currentTime);
+      const totalGain = this.masterVolume * (this.state.preampGain ?? 1.0);
+      this.masterGain.gain.setValueAtTime(totalGain, this.audioCtx.currentTime);
     }
   }
 
@@ -225,14 +237,34 @@ export class SpatialAudioEngine {
   }
 
   /**
+   * Ensures an active, resumed AudioContext exists
+   */
+  public ensureAudioContext(): AudioContext {
+    if (!this.audioCtx) {
+      const AudioCtxClass =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      this.audioCtx = new AudioCtxClass();
+    }
+    if (this.audioCtx.state === 'suspended') {
+      this.audioCtx.resume().catch(() => {});
+    }
+    return this.audioCtx;
+  }
+
+  public getAudioContext(): AudioContext | null {
+    return this.audioCtx;
+  }
+
+  /**
    * Plays a quick binaural 3D acoustic sweep to test speaker balance
    */
   public playTestChime(): void {
-    if (!this.audioCtx) return;
+    const ctx = this.ensureAudioContext();
     try {
-      const osc = this.audioCtx.createOscillator();
-      const gain = this.audioCtx.createGain();
-      const now = this.audioCtx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const now = ctx.currentTime;
 
       osc.type = 'sine';
       osc.frequency.setValueAtTime(440, now);
@@ -243,11 +275,19 @@ export class SpatialAudioEngine {
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
 
       osc.connect(gain);
-      gain.connect(this.masterGain || this.audioCtx.destination);
+      if (this.pannerNode) {
+        gain.connect(this.pannerNode);
+      } else if (this.masterGain) {
+        gain.connect(this.masterGain);
+      } else {
+        gain.connect(ctx.destination);
+      }
 
       osc.start(now);
       osc.stop(now + 0.35);
-    } catch {}
+    } catch (e) {
+      console.warn('[SpatialAudioEngine] playTestChime error:', e);
+    }
   }
 
   public setProfile(profile: SpatialProfileId): void {
@@ -316,8 +356,25 @@ export class SpatialAudioEngine {
 
   public setEnabled(enabled: boolean): void {
     this.state.enabled = enabled;
-    if (this.masterGain && this.audioCtx) {
-      this.masterGain.gain.setValueAtTime(enabled ? this.state.preampGain : 0.0, this.audioCtx.currentTime);
+    if (!this.audioCtx) return;
+
+    if (enabled) {
+      this.applyState(this.state);
+    } else {
+      // Neutral balanced pass-through without 3D HRTF panning displacement
+      this.setCoordinates(0, 0, 0);
+      const neutralSpeakers: SpeakerLevels = {
+        frontLeft: 1.0,
+        center: 1.0,
+        frontRight: 1.0,
+        surroundLeft: 1.0,
+        surroundRight: 1.0,
+        subwoofer: 1.0,
+      };
+      (Object.keys(neutralSpeakers) as (keyof SpeakerLevels)[]).forEach((spk) => {
+        this.setSpeakerVolume(spk, neutralSpeakers[spk]);
+      });
+      this.updateMasterGain();
     }
   }
 

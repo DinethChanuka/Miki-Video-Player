@@ -9,6 +9,7 @@ import { FileBrowserModal } from './components/hud/FileBrowserModal';
 import { ResumeChoiceModal } from './components/hud/ResumeChoiceModal';
 import { ErrorToast } from './components/hud/ErrorToast';
 import { SplashScreen } from './components/splash/SplashScreen';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { usePlayerGestures } from './hooks/usePlayerGestures';
 import { YouTubePlayer } from './components/player/YouTubePlayer';
 import { SubtitleOverlay } from './components/player/SubtitleOverlay';
@@ -22,6 +23,7 @@ import {
   Film,
   Plus,
   Camera,
+  RefreshCw,
 } from 'lucide-react';
 
 export function parseYouTubeId(url: string | null): string | null {
@@ -90,7 +92,9 @@ export const App: React.FC = () => {
   const customBgImage = usePlayerStore((s) => s.customBgImage);
   const customBgOpacity = usePlayerStore((s) => s.customBgOpacity);
   const customBgBlur = usePlayerStore((s) => s.customBgBlur);
+  const customBgBrightness = usePlayerStore((s) => s.customBgBrightness);
   const customBgTint = usePlayerStore((s) => s.customBgTint);
+  const isBuffering = usePlayerStore((s) => s.isBuffering);
   const positionMs = usePlayerStore((s) => s.positionMs);
   const activeSubtitleTrack = usePlayerStore((s) => s.activeSubtitleTrack);
   const isSubtitlesVisible = usePlayerStore((s) => s.isSubtitlesVisible);
@@ -221,7 +225,7 @@ export const App: React.FC = () => {
     bootEngine(undefined, videoRef.current ?? undefined);
   }, [bootEngine]);
 
-  // Ensure DOM video element is always attached
+  // Ensure DOM video element is always attached and spatial audio engine is connected
   useEffect(() => {
     if (videoRef.current) {
       const engine = usePlayerStore.getState().engine;
@@ -230,8 +234,22 @@ export const App: React.FC = () => {
           videoRef.current
         );
       }
+      if (engine && 'attachSpatialAudio' in engine) {
+        (engine as { attachSpatialAudio: (s: any) => void }).attachSpatialAudio(
+          usePlayerStore.getState().spatialAudio
+        );
+      }
     }
   }, [videoRef]);
+
+  // Disable default browser/WebView right-click context menu
+  useEffect(() => {
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener('contextmenu', handleContextMenu);
+    return () => window.removeEventListener('contextmenu', handleContextMenu);
+  }, []);
 
   // Listen to Cocoa native file picker event from BorderlessKeyWindow
   useEffect(() => {
@@ -395,6 +413,7 @@ export const App: React.FC = () => {
         handleTouchStart(e);
       }}
       onTouchEnd={handleTouchEnd}
+      onContextMenu={(e) => e.preventDefault()}
       className={`relative w-screen h-screen overflow-hidden bg-slate-950 select-none flex flex-col font-sans ${
         areControlsVisible || !currentUri ? 'cursor-default' : 'cursor-none'
       }`}
@@ -403,16 +422,16 @@ export const App: React.FC = () => {
       {customBgImage && (
         <div className="absolute -inset-10 z-0 pointer-events-none overflow-hidden">
           <div
-            className="w-full h-full bg-cover bg-center transition-all duration-700 ease-out transform scale-105"
+            className="w-full h-full bg-cover bg-center transition-all duration-300 ease-out transform scale-105"
             style={{
               backgroundImage: `url(${customBgImage})`,
               opacity: customBgOpacity,
-              filter: `blur(${customBgBlur}px)`,
+              filter: `blur(${customBgBlur}px) brightness(${customBgBrightness ?? 1.0})`,
             }}
           />
           {/* Dynamic Tint Overlay Layer */}
           <div
-            className={`absolute inset-0 pointer-events-none transition-colors duration-500 ${
+            className={`absolute inset-0 pointer-events-none transition-colors duration-300 ${
               customBgTint === 'navy'
                 ? 'bg-blue-950/40'
                 : customBgTint === 'aurora'
@@ -423,20 +442,19 @@ export const App: React.FC = () => {
                       ? 'bg-transparent'
                       : 'bg-black/40'
             }`}
+            style={{
+              opacity: customBgTint === 'clear' ? 0 : Math.min(1, (customBgOpacity ?? 1) * 0.9),
+            }}
           />
         </div>
       )}
 
-      {/* Sleek, Clean Frameless Titlebar - Drag & 5s Inactivity Auto-Hide */}
+      {/* Sleek, Clean Frameless Titlebar - Drag & Always Visible Menubar */}
       <div
         onMouseDown={handleStartWindowDrag}
-        className={`w-full h-11 z-50 flex items-center justify-between px-4 backdrop-blur-xl border-b select-none transition-all duration-500 ${
+        className={`w-full h-11 z-50 flex items-center justify-between px-4 backdrop-blur-xl border-b select-none opacity-100 translate-y-0 transition-all duration-300 ${
           theme.glassBg
-        } ${theme.glassBorder} ${
-          areControlsVisible || !currentUri
-            ? 'opacity-100 translate-y-0'
-            : 'opacity-0 -translate-y-full pointer-events-none'
-        }`}
+        } ${theme.glassBorder}`}
         style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
       >
         {/* Left Branding & Return Button */}
@@ -549,17 +567,64 @@ export const App: React.FC = () => {
             <video
               id="aether-video-viewport"
               ref={videoRef}
+              crossOrigin="anonymous"
               className="w-full h-full object-contain z-10 cursor-pointer"
               playsInline
               preload="auto"
+              onWaiting={() => usePlayerStore.setState({ isBuffering: true })}
+              onPlaying={() => usePlayerStore.setState({ isBuffering: false })}
+              onCanPlay={() => usePlayerStore.setState({ isBuffering: false })}
+              onLoadedData={() => usePlayerStore.setState({ isBuffering: false })}
+              onLoadStart={() => usePlayerStore.setState({ isBuffering: true })}
+              onError={(e) => {
+                const err = e.currentTarget.error;
+                let code: 'STREAM_ERROR' | 'MEDIA_NOT_FOUND' | 'CODEC_UNSUPPORTED' | 'STREAM_TIMEOUT' = 'STREAM_ERROR';
+                let message = 'Failed to load video stream or file.';
+                let details = err?.message || 'Media source unreachable or unsupported format.';
+                let severity: 'warning' | 'recoverable' | 'critical' = 'recoverable';
+                let recovery: 'none' | 'retry_with_backoff' | 'retry_software_decode' = 'retry_with_backoff';
+
+                if (err?.code === 1) {
+                  code = 'STREAM_ERROR';
+                  message = 'Media playback was aborted.';
+                  severity = 'warning';
+                  recovery = 'none';
+                } else if (err?.code === 2) {
+                  code = 'STREAM_TIMEOUT';
+                  message = 'A network error occurred while downloading the media.';
+                  severity = 'recoverable';
+                  recovery = 'retry_with_backoff';
+                } else if (err?.code === 3) {
+                  code = 'CODEC_UNSUPPORTED';
+                  message = 'Video decoding failed: media format or codec is corrupted or unsupported.';
+                  severity = 'recoverable';
+                  recovery = 'retry_software_decode';
+                } else if (err?.code === 4) {
+                  code = 'MEDIA_NOT_FOUND';
+                  message = 'Media file or stream not supported or source could not be found.';
+                  severity = 'critical';
+                  recovery = 'none';
+                }
+                usePlayerStore.setState({
+                  isBuffering: false,
+                  lastError: {
+                    code,
+                    message,
+                    details,
+                    severity,
+                    recovery,
+                    timestampMs: Date.now(),
+                  },
+                });
+              }}
               onClick={() => usePlayerStore.getState().togglePlay()}
-              onPlay={() => usePlayerStore.setState({ isPaused: false })}
+              onPlay={() => usePlayerStore.setState({ isPaused: false, isBuffering: false })}
               onPause={() => {
                 usePlayerStore.setState({ isPaused: true });
                 captureCurrentVideoFrame();
               }}
               onEnded={() => {
-                usePlayerStore.setState({ isPaused: true });
+                usePlayerStore.setState({ isPaused: true, isBuffering: false });
                 captureCurrentVideoFrame();
               }}
               onTimeUpdate={(e) => {
@@ -577,6 +642,44 @@ export const App: React.FC = () => {
                 }
               }}
             />
+
+            {/* High-Performance Loading / Buffering HUD Animation Indicator */}
+            {isBuffering && currentUri && (
+              <div className="absolute inset-0 pointer-events-none z-20 flex flex-col items-center justify-center bg-black/45 backdrop-blur-sm animate-in fade-in duration-200">
+                <div className="relative flex items-center justify-center">
+                  {/* Outer Pulsing Aura */}
+                  <div
+                    className={`absolute -inset-6 rounded-full bg-gradient-to-r ${theme.accentGradient} opacity-35 blur-xl animate-pulse`}
+                  />
+                  {/* Outer Spinning Ring */}
+                  <div
+                    className="w-16 h-16 rounded-full border-4 border-transparent border-t-cyan-400 border-r-fuchsia-400 animate-spin"
+                    style={{ animationDuration: '0.85s' }}
+                  />
+                  {/* Inner Counter-Spinning Ring */}
+                  <div
+                    className="absolute w-10 h-10 rounded-full border-2 border-transparent border-b-cyan-300 border-l-purple-400 animate-spin"
+                    style={{ animationDirection: 'reverse', animationDuration: '1.2s' }}
+                  />
+                  {/* Center Spinning Icon */}
+                  <div className="absolute flex items-center justify-center">
+                    <RefreshCw className="w-5 h-5 text-white animate-spin opacity-85" />
+                  </div>
+                </div>
+
+                <div className="mt-4 flex flex-col items-center gap-1">
+                  <span className="text-xs font-bold text-white tracking-wider uppercase drop-shadow flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+                    Loading Media Stream...
+                  </span>
+                  {currentTitle && (
+                    <span className="text-[11px] text-white/70 font-medium max-w-sm truncate drop-shadow px-2">
+                      {currentTitle}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Subtitle Caption Overlay */}
             {activeSubtitleTrack && (
@@ -645,7 +748,11 @@ export const App: React.FC = () => {
 
         {/* Home View / Top-Aligned Jump Back In & Card Previews */}
         {!currentUri && (
-          <div className="absolute inset-0 z-30 flex flex-col items-center justify-start pt-6 sm:pt-8 pb-12 px-6 sm:px-10 pointer-events-auto bg-black/75 backdrop-blur-md animate-in fade-in duration-300 overflow-y-auto">
+          <div
+            className={`absolute inset-0 z-30 flex flex-col items-center justify-start pt-6 sm:pt-8 pb-12 px-6 sm:px-10 pointer-events-auto animate-in fade-in duration-300 overflow-y-auto ${
+              customBgImage ? 'bg-black/25' : 'bg-black/75 backdrop-blur-md'
+            }`}
+          >
             {recentMedia.length > 0 ? (
               /* Rich Card Grid: Stopped-Point Video Preview Thumbnail, No Paths/URLs */
               <div className="w-full max-w-6xl flex flex-col gap-6">
@@ -660,9 +767,9 @@ export const App: React.FC = () => {
                     </div>
                     <div>
                       <h2 className="text-2xl font-extrabold text-white tracking-tight">
-                        Jump Back In
+                        Resume
                       </h2>
-                      <p className="text-xs text-white/50">
+                      <p className="text-xs text-slate-300">
                         Pick up right where you left off with stopped-point frame previews
                       </p>
                     </div>
@@ -679,7 +786,7 @@ export const App: React.FC = () => {
                       style={{ boxShadow: `0 4px 15px ${theme.haloGlow}` }}
                     >
                       <Plus className="w-4 h-4" />
-                      <span>Open File</span>
+                      <span>Open</span>
                       <input
                         id="miki-main-file-input"
                         type="file"
@@ -694,7 +801,7 @@ export const App: React.FC = () => {
                       className="px-4 py-2.5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-semibold text-xs transition-all active:scale-95 flex items-center gap-1.5"
                     >
                       <Sparkles className="w-4 h-4 text-cyan-400" />
-                      <span>Library & Streams</span>
+                      <span>Library</span>
                     </button>
                   </div>
                 </div>
@@ -933,24 +1040,36 @@ export const App: React.FC = () => {
         )}
       </div>
 
-      {/* Modals */}
-      <EqualizerModal isOpen={isEqOpen} onClose={() => setIsEqOpen(false)} />
-      <VideoSettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        onOpenEq={() => setIsEqOpen(true)}
-      />
-      <FileBrowserModal isOpen={isFileBrowserOpen} onClose={() => setIsFileBrowserOpen(false)} />
-      <ResumeChoiceModal
-        isOpen={isResumeChoiceOpen}
-        item={pendingResumeItem}
-        onClose={() => {
-          setIsResumeChoiceOpen(false);
-          setPendingResumeItem(null);
-        }}
-        onResume={handleConfirmResume}
-        onRestart={handleConfirmRestart}
-      />
+      {/* Modals wrapped in ErrorBoundary to guarantee uninterrupted UI */}
+      <ErrorBoundary onReset={() => setIsFileBrowserOpen(false)}>
+        <FileBrowserModal isOpen={isFileBrowserOpen} onClose={() => setIsFileBrowserOpen(false)} />
+      </ErrorBoundary>
+
+      <ErrorBoundary onReset={() => setIsSettingsOpen(false)}>
+        <VideoSettingsModal
+          isOpen={isSettingsOpen}
+          onClose={() => setIsSettingsOpen(false)}
+          onOpenEq={() => setIsEqOpen(true)}
+        />
+      </ErrorBoundary>
+
+      <ErrorBoundary onReset={() => setIsEqOpen(false)}>
+        <EqualizerModal isOpen={isEqOpen} onClose={() => setIsEqOpen(false)} />
+      </ErrorBoundary>
+
+      <ErrorBoundary onReset={() => setIsResumeChoiceOpen(false)}>
+        <ResumeChoiceModal
+          isOpen={isResumeChoiceOpen}
+          item={pendingResumeItem}
+          onClose={() => {
+            setIsResumeChoiceOpen(false);
+            setPendingResumeItem(null);
+          }}
+          onResume={handleConfirmResume}
+          onRestart={handleConfirmRestart}
+        />
+      </ErrorBoundary>
+
       <ErrorToast />
 
       {/* Cinematic Startup Video Splash Loader */}

@@ -167,10 +167,12 @@ export interface PlayerStoreState {
   customBgImage: string | null;
   customBgOpacity: number;
   customBgBlur: number;
+  customBgBrightness: number;
   customBgTint: 'obsidian' | 'navy' | 'aurora' | 'amethyst' | 'clear';
   setCustomBgImage: (url: string | null) => void;
   setCustomBgOpacity: (opacity: number) => void;
   setCustomBgBlur: (blur: number) => void;
+  setCustomBgBrightness: (brightness: number) => void;
   setCustomBgTint: (tint: 'obsidian' | 'navy' | 'aurora' | 'amethyst' | 'clear') => void;
   
   // Sound System Advanced Controls
@@ -325,6 +327,7 @@ const saveStoredScreenshotDirectory = (dir: string) => {
 const STORAGE_KEY_BG_IMAGE = 'miki_custom_bg_image';
 const STORAGE_KEY_BG_OPACITY = 'miki_custom_bg_opacity';
 const STORAGE_KEY_BG_BLUR = 'miki_custom_bg_blur';
+const STORAGE_KEY_BG_BRIGHTNESS = 'miki_custom_bg_brightness';
 const STORAGE_KEY_BG_TINT = 'miki_custom_bg_tint';
 
 export const DEFAULT_BG_IMAGE = 'https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?auto=format&fit=crop&w=1920&q=80'; // Deep Nebula
@@ -356,6 +359,16 @@ const loadStoredBgBlur = (): number => {
     return v !== null ? parseFloat(v) : 22;
   } catch {
     return 22;
+  }
+};
+
+const loadStoredBgBrightness = (): number => {
+  if (typeof window === 'undefined') return 1.0;
+  try {
+    const v = localStorage.getItem(STORAGE_KEY_BG_BRIGHTNESS);
+    return v !== null ? parseFloat(v) : 1.0;
+  } catch {
+    return 1.0;
   }
 };
 
@@ -503,6 +516,7 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
   customBgImage: loadStoredBgImage(),
   customBgOpacity: loadStoredBgOpacity(),
   customBgBlur: loadStoredBgBlur(),
+  customBgBrightness: loadStoredBgBrightness(),
   setCustomBgImage: (url) => {
     set({ customBgImage: url });
     if (url) {
@@ -525,6 +539,12 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     set({ customBgBlur: blur });
     try {
       localStorage.setItem(STORAGE_KEY_BG_BLUR, blur.toString());
+    } catch {}
+  },
+  setCustomBgBrightness: (brightness) => {
+    set({ customBgBrightness: brightness });
+    try {
+      localStorage.setItem(STORAGE_KEY_BG_BRIGHTNESS, brightness.toString());
     } catch {}
   },
 
@@ -720,6 +740,10 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
 
     const engine: IPlayerEngine =
       targetType === 'tauri-mpv' ? new TauriMpvEngine() : new WebMediaEngine();
+
+    if (engine && 'attachSpatialAudio' in engine) {
+      (engine as { attachSpatialAudio: (s: any) => void }).attachSpatialAudio(get().spatialAudio);
+    }
 
     engine.onTelemetry((telemetry: PlaybackTelemetry) => {
       set({
@@ -972,6 +996,7 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
       retryCount: 0,
       lastError: null,
       resumeBannerPositionMs: null,
+      isBuffering: true,
     });
 
     // Restore any memorized subtitles for this video
@@ -1007,12 +1032,20 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
       positionMs: 0,
       durationMs: 0,
       isPaused: true,
+      isBuffering: false,
       resumeBannerPositionMs: null,
     });
   },
 
   togglePlay: async () => {
-    const { engine, isPaused, currentMediaId, positionMs, durationMs } = get();
+    const { engine, isPaused, currentMediaId, currentUri, positionMs, durationMs } = get();
+
+    // Check if currently playing YouTube
+    const isYouTube = /(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/.test(currentUri || '');
+    if (isYouTube) {
+      set({ isPaused: !isPaused });
+      return;
+    }
 
     // Direct DOM element control for 100% reliable local video playback
     const video = (document.getElementById('aether-video-viewport') as HTMLVideoElement) || null;
@@ -1059,7 +1092,15 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
 
   seek: async (timestampMs, exact = false) => {
     set({ positionMs: timestampMs });
-    await get().engine?.seek(timestampMs, exact);
+    const { currentUri, engine } = get();
+    const isYouTube = /(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/.test(currentUri || '');
+    if (isYouTube) {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('miki:youtube-seek', { detail: { positionSec: timestampMs / 1000 } }));
+      }
+      return;
+    }
+    await engine?.seek(timestampMs, exact);
   },
 
   setVolume: async (volume) => {

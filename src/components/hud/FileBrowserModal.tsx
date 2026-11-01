@@ -133,15 +133,14 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({ isOpen, onCl
   const removeYouTubeHistory = usePlayerStore((s) => s.removeYouTubeHistory);
   const activeSubtitleTrack = usePlayerStore((s) => s.activeSubtitleTrack);
   const loadSubtitleFromFile = usePlayerStore((s) => s.loadSubtitleFromFile);
+  const customBgImage = usePlayerStore((s) => s.customBgImage);
 
-  const [activeTab, setActiveTab] = useState<'demos' | 'recent' | 'bookmarks' | 'url'>('demos');
+  const [activeTab, setActiveTab] = useState<'demos' | 'recent' | 'bookmarks' | 'url'>('url');
   const [selectedCategory, setSelectedCategory] = useState<DemoCategory>('All');
   const [customUrl, setCustomUrl] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<SortCriteria>('recent');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
-
-  if (!isOpen) return null;
 
   const handleOpenLocalFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -171,45 +170,43 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({ isOpen, onCl
 
   // Filtered and Sorted Demo Streams
   const filteredAndSortedDemos = useMemo(() => {
+    const term = (searchTerm || '').toLowerCase();
     let list = DEMO_STREAMS.filter((d) => {
       const matchesCategory = selectedCategory === 'All' || d.category === selectedCategory;
       const matchesSearch =
-        d.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        d.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        d.badge.toLowerCase().includes(searchTerm.toLowerCase());
+        (d.title || '').toLowerCase().includes(term) ||
+        (d.category || '').toLowerCase().includes(term) ||
+        (d.badge || '').toLowerCase().includes(term);
       return matchesCategory && matchesSearch;
     });
 
     list.sort((a, b) => {
-      let cmp = 0;
-      if (sortBy === 'title') {
-        cmp = a.title.localeCompare(b.title);
-      } else {
-        cmp = a.title.localeCompare(b.title);
-      }
+      let cmp = (a.title || '').localeCompare(b.title || '');
       return sortDirection === 'asc' ? cmp : -cmp;
     });
 
     return list;
-  }, [selectedCategory, searchTerm, sortBy, sortDirection]);
+  }, [selectedCategory, searchTerm, sortDirection]);
 
   // Filtered and Sorted YouTube History
   const filteredAndSortedYouTube = useMemo(() => {
-    let list = youtubeHistory.filter((item) =>
-      item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.url.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const term = (searchTerm || '').toLowerCase();
+    let list = (youtubeHistory || []).filter((item) => {
+      const title = (item.title || '').toLowerCase();
+      const url = (item.url || '').toLowerCase();
+      return title.includes(term) || url.includes(term);
+    });
 
     list.sort((a, b) => {
       let cmp = 0;
       if (sortBy === 'title') {
-        cmp = a.title.localeCompare(b.title);
+        cmp = (a.title || '').localeCompare(b.title || '');
       } else if (sortBy === 'duration') {
         cmp = (a.durationMs || 0) - (b.durationMs || 0);
       } else if (sortBy === 'progress') {
         cmp = (a.progressPercent || 0) - (b.progressPercent || 0);
       } else {
-        cmp = a.timestamp - b.timestamp;
+        cmp = (a.timestamp || 0) - (b.timestamp || 0);
       }
       return sortDirection === 'asc' ? cmp : -cmp;
     });
@@ -219,15 +216,17 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({ isOpen, onCl
 
   // Filtered and Sorted Recent Media
   const filteredAndSortedRecents = useMemo(() => {
-    let list = recentMedia.filter((item) =>
-      item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.uri.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const term = (searchTerm || '').toLowerCase();
+    let list = (recentMedia || []).filter((item) => {
+      const title = (item.title || '').toLowerCase();
+      const uri = (item.uri || '').toLowerCase();
+      return title.includes(term) || uri.includes(term);
+    });
 
     list.sort((a, b) => {
       let cmp = 0;
       if (sortBy === 'title') {
-        cmp = a.title.localeCompare(b.title);
+        cmp = (a.title || '').localeCompare(b.title || '');
       } else if (sortBy === 'duration') {
         cmp = (a.durationMs || 0) - (b.durationMs || 0);
       } else if (sortBy === 'progress') {
@@ -249,8 +248,10 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({ isOpen, onCl
     '4K & Nature',
   ];
 
+  if (!isOpen) return null;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md animate-in fade-in duration-200 p-4">
+    <div className={`fixed inset-0 z-50 flex items-center justify-center animate-in fade-in duration-200 p-4 ${customBgImage ? 'bg-black/45' : 'bg-black/80 backdrop-blur-md'}`}>
       <div className="glass-panel w-full max-w-4xl h-[650px] p-6 rounded-3xl flex flex-col gap-4 border border-white/20 shadow-2xl overflow-hidden bg-slate-950/95">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-white/10 pb-3">
@@ -259,8 +260,8 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({ isOpen, onCl
               <Film className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-white tracking-tight">Media Explorer & Streams</h2>
-              <p className="text-xs text-white/50">Universal playback library, high-speed verified streams & YouTube</p>
+              <h2 className="text-lg font-bold text-white tracking-tight">Library</h2>
+              <p className="text-xs text-slate-300">Streams, Recent Media, Bookmarks & Demos</p>
             </div>
           </div>
 
@@ -268,7 +269,7 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({ isOpen, onCl
             {/* Insert Subtitle File Button */}
             <label className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-semibold text-xs cursor-pointer transition-all border border-white/15 active:scale-95" title="Insert SRT or WebVTT Subtitle File">
               <Subtitles className="w-4 h-4 text-amber-400" />
-              <span className="hidden sm:inline">Insert Captions</span>
+              <span className="hidden sm:inline">Captions</span>
               <input
                 type="file"
                 className="hidden"
@@ -294,7 +295,7 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({ isOpen, onCl
               className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs cursor-pointer transition-all shadow-lg shadow-cyan-500/20 active:scale-95"
             >
               <FolderOpen className="w-4 h-4" />
-              <span>Choose Local File</span>
+              <span>Choose</span>
               <input
                 id="miki-modal-file-input"
                 type="file"
@@ -329,30 +330,18 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({ isOpen, onCl
           </div>
         )}
 
-        {/* Navigation Tabs */}
+        {/* Navigation Tabs - Minimal One-Word Names */}
         <div className="flex items-center gap-2 border-b border-white/10 pb-2">
-          <button
-            onClick={() => setActiveTab('demos')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-semibold transition-all ${
-              activeTab === 'demos'
-                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 shadow-sm'
-                : 'text-white/60 hover:text-white hover:bg-white/5'
-            }`}
-          >
-            <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-            Fast Demo Streams ({DEMO_STREAMS.length})
-          </button>
-
           <button
             onClick={() => setActiveTab('url')}
             className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-semibold transition-all ${
               activeTab === 'url'
                 ? 'bg-rose-500/20 text-rose-300 border border-rose-400/30 shadow-sm'
-                : 'text-white/60 hover:text-white hover:bg-white/5'
+                : 'text-white/70 hover:text-white hover:bg-white/5'
             }`}
           >
             <Youtube className="w-3.5 h-3.5 text-rose-400" />
-            YouTube & URL Stream Cards ({youtubeHistory.length})
+            Streams ({youtubeHistory.length})
           </button>
 
           <button
@@ -360,7 +349,7 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({ isOpen, onCl
             className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-semibold transition-all ${
               activeTab === 'recent'
                 ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 shadow-sm'
-                : 'text-white/60 hover:text-white hover:bg-white/5'
+                : 'text-white/70 hover:text-white hover:bg-white/5'
             }`}
           >
             <Clock className="w-3.5 h-3.5" />
@@ -372,11 +361,23 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({ isOpen, onCl
             className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-semibold transition-all ${
               activeTab === 'bookmarks'
                 ? 'bg-amber-500/20 text-amber-300 border border-amber-400/30 shadow-sm'
-                : 'text-white/60 hover:text-white hover:bg-white/5'
+                : 'text-white/70 hover:text-white hover:bg-white/5'
             }`}
           >
             <Bookmark className="w-3.5 h-3.5 text-amber-400" />
-            Bookmarks ({bookmarks.length})
+            Saved ({bookmarks.length})
+          </button>
+
+          <button
+            onClick={() => setActiveTab('demos')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-semibold transition-all ${
+              activeTab === 'demos'
+                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 shadow-sm'
+                : 'text-white/70 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+            Demos ({DEMO_STREAMS.length})
           </button>
         </div>
 
@@ -585,7 +586,7 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({ isOpen, onCl
                               </div>
                               <div className="flex items-center justify-between text-[10px] text-white/40 pt-1">
                                 <span>{item.progressPercent ? `${item.progressPercent}% watched` : 'Recently saved'}</span>
-                                <span>{new Date(item.timestamp).toLocaleDateString()}</span>
+                                <span>{item.timestamp ? new Date(item.timestamp).toLocaleDateString() : ''}</span>
                               </div>
                             </div>
                           </div>
@@ -644,12 +645,12 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({ isOpen, onCl
                       }}
                     >
                       <span className="text-sm font-medium text-white truncate group-hover:text-cyan-300 transition-colors">
-                        {item.title}
+                        {item.title || 'Untitled Video'}
                       </span>
                       <div className="flex items-center gap-3 text-xs text-white/50">
-                        <span>{item.progressPercent.toFixed(0)}% watched</span>
+                        <span>{(item.progressPercent || 0).toFixed(0)}% watched</span>
                         <span>•</span>
-                        <span className="font-mono truncate">{formatPathForOS(item.uri)}</span>
+                        <span className="font-mono truncate">{formatPathForOS(item.uri || '')}</span>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
@@ -703,10 +704,10 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({ isOpen, onCl
                   >
                     <div className="flex flex-col gap-0.5">
                       <span className="text-sm font-medium text-white group-hover:text-amber-300 transition-colors">
-                        {bm.label}
+                        {bm.label || 'Bookmark'}
                       </span>
                       <span className="text-xs font-mono text-amber-400">
-                        Jump to: {(bm.timestampMs / 1000).toFixed(1)}s
+                        Jump to: {((bm.timestampMs || 0) / 1000).toFixed(1)}s
                       </span>
                     </div>
                     <Play className="w-4 h-4 text-amber-400 shrink-0" />

@@ -75,3 +75,4 @@ fs.writeFileSync(outIco, ico);
 fs.rmSync(tmpDir, { recursive: true, force: true });
 
 console.log(`[ICO] Successfully wrote Windows 3.00 format icon to ${outIco} (${ico.length} bytes)`);
+

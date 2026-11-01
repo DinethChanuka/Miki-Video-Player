@@ -1,5 +1,6 @@
 import { invoke, Channel } from '@tauri-apps/api/core';
 import Hls from 'hls.js';
+import { SpatialAudioEngine } from './SpatialAudioEngine';
 
 export type EngineType = 'tauri-mpv' | 'web-media';
 
@@ -15,6 +16,7 @@ export type ErrorCode =
   | 'DB_QUERY_FAILED'
   | 'THUMBNAIL_EXTRACT_FAILED'
   | 'IPC_CHANNEL_CLOSED'
+  | 'STREAM_ERROR'
   | 'BOOKMARK_SAVED';
 
 export type RecoveryStrategy =
@@ -239,6 +241,9 @@ export class WebMediaEngine implements IPlayerEngine {
   private gainNode: GainNode | null = null;
   private eqBands: BiquadFilterNode[] = [];
   private compressorNode: DynamicsCompressorNode | null = null;
+  private spatialAudio: SpatialAudioEngine | null = null;
+  private mediaSourceNode: MediaElementAudioSourceNode | null = null;
+  private lastEqNode: AudioNode | null = null;
   private rafId: number | null = null;
   private currentVolumePercent: number = 100;
 
@@ -246,6 +251,13 @@ export class WebMediaEngine implements IPlayerEngine {
   private errorListeners = new Set<(e: PlayerErrorEnvelope) => void>();
 
   private static readonly EQ_FREQUENCIES = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
+
+  public attachSpatialAudio(spatial: SpatialAudioEngine): void {
+    this.spatialAudio = spatial;
+    if (this.audioCtx && this.lastEqNode) {
+      this.spatialAudio.init(this.audioCtx, this.lastEqNode, this.audioCtx.destination);
+    }
+  }
 
   private getVideoEl(): HTMLVideoElement | null {
     if (this.videoEl && document.contains(this.videoEl)) {
@@ -262,6 +274,7 @@ export class WebMediaEngine implements IPlayerEngine {
   async initialize(container?: HTMLVideoElement): Promise<void> {
     const el = container ?? (document.getElementById('aether-video-viewport') as HTMLVideoElement) ?? document.createElement('video');
     this.bindVideoElement(el);
+    this.setupWebAudioGraph();
     this.startTelemetryLoop();
   }
 
@@ -270,6 +283,7 @@ export class WebMediaEngine implements IPlayerEngine {
     this.videoEl = el;
     this.videoEl.playsInline = true;
     this.videoEl.preload = 'auto';
+    this.setupWebAudioGraph();
 
     // Hook critical HTML5 video events
     this.videoEl.onplay = () => this.notifyTelemetry();
@@ -291,50 +305,65 @@ export class WebMediaEngine implements IPlayerEngine {
     };
   }
 
-  private setupWebAudioGraph(): void {
+  public setupWebAudioGraph(): void {
     const el = this.getVideoEl();
-    if (!el || this.audioCtx) return;
+    if (!el) return;
     try {
-      const AudioCtxClass =
-        window.AudioContext ||
-        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      if (!AudioCtxClass) return;
-      this.audioCtx = new AudioCtxClass();
-
-      // Only attempt media element source if crossOrigin is supported or local
-      const source = this.audioCtx.createMediaElementSource(el);
-
-      this.eqBands = WebMediaEngine.EQ_FREQUENCIES.map((freq) => {
-        const filter = this.audioCtx!.createBiquadFilter();
-        filter.type = 'peaking';
-        filter.frequency.value = freq;
-        filter.Q.value = 1.41;
-        filter.gain.value = 0;
-        return filter;
-      });
-
-      this.compressorNode = this.audioCtx.createDynamicsCompressor();
-      this.compressorNode.threshold.value = -24;
-      this.compressorNode.knee.value = 30;
-      this.compressorNode.ratio.value = 1;
-
-      this.gainNode = this.audioCtx.createGain();
-      this.gainNode.gain.value = this.currentVolumePercent / 100;
-
-      let currentNode: AudioNode = source;
-      for (const band of this.eqBands) {
-        currentNode.connect(band);
-        currentNode = band;
+      if (!this.audioCtx) {
+        const AudioCtxClass =
+          window.AudioContext ||
+          (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        if (!AudioCtxClass) return;
+        this.audioCtx = new AudioCtxClass();
       }
-      currentNode.connect(this.compressorNode);
-      this.compressorNode.connect(this.gainNode);
-      this.gainNode.connect(this.audioCtx.destination);
+
+      if (this.audioCtx.state === 'suspended') {
+        this.audioCtx.resume().catch(() => {});
+      }
+
+      if (!this.mediaSourceNode) {
+        this.mediaSourceNode = this.audioCtx.createMediaElementSource(el);
+
+        this.eqBands = WebMediaEngine.EQ_FREQUENCIES.map((freq) => {
+          const filter = this.audioCtx!.createBiquadFilter();
+          filter.type = 'peaking';
+          filter.frequency.value = freq;
+          filter.Q.value = 1.41;
+          filter.gain.value = 0;
+          return filter;
+        });
+
+        this.compressorNode = this.audioCtx.createDynamicsCompressor();
+        this.compressorNode.threshold.value = -24;
+        this.compressorNode.knee.value = 30;
+        this.compressorNode.ratio.value = 1;
+
+        this.gainNode = this.audioCtx.createGain();
+        this.gainNode.gain.value = this.currentVolumePercent / 100;
+
+        let currentNode: AudioNode = this.mediaSourceNode;
+        for (const band of this.eqBands) {
+          currentNode.connect(band);
+          currentNode = band;
+        }
+        this.lastEqNode = currentNode;
+
+        if (this.spatialAudio) {
+          this.spatialAudio.init(this.audioCtx, this.lastEqNode, this.audioCtx.destination);
+        } else {
+          this.lastEqNode.connect(this.compressorNode);
+          this.compressorNode.connect(this.gainNode);
+          this.gainNode.connect(this.audioCtx.destination);
+        }
+      }
     } catch (err) {
       logWarn('WebAudio advanced routing optional or bypassed for CORS stream: ' + String(err));
     }
   }
 
   async load(uri: string, startPositionMs = 0): Promise<void> {
+    this.setupWebAudioGraph();
+
     // If YouTube URL, never pass to <video> src
     if (/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)/.test(uri)) {
       const el = this.getVideoEl();
@@ -443,24 +472,31 @@ export class WebMediaEngine implements IPlayerEngine {
     const clamped = Math.max(0, Math.min(200, volume));
     this.currentVolumePercent = clamped;
 
-    if (clamped > 100) {
-      this.setupWebAudioGraph();
-    }
+    this.setupWebAudioGraph();
 
     if (this.videoEl) {
       // HTML5 video element standard volume only supports 0 to 1 (0% to 100%)
       this.videoEl.volume = Math.min(1, clamped / 100);
     }
 
-    if (this.gainNode) {
-      // Gain node delivers the amplified 101% - 200% volume boost
-      this.gainNode.gain.value = clamped / 100;
+    if (this.gainNode && this.audioCtx) {
+      this.gainNode.gain.setValueAtTime(clamped / 100, this.audioCtx.currentTime);
+    }
+
+    if (this.spatialAudio) {
+      this.spatialAudio.setMasterVolume(clamped / 100);
     }
   }
 
   async setMuted(muted: boolean): Promise<void> {
     if (this.videoEl) {
       this.videoEl.muted = muted;
+    }
+    const targetVolume = muted ? 0 : this.currentVolumePercent / 100;
+    if (this.spatialAudio) {
+      this.spatialAudio.setMasterVolume(targetVolume);
+    } else if (this.gainNode && this.audioCtx) {
+      this.gainNode.gain.setValueAtTime(targetVolume, this.audioCtx.currentTime);
     }
   }
 
@@ -483,6 +519,7 @@ export class WebMediaEngine implements IPlayerEngine {
   }
 
   async setEqualizer(gainsDb: number[], nightMode: boolean): Promise<void> {
+    this.setupWebAudioGraph();
     this.eqBands.forEach((band, idx) => {
       const clamped = Math.max(-20, Math.min(20, gainsDb[idx] ?? 0));
       band.gain.value = clamped;
