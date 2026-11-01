@@ -7,6 +7,7 @@ import { EqualizerModal } from './components/hud/EqualizerModal';
 import { VideoSettingsModal } from './components/hud/VideoSettingsModal';
 import { FileBrowserModal } from './components/hud/FileBrowserModal';
 import { ResumeChoiceModal } from './components/hud/ResumeChoiceModal';
+import { SystemAccessModal } from './components/hud/SystemAccessModal';
 import { ErrorToast } from './components/hud/ErrorToast';
 import { SplashScreen } from './components/splash/SplashScreen';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
@@ -105,6 +106,7 @@ export const App: React.FC = () => {
   const [isEqOpen, setIsEqOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isFileBrowserOpen, setIsFileBrowserOpen] = useState(false);
+  const [isSystemAccessOpen, setIsSystemAccessOpen] = useState(false);
   const [pendingResumeItem, setPendingResumeItem] = useState<MediaHistoryItem | null>(null);
   const [isResumeChoiceOpen, setIsResumeChoiceOpen] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
@@ -262,6 +264,24 @@ export const App: React.FC = () => {
     window.addEventListener('miki:nativeFileSelected', handleNativePicked);
     return () => window.removeEventListener('miki:nativeFileSelected', handleNativePicked);
   }, [openMedia]);
+
+  // Check initial OS System Permissions Access confirmation on first launch
+  useEffect(() => {
+    const hasAccepted = localStorage.getItem('miki_os_permissions_accepted');
+    if (!hasAccepted) {
+      const timer = setTimeout(() => {
+        setIsSystemAccessOpen(true);
+      }, 700);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  // Allow reopening OS System Access dialog from settings or anywhere
+  useEffect(() => {
+    const handleOpenAccess = () => setIsSystemAccessOpen(true);
+    window.addEventListener('miki:open-system-access', handleOpenAccess);
+    return () => window.removeEventListener('miki:open-system-access', handleOpenAccess);
+  }, []);
 
   // Listen to Cocoa native directory picker and screenshot saved events
   useEffect(() => {
@@ -560,7 +580,7 @@ export const App: React.FC = () => {
         {youtubeId ? (
           <YouTubePlayer
             youtubeId={youtubeId}
-            initialPositionMs={positionMs}
+            initialPositionMs={usePlayerStore.getState().positionMs}
           />
         ) : activeEngineType === 'web-media' ? (
           <div ref={viewportRef} className="relative w-full h-full flex items-center justify-center overflow-hidden">
@@ -1067,6 +1087,13 @@ export const App: React.FC = () => {
           }}
           onResume={handleConfirmResume}
           onRestart={handleConfirmRestart}
+        />
+      </ErrorBoundary>
+
+      <ErrorBoundary onReset={() => setIsSystemAccessOpen(false)}>
+        <SystemAccessModal
+          isOpen={isSystemAccessOpen}
+          onClose={() => setIsSystemAccessOpen(false)}
         />
       </ErrorBoundary>
 

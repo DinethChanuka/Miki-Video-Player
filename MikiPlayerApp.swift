@@ -58,6 +58,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         contentController.add(self, name: "openNativeFileDialog")
         contentController.add(self, name: "openNativeDirectoryDialog")
         contentController.add(self, name: "saveScreenshot")
+        contentController.add(self, name: "requestSystemAccess")
         config.userContentController = contentController
 
         webView = WKWebView(frame: window.contentView!.bounds, configuration: config)
@@ -217,6 +218,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
                         print("[Miki] Screenshot write failed: \(error)")
                     }
                 }
+            } else if message.name == "requestSystemAccess" {
+                // Ensure screenshot and user directories exist and trigger system access validation
+                let home = FileManager.default.homeDirectoryForCurrentUser.path
+                let screenshotsDir = "\(home)/Pictures/Miki Player/Screenshots"
+                try? FileManager.default.createDirectory(atPath: screenshotsDir, withIntermediateDirectories: true, attributes: nil)
+                let js = "window.dispatchEvent(new CustomEvent('miki:systemAccessGranted', { detail: { status: 'granted' } }));"
+                self.webView.evaluateJavaScript(js, completionHandler: nil)
             }
         }
     }

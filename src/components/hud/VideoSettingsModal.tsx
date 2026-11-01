@@ -1218,6 +1218,27 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
                     <span>Capture</span>
                   </button>
                 </div>
+
+                {/* System Access & OS Permissions Card */}
+                <div className="flex items-center justify-between p-3 rounded-2xl bg-white/[0.03] border border-white/10 mt-1">
+                  <div className="flex items-center gap-2.5">
+                    <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <div>
+                      <span className="text-xs font-semibold text-white block">OS Permissions & System Access</span>
+                      <span className="text-[10px] text-slate-300">File system, media folders & GPU access status</span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (typeof window !== 'undefined') {
+                        window.dispatchEvent(new CustomEvent('miki:open-system-access'));
+                      }
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-medium border border-white/15 transition-all active:scale-95 shrink-0"
+                  >
+                    Review Access
+                  </button>
+                </div>
               </div>
             </div>
           )}

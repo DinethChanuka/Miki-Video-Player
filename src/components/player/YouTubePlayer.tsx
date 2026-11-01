@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo, useCallback } from 'react';
 import { usePlayerStore } from '../../store/playerStore';
 
 interface YouTubePlayerProps {
@@ -15,13 +15,33 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
   onEnded,
 }) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const startSec = Math.max(0, Math.floor(initialPositionMs / 1000));
+
+  // Lock initial start second per video ID to PREVENT IFRAME RELOAD LOOPS
+  const startSecRef = useRef<number>(Math.max(0, Math.floor(initialPositionMs / 1000)));
+  const currentVideoIdRef = useRef<string>(youtubeId);
+  if (currentVideoIdRef.current !== youtubeId) {
+    currentVideoIdRef.current = youtubeId;
+    startSecRef.current = Math.max(0, Math.floor(initialPositionMs / 1000));
+  }
+
   const isPaused = usePlayerStore((s) => s.isPaused);
   const volume = usePlayerStore((s) => s.volume);
   const isMuted = usePlayerStore((s) => s.isMuted);
 
   const setPlayerState = usePlayerStore.setState;
-  const isInitialMount = useRef(true);
+
+  // Track last command sent to avoid echo loops
+  const lastCommandRef = useRef<string | null>(null);
+
+  // Send listening command safely to iframe
+  const sendListeningPing = useCallback(() => {
+    if (iframeRef.current?.contentWindow) {
+      iframeRef.current.contentWindow.postMessage(
+        JSON.stringify({ event: 'listening' }),
+        '*'
+      );
+    }
+  }, []);
 
   // Listen for timeline scrubber seeking
   useEffect(() => {
@@ -38,10 +58,11 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
     return () => window.removeEventListener('miki:youtube-seek', handleSeek);
   }, []);
 
+  // Main YouTube message & time sync effect
   useEffect(() => {
-    // Post initial time
-    if (initialPositionMs > 0) {
-      setPlayerState({ positionMs: initialPositionMs });
+    // Initial start position in store
+    if (startSecRef.current > 0) {
+      setPlayerState({ positionMs: startSecRef.current * 1000 });
     }
 
     const handleWindowMessage = (event: MessageEvent) => {
@@ -89,19 +110,22 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
 
             onTimeUpdate?.(curPosMs, totalDurMs);
 
-            // Periodically update YouTube history stopped place in store
+            // Update YouTube progress in database/store
             usePlayerStore.getState().saveYouTubeProgress(youtubeId, curPosMs, totalDurMs);
           }
 
           if (info.playerState === 0) {
             // Ended
+            lastCommandRef.current = 'pauseVideo';
             setPlayerState({ isPaused: true, isBuffering: false });
             onEnded?.();
           } else if (info.playerState === 1) {
             // Playing
+            lastCommandRef.current = 'playVideo';
             setPlayerState({ isPaused: false, isBuffering: false });
           } else if (info.playerState === 2) {
             // Paused
+            lastCommandRef.current = 'pauseVideo';
             setPlayerState({ isPaused: true, isBuffering: false });
             const curPosMs = usePlayerStore.getState().positionMs;
             const durMs = usePlayerStore.getState().durationMs;
@@ -116,34 +140,27 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
 
     window.addEventListener('message', handleWindowMessage);
 
-    // Tell YouTube iframe to listen for time delivery events
-    const pingTimer = setInterval(() => {
-      if (iframeRef.current?.contentWindow) {
-        iframeRef.current.contentWindow.postMessage(
-          JSON.stringify({ event: 'listening', id: youtubeId }),
-          '*'
-        );
-      }
-    }, 1000);
+    // Initial ping when mounted
+    sendListeningPing();
 
     return () => {
       window.removeEventListener('message', handleWindowMessage);
-      clearInterval(pingTimer);
       // Save last stopped position on unmount
       const curPosMs = usePlayerStore.getState().positionMs;
       const durMs = usePlayerStore.getState().durationMs;
       usePlayerStore.getState().saveYouTubeProgress(youtubeId, curPosMs, durMs);
     };
-  }, [youtubeId, initialPositionMs, onTimeUpdate, onEnded, setPlayerState]);
+  }, [youtubeId, onTimeUpdate, onEnded, setPlayerState, sendListeningPing]);
 
-  // Sync pause/play state to iframe (skip initial mount to let autoplay proceed smoothly)
+  // Sync pause/play state to iframe with loop prevention
   useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
-    }
     if (!iframeRef.current?.contentWindow) return;
     const command = isPaused ? 'pauseVideo' : 'playVideo';
+
+    // Prevent echoing command if already in that state
+    if (lastCommandRef.current === command) return;
+    lastCommandRef.current = command;
+
     iframeRef.current.contentWindow.postMessage(
       JSON.stringify({ event: 'command', func: command, args: [] }),
       '*'
@@ -170,18 +187,24 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
     }
   }, [volume, isMuted]);
 
-  const originParam =
-    typeof window !== 'undefined' && window.location.origin
-      ? `&origin=${encodeURIComponent(window.location.origin)}`
-      : '';
+  // STABLE MEMOIZED EMBED URL: NEVER changes while watching the same video
+  const embedSrc = useMemo(() => {
+    const originParam =
+      typeof window !== 'undefined' && window.location.origin
+        ? `&origin=${encodeURIComponent(window.location.origin)}`
+        : '';
+    const initialStart = startSecRef.current;
+    return `https://www.youtube-nocookie.com/embed/${youtubeId}?autoplay=1&enablejsapi=1&playsinline=1&rel=0&modestbranding=1&start=${initialStart}${originParam}`;
+  }, [youtubeId]);
 
   return (
-    <div className="w-full h-full z-10 bg-black flex items-center justify-center relative">
+    <div className="w-full h-full z-10 bg-black flex items-center justify-center relative select-none">
       <iframe
         ref={iframeRef}
-        src={`https://www.youtube-nocookie.com/embed/${youtubeId}?autoplay=1&enablejsapi=1&playsinline=1&rel=0&modestbranding=1&start=${startSec}${originParam}`}
+        src={embedSrc}
+        onLoad={sendListeningPing}
         title="YouTube video player"
-        className="w-full h-full border-0 select-none"
+        className="w-full h-full border-0 pointer-events-auto"
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
         allowFullScreen
       />
