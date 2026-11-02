@@ -8,6 +8,7 @@ import { VideoSettingsModal } from './components/hud/VideoSettingsModal';
 import { FileBrowserModal } from './components/hud/FileBrowserModal';
 import { WebBrowserModal } from './components/hud/WebBrowserModal';
 import { FullWindowGamesModal } from './components/games/FullWindowGamesModal';
+import { LiveChannelsModal } from './components/hud/LiveChannelsModal';
 import { ResumeChoiceModal } from './components/hud/ResumeChoiceModal';
 import { SystemAccessModal } from './components/hud/SystemAccessModal';
 import { ErrorToast } from './components/hud/ErrorToast';
@@ -131,6 +132,7 @@ export const App: React.FC = () => {
   const [webBrowserUrl, setWebBrowserUrl] = useState('https://www.youtube.com');
   const [isGamesOpen, setIsGamesOpen] = useState(false);
   const [selectedGameId, setSelectedGameId] = useState<string | undefined>(undefined);
+  const [isChannelsOpen, setIsChannelsOpen] = useState(false);
   const [isSystemAccessOpen, setIsSystemAccessOpen] = useState(false);
   const [isGmailSignInOpen, setIsGmailSignInOpen] = useState(false);
   const [pendingResumeItem, setPendingResumeItem] = useState<MediaHistoryItem | null>(null);
@@ -270,6 +272,9 @@ export const App: React.FC = () => {
       if (detail?.gameId) setSelectedGameId(detail.gameId);
       setIsGamesOpen(true);
     };
+    const handleOpenChannelsEvent = () => {
+      setIsChannelsOpen(true);
+    };
     window.addEventListener('miki:open-gmail-signin', handleOpenGmail);
     window.addEventListener('miki:open-settings', handleOpenSettings);
     window.addEventListener('miki:open-eq', handleOpenEq);
@@ -277,6 +282,7 @@ export const App: React.FC = () => {
     window.addEventListener('miki:open-web-stream', handleOpenStream);
     window.addEventListener('miki:open-web-browser', handleOpenBrowser);
     window.addEventListener('miki:open-games', handleOpenGamesEvent);
+    window.addEventListener('miki:open-channels', handleOpenChannelsEvent);
     return () => {
       window.removeEventListener('miki:open-gmail-signin', handleOpenGmail);
       window.removeEventListener('miki:open-settings', handleOpenSettings);
@@ -285,6 +291,7 @@ export const App: React.FC = () => {
       window.removeEventListener('miki:open-web-stream', handleOpenStream);
       window.removeEventListener('miki:open-web-browser', handleOpenBrowser);
       window.removeEventListener('miki:open-games', handleOpenGamesEvent);
+      window.removeEventListener('miki:open-channels', handleOpenChannelsEvent);
     };
   }, []);
 
@@ -624,6 +631,7 @@ export const App: React.FC = () => {
               if (gameId) setSelectedGameId(gameId);
               setIsGamesOpen(true);
             }}
+            onOpenChannels={() => setIsChannelsOpen(true)}
           />
 
           {currentUri && (
@@ -1243,6 +1251,16 @@ export const App: React.FC = () => {
           isOpen={isGamesOpen}
           initialGameId={selectedGameId}
           onClose={() => setIsGamesOpen(false)}
+        />
+      </ErrorBoundary>
+
+      <ErrorBoundary onReset={() => setIsChannelsOpen(false)}>
+        <LiveChannelsModal
+          isOpen={isChannelsOpen}
+          onClose={() => setIsChannelsOpen(false)}
+          onPlayChannel={(channel) => {
+            openMedia(channel.streamUrl, channel.name);
+          }}
         />
       </ErrorBoundary>
 

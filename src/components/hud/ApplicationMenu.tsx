@@ -12,6 +12,7 @@ import {
   Plus,
   Globe,
   Film,
+  Tv,
 } from 'lucide-react';
 import { StoredGmailAccount, getStoredGmailAccount } from './GmailSignInModal';
 
@@ -25,6 +26,7 @@ interface ApplicationMenuProps {
   onOpenSystemAccess: () => void;
   onOpenGames?: () => void;
   onOpenMusic?: () => void;
+  onOpenChannels?: () => void;
 }
 
 export const ApplicationMenu: React.FC<ApplicationMenuProps> = ({
@@ -37,6 +39,7 @@ export const ApplicationMenu: React.FC<ApplicationMenuProps> = ({
   onOpenSystemAccess,
   onOpenGames,
   onOpenMusic,
+  onOpenChannels,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [account, setAccount] = useState<StoredGmailAccount | null>(null);
@@ -166,6 +169,17 @@ export const ApplicationMenu: React.FC<ApplicationMenuProps> = ({
             <span className="text-[10px] uppercase font-mono tracking-wider text-slate-300 font-bold px-2 py-0.5">
               Streams
             </span>
+
+            <button
+              onClick={() => {
+                setIsOpen(false);
+                onOpenChannels?.();
+              }}
+              className="flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/15 text-xs font-medium text-white transition-all text-left"
+            >
+              <Tv className="w-4 h-4 text-rose-400 shrink-0" />
+              <span>Channels</span>
+            </button>
 
             <button
               onClick={() => {
