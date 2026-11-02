@@ -34,7 +34,7 @@ pub async fn load_media_file(
     start_position_ms: i64,
     controller: State<'_, Arc<Mutex<MpvController>>>,
 ) -> PlayerResult<()> {
-    let guard = controller.lock();
+    let mut guard = controller.lock();
     guard.load_file(&uri, start_position_ms)
 }
 
