@@ -48,3 +48,4 @@ export const POPULAR_PORTAL_LOGOS: Record<string, string> = {
   'tiktok.com': 'https://www.google.com/s2/favicons?domain=tiktok.com&sz=128',
   'instagram.com': 'https://www.google.com/s2/favicons?domain=instagram.com&sz=128',
 };
+

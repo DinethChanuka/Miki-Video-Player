@@ -52,6 +52,13 @@ export const AD_BLOCK_DOMAINS: string[] = [
   'adtrue.com',
   'monetag.com',
   'mgid.com',
+  'deloton.com',
+  'adcash.com',
+  '1xbet.com',
+  'bet365.com',
+  'adkeeper.co',
+  'richpush.co',
+  'adoperator.com',
 
   // Malicious Redirects & Crypto Miners
   'coinhive.com',
@@ -171,6 +178,40 @@ export function generateAdBlockScript(): string {
       });
     } catch (e) {}
   };
+
+  // 4. Neutralize beforeunload redirect traps
+  try {
+    window.onbeforeunload = null;
+    Object.defineProperty(window, 'onbeforeunload', {
+      get: function() { return null; },
+      set: function() {},
+      configurable: true
+    });
+  } catch (e) {}
+
+  // 5. Intercept click-jacking navigation on suspicious ad links
+  const adKeywords = [
+    'onclick', 'popads', 'adsterra', 'bet365', '1xbet', 'monetag',
+    'adcash', 'propeller', 'exoclick', 'popcash', 'hilltopads',
+    'deloton', 'richpush', 'clickadu', 'zeroredirect'
+  ];
+
+  document.addEventListener('click', function(e) {
+    try {
+      let node = e.target;
+      while (node && node.tagName !== 'A' && node !== document.body) {
+        node = node.parentElement;
+      }
+      if (node && node.tagName === 'A' && node.href) {
+        const href = String(node.href).toLowerCase();
+        if (adKeywords.some(kw => href.includes(kw))) {
+          e.preventDefault();
+          e.stopPropagation();
+          console.warn('[Miki Shield] Prevented ad clickjack navigation to:', node.href);
+        }
+      }
+    } catch (err) {}
+  }, true);
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', removeHijackOverlays);

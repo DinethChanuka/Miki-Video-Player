@@ -112,7 +112,20 @@ export const App: React.FC = () => {
   const [isEqOpen, setIsEqOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isFileBrowserOpen, setIsFileBrowserOpen] = useState(false);
-  const [fileBrowserInitialTab, setFileBrowserInitialTab] = useState<'youtube' | 'tiktok' | 'instagram' | 'demos' | 'recent' | 'bookmarks' | 'cinema'>('youtube');
+  const [fileBrowserInitialTab, setFileBrowserInitialTab] = useState<
+    | 'youtube'
+    | 'tiktok'
+    | 'instagram'
+    | 'demos'
+    | 'recent'
+    | 'bookmarks'
+    | 'cinema'
+    | 'social'
+    | 'games'
+    | 'music'
+    | 'history'
+    | 'saved'
+  >('cinema');
   const [isWebBrowserOpen, setIsWebBrowserOpen] = useState(false);
   const [webBrowserUrl, setWebBrowserUrl] = useState('https://www.youtube.com');
   const [isSystemAccessOpen, setIsSystemAccessOpen] = useState(false);

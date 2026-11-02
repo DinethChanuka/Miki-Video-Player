@@ -81,6 +81,8 @@ declare module 'lucide-react' {
   export const ShieldAlert: LucideIcon;
   export const ArrowRight: LucideIcon;
   export const Lock: LucideIcon;
+  export const MousePointer: LucideIcon;
+  export const Gamepad2: LucideIcon;
 
   // Fallback index signature so any other Lucide icon is also typed
   const icons: { [key: string]: LucideIcon };

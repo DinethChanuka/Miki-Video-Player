@@ -4,26 +4,34 @@ import {
   CINEMA_LINKS,
   filterCinemaLinks,
 } from '../src/utils/cinemaLinks.ts';
+import { SOCIAL_LINKS } from '../src/utils/socialLinks.ts';
 
 describe('Cinema & Fast Streaming Links Catalog', () => {
-  it('contains essential curated streaming portals including CineSubz and social platforms', () => {
+  it('contains essential curated streaming portals including CineSubz and movie portals', () => {
     const cinesub = CINEMA_LINKS.find((item) => item.id === 'cinesubz');
     assert.ok(cinesub, 'CineSubz portal must be present');
     assert.equal(cinesub.url, 'https://cinesubz.co');
     assert.equal(cinesub.category, 'Subtitles');
     assert.equal(cinesub.isAdShieldRecommended, true);
 
-    const yt = CINEMA_LINKS.find((item) => item.id === 'youtube');
-    assert.ok(yt, 'YouTube must be present');
+    const fmovies = CINEMA_LINKS.find((item) => item.id === 'fmovies');
+    assert.ok(fmovies, 'FMovies must be present');
 
-    const tt = CINEMA_LINKS.find((item) => item.id === 'tiktok');
-    assert.ok(tt, 'TikTok must be present');
+    const bflix = CINEMA_LINKS.find((item) => item.id === 'bflix');
+    assert.ok(bflix, 'BFlix must be present');
 
-    const ig = CINEMA_LINKS.find((item) => item.id === 'instagram');
-    assert.ok(ig, 'Instagram must be present');
+    // Social platforms are maintained in SOCIAL_LINKS
+    const yt = SOCIAL_LINKS.find((item) => item.id === 'youtube');
+    assert.ok(yt, 'YouTube must be present in SOCIAL_LINKS');
 
-    const fb = CINEMA_LINKS.find((item) => item.id === 'facebook');
-    assert.ok(fb, 'Facebook must be present');
+    const tt = SOCIAL_LINKS.find((item) => item.id === 'tiktok');
+    assert.ok(tt, 'TikTok must be present in SOCIAL_LINKS');
+
+    const ig = SOCIAL_LINKS.find((item) => item.id === 'instagram');
+    assert.ok(ig, 'Instagram must be present in SOCIAL_LINKS');
+
+    const fb = SOCIAL_LINKS.find((item) => item.id === 'facebook');
+    assert.ok(fb, 'Facebook must be present in SOCIAL_LINKS');
   });
 
   it('filters streaming portals by category correctly', () => {
@@ -34,10 +42,12 @@ describe('Cinema & Fast Streaming Links Catalog', () => {
     assert.ok(subtitles.some((item) => item.id === 'cinesubz'));
     assert.ok(subtitles.every((item) => item.category === 'Subtitles'));
 
-    const social = filterCinemaLinks(CINEMA_LINKS, '', 'Social');
-    assert.ok(social.some((item) => item.id === 'tiktok'));
-    assert.ok(social.some((item) => item.id === 'instagram'));
-    assert.ok(social.some((item) => item.id === 'facebook'));
+    const anime = filterCinemaLinks(CINEMA_LINKS, '', 'Anime');
+    assert.ok(anime.some((item) => item.id === 'aniwave'));
+
+    const cinema = filterCinemaLinks(CINEMA_LINKS, '', 'Cinema');
+    assert.ok(cinema.some((item) => item.id === 'fmovies'));
+    assert.ok(cinema.some((item) => item.id === 'soap2day'));
   });
 
   it('filters portals with search query case-insensitively', () => {

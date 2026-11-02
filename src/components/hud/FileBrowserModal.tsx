@@ -20,16 +20,20 @@ import {
   ShieldCheck,
   ExternalLink,
   Star,
+  Sliders,
 } from 'lucide-react';
 import { parseYouTubeId } from '../../App';
 import { formatPathForOS } from '../../utils/pathUtils';
 import { CINEMA_LINKS, filterCinemaLinks, CinemaCategory } from '../../utils/cinemaLinks';
 import { getWebsiteFaviconUrl } from '../../utils/faviconService';
+import { SOCIAL_LINKS } from '../../utils/socialLinks';
+import { GamesSection } from '../games/GamesSection';
+import { MusicPlayerView } from '../music/MusicPlayerView';
 
 interface FileBrowserModalProps {
   isOpen: boolean;
   onClose: () => void;
-  initialTab?: 'youtube' | 'tiktok' | 'instagram' | 'demos' | 'recent' | 'bookmarks' | 'cinema';
+  initialTab?: 'youtube' | 'tiktok' | 'instagram' | 'demos' | 'recent' | 'bookmarks' | 'cinema' | 'social' | 'games' | 'music' | 'history' | 'saved';
 }
 
 export interface SocialStreamItem {
@@ -211,7 +215,21 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({
   const activeSubtitleTrack = usePlayerStore((s) => s.activeSubtitleTrack);
   const loadSubtitleFromFile = usePlayerStore((s) => s.loadSubtitleFromFile);
 
-  const [activeTab, setActiveTab] = useState<'youtube' | 'tiktok' | 'instagram' | 'demos' | 'recent' | 'bookmarks' | 'cinema'>('youtube');
+  type TabType =
+    | 'cinema'
+    | 'social'
+    | 'music'
+    | 'games'
+    | 'demos'
+    | 'history'
+    | 'saved'
+    | 'youtube'
+    | 'tiktok'
+    | 'instagram'
+    | 'recent'
+    | 'bookmarks';
+
+  const [activeTab, setActiveTab] = useState<TabType>('cinema');
   const [selectedCategory, setSelectedCategory] = useState<DemoCategory>('All');
   const [cinemaCategory, setCinemaCategory] = useState<CinemaCategory>('All');
   const [customUrl, setCustomUrl] = useState('');
@@ -223,9 +241,29 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({
     return filterCinemaLinks(CINEMA_LINKS, searchTerm, cinemaCategory);
   }, [searchTerm, cinemaCategory]);
 
+  // Synchronize overlay visibility with native WebKit view so modals render on top
+  useEffect(() => {
+    if (typeof window !== 'undefined' && (window as any).webkit?.messageHandlers?.browserViewAction) {
+      try {
+        (window as any).webkit.messageHandlers.browserViewAction.postMessage({
+          action: 'setOverlayVisible',
+          visible: isOpen,
+        });
+      } catch (e) {}
+    }
+  }, [isOpen]);
+
   useEffect(() => {
     if (isOpen && initialTab) {
-      setActiveTab(initialTab);
+      if (initialTab === 'youtube' || initialTab === 'tiktok' || initialTab === 'instagram') {
+        setActiveTab('social');
+      } else if (initialTab === 'recent') {
+        setActiveTab('history');
+      } else if (initialTab === 'bookmarks') {
+        setActiveTab('saved');
+      } else {
+        setActiveTab(initialTab);
+      }
     }
   }, [isOpen, initialTab]);
 
@@ -420,18 +458,6 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({
         {/* Navigation Tabs - Minimal One-Word Names */}
         <div className="flex items-center gap-1.5 border-b border-white/10 pb-2 overflow-x-auto">
           <button
-            onClick={() => setActiveTab('youtube')}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-2xl text-xs font-semibold transition-all whitespace-nowrap ${
-              activeTab === 'youtube'
-                ? 'bg-rose-500/20 text-rose-300 border border-rose-400/30 shadow-sm'
-                : 'text-white/70 hover:text-white hover:bg-white/5'
-            }`}
-          >
-            <Youtube className="w-3.5 h-3.5 text-rose-400" />
-            <span>YouTube ({youtubeHistory.length})</span>
-          </button>
-
-          <button
             onClick={() => setActiveTab('cinema')}
             className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-2xl text-xs font-semibold transition-all whitespace-nowrap ${
               activeTab === 'cinema'
@@ -444,27 +470,39 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({
           </button>
 
           <button
-            onClick={() => setActiveTab('tiktok')}
+            onClick={() => setActiveTab('social')}
             className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-2xl text-xs font-semibold transition-all whitespace-nowrap ${
-              activeTab === 'tiktok'
+              activeTab === 'social' || activeTab === 'youtube' || activeTab === 'tiktok' || activeTab === 'instagram'
                 ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 shadow-sm'
                 : 'text-white/70 hover:text-white hover:bg-white/5'
             }`}
           >
             <Share2 className="w-3.5 h-3.5 text-cyan-400" />
-            <span>TikTok</span>
+            <span>Social ({SOCIAL_LINKS.length})</span>
           </button>
 
           <button
-            onClick={() => setActiveTab('instagram')}
+            onClick={() => setActiveTab('music')}
             className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-2xl text-xs font-semibold transition-all whitespace-nowrap ${
-              activeTab === 'instagram'
-                ? 'bg-pink-500/20 text-pink-300 border border-pink-400/30 shadow-sm'
+              activeTab === 'music'
+                ? 'bg-rose-500/20 text-rose-300 border border-rose-400/30 shadow-sm'
                 : 'text-white/70 hover:text-white hover:bg-white/5'
             }`}
           >
-            <Sparkles className="w-3.5 h-3.5 text-pink-400" />
-            <span>Instagram</span>
+            <Sparkles className="w-3.5 h-3.5 text-rose-400" />
+            <span>Music</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('games')}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-2xl text-xs font-semibold transition-all whitespace-nowrap ${
+              activeTab === 'games'
+                ? 'bg-purple-500/20 text-purple-300 border border-purple-400/30 shadow-sm'
+                : 'text-white/70 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <Sliders className="w-3.5 h-3.5 text-purple-400" />
+            <span>Games</span>
           </button>
 
           <button
@@ -480,21 +518,21 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({
           </button>
 
           <button
-            onClick={() => setActiveTab('recent')}
+            onClick={() => setActiveTab('history')}
             className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-2xl text-xs font-semibold transition-all whitespace-nowrap ${
-              activeTab === 'recent'
+              activeTab === 'history' || activeTab === 'recent'
                 ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 shadow-sm'
                 : 'text-white/70 hover:text-white hover:bg-white/5'
             }`}
           >
             <Clock className="w-3.5 h-3.5" />
-            <span>Recent ({recentMedia.length})</span>
+            <span>History ({recentMedia.length})</span>
           </button>
 
           <button
-            onClick={() => setActiveTab('bookmarks')}
+            onClick={() => setActiveTab('saved')}
             className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-2xl text-xs font-semibold transition-all whitespace-nowrap ${
-              activeTab === 'bookmarks'
+              activeTab === 'saved' || activeTab === 'bookmarks'
                 ? 'bg-amber-500/20 text-amber-300 border border-amber-400/30 shadow-sm'
                 : 'text-white/70 hover:text-white hover:bg-white/5'
             }`}
@@ -612,7 +650,135 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({
             </div>
           )}
 
-          {activeTab === 'youtube' && (
+          {/* TAB: GAMES */}
+          {activeTab === 'games' && (
+            <div className="flex flex-col gap-4 py-1">
+              <GamesSection onClose={onClose} />
+            </div>
+          )}
+
+          {/* TAB: MUSIC */}
+          {activeTab === 'music' && (
+            <div className="flex flex-col gap-4 py-1">
+              <MusicPlayerView />
+            </div>
+          )}
+
+          {/* TAB: SOCIAL */}
+          {(activeTab === 'social' || activeTab === 'youtube' || activeTab === 'tiktok' || activeTab === 'instagram') && (
+            <div className="flex flex-col gap-4 py-1">
+              {/* Curated Social Media Portals with dedicated Browse buttons */}
+              <div className="flex flex-col gap-2.5">
+                <div className="flex items-center gap-2 text-xs font-semibold text-cyan-300">
+                  <Share2 className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Social & Creator Web Feeds ({SOCIAL_LINKS.length})</span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {SOCIAL_LINKS.map((site) => (
+                    <div
+                      key={site.id}
+                      className="p-3.5 rounded-2xl bg-white/5 border border-white/10 hover:border-cyan-400/40 hover:bg-white/10 transition-all flex flex-col justify-between gap-3 group shadow-md"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-9 h-9 rounded-xl bg-black/60 border border-white/15 p-1 flex items-center justify-center shrink-0">
+                            <img
+                              src={site.logoUrl}
+                              alt={site.name}
+                              className="w-7 h-7 object-contain rounded-lg"
+                              onError={(e) => {
+                                (e.currentTarget as HTMLElement).style.display = 'none';
+                              }}
+                            />
+                          </div>
+                          <div>
+                            <h4 className="text-xs font-bold text-white group-hover:text-cyan-300 transition-colors">
+                              {site.name}
+                            </h4>
+                            <span className="text-[10px] font-mono text-cyan-400">
+                              {site.url.replace(/^https?:\/\//, '')}
+                            </span>
+                          </div>
+                        </div>
+
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-lg bg-black/60 border border-white/10 text-white/80 shrink-0">
+                          {site.badge}
+                        </span>
+                      </div>
+
+                      <p className="text-[11px] text-slate-300 leading-relaxed">
+                        {site.description}
+                      </p>
+
+                      <div className="flex items-center justify-between pt-2 border-t border-white/10">
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          Auto Ad-Block Active
+                        </span>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              window.dispatchEvent(
+                                new CustomEvent('miki:open-web-browser', {
+                                  detail: { url: site.browseUrl || site.url },
+                                })
+                              );
+                              onClose();
+                            }}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:brightness-110 active:scale-95 text-white font-bold text-xs shadow-md transition-all"
+                            title="Browse in web view"
+                          >
+                            <Globe className="w-3.5 h-3.5" />
+                            <span>Browse</span>
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              openMedia(site.url, site.name);
+                              onClose();
+                            }}
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-all"
+                            title="Play in system engine"
+                          >
+                            <Play className="w-3 h-3 fill-white" />
+                            <span>Play</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Fast Stream Loader Form */}
+              <form onSubmit={handlePlayUrl} className="flex flex-col gap-3 pt-2 border-t border-white/10">
+                <div className="flex items-center gap-2 text-white/70 font-semibold text-xs">
+                  <Play className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Stream URL Fast-Loader</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    required
+                    placeholder="Paste YouTube, TikTok, Instagram or Web Video Stream URL..."
+                    value={customUrl}
+                    onChange={(e) => setCustomUrl(e.target.value)}
+                    className="flex-1 px-4 py-2.5 bg-white/5 rounded-2xl border border-white/15 text-xs text-white placeholder-white/30 focus:outline-none focus:border-cyan-400"
+                  />
+                  <button
+                    type="submit"
+                    className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:brightness-110 text-white font-bold text-xs shadow-lg transition-all shrink-0 active:scale-95 flex items-center gap-1.5"
+                  >
+                    <Play className="w-3.5 h-3.5 fill-white" />
+                    <span>Play</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {false && activeTab === 'youtube' && (
             <div className="flex flex-col gap-4 py-1">
               {/* Form to load YouTube URL */}
               <form onSubmit={handlePlayUrl} className="flex flex-col gap-3">
@@ -915,7 +1081,7 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({
             </div>
           )}
 
-          {activeTab === 'recent' && (
+          {(activeTab === 'recent' || activeTab === 'history') && (
             <div className="flex flex-col gap-2">
               {filteredAndSortedRecents.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-48 text-white/40 text-xs gap-2">
@@ -993,7 +1159,7 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({
             </div>
           )}
 
-          {activeTab === 'bookmarks' && (
+          {(activeTab === 'bookmarks' || activeTab === 'saved') && (
             <div className="flex flex-col gap-4">
               {/* Bookmarked Websites & Web Streams */}
               {bookmarkedWebsites && bookmarkedWebsites.length > 0 && (
