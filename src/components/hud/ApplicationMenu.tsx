@@ -10,8 +10,8 @@ import {
   Share2,
   CheckCircle2,
   Plus,
-  Globe,
   Film,
+  Tv,
 } from 'lucide-react';
 import { StoredGmailAccount, getStoredGmailAccount } from './GmailSignInModal';
 
@@ -23,20 +23,22 @@ interface ApplicationMenuProps {
   onOpenEq: () => void;
   onOpenLocalFile: () => void;
   onOpenSystemAccess: () => void;
-  onOpenGames?: () => void;
+  onOpenGames?: (gameId?: string) => void;
   onOpenMusic?: () => void;
+  onOpenChannels?: () => void;
 }
 
 export const ApplicationMenu: React.FC<ApplicationMenuProps> = ({
   onOpenGmailSignIn,
   onOpenLibrary,
-  onOpenWebBrowser,
+  onOpenWebBrowser: _onOpenWebBrowser,
   onOpenSettings,
   onOpenEq,
   onOpenLocalFile,
   onOpenSystemAccess,
   onOpenGames,
   onOpenMusic,
+  onOpenChannels,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [account, setAccount] = useState<StoredGmailAccount | null>(null);
@@ -170,16 +172,12 @@ export const ApplicationMenu: React.FC<ApplicationMenuProps> = ({
             <button
               onClick={() => {
                 setIsOpen(false);
-                if (onOpenWebBrowser) {
-                  onOpenWebBrowser('https://www.youtube.com');
-                } else {
-                  onOpenLibrary('cinema');
-                }
+                onOpenChannels?.();
               }}
               className="flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/15 text-xs font-medium text-white transition-all text-left"
             >
-              <Globe className="w-4 h-4 text-cyan-400 shrink-0" />
-              <span>Browse Web</span>
+              <Tv className="w-4 h-4 text-rose-400 shrink-0" />
+              <span>Channels</span>
             </button>
 
             <button

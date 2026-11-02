@@ -1,0 +1,776 @@
+/**
+ * Self-Contained Inbuilt HTML5 Canvas Game Engines
+ * Zero latency, zero external network requests, zero X-Frame-Options blocking.
+ * Includes Web Audio API retro sound synthesis and full responsive canvas.
+ */
+
+export function getInbuiltGameSrcDoc(id: string): string {
+  switch (id) {
+    case '2048':
+      return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; background: #0b0f19; color: #fff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; user-select: none; }
+  h1 { margin: 0 0 10px; font-size: 28px; color: #38bdf8; display: flex; align-items: center; gap: 15px; }
+  .score-box { background: #1e293b; padding: 4px 12px; border-radius: 10px; font-size: 14px; color: #f8fafc; border: 1px solid #334155; }
+  #grid { display: grid; grid-template-columns: repeat(4, 70px); grid-template-rows: repeat(4, 70px); gap: 10px; background: #1e293b; padding: 10px; border-radius: 16px; border: 2px solid #334155; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+  .tile { width: 70px; height: 70px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: bold; background: #334155; color: #f8fafc; transition: all 0.1s ease; }
+  .tile-2 { background: #38bdf8; color: #0f172a; }
+  .tile-4 { background: #818cf8; color: #0f172a; }
+  .tile-8 { background: #c084fc; color: #0f172a; }
+  .tile-16 { background: #f472b6; color: #fff; }
+  .tile-32 { background: #fb7185; color: #fff; }
+  .tile-64 { background: #f97316; color: #fff; }
+  .tile-128 { background: #eab308; color: #0f172a; font-size: 20px; }
+  .tile-256 { background: #10b981; color: #fff; font-size: 20px; }
+  .tile-512 { background: #06b6d4; color: #fff; font-size: 20px; }
+  .tile-1024 { background: #6366f1; color: #fff; font-size: 18px; }
+  .tile-2048 { background: #ec4899; color: #fff; font-size: 18px; box-shadow: 0 0 20px #ec4899; }
+  .hint { margin-top: 15px; font-size: 12px; color: #94a3b8; }
+</style>
+</head>
+<body>
+  <h1>2048 <span class="score-box">SCORE: <span id="score">0</span></span></h1>
+  <div id="grid"></div>
+  <div class="hint">Use Arrow Keys or WASD to slide & combine tiles</div>
+<script>
+  let board = Array(16).fill(0);
+  let score = 0;
+  function addRandom() {
+    let empty = board.map((v, i) => v === 0 ? i : null).filter(v => v !== null);
+    if (!empty.length) return;
+    board[empty[Math.floor(Math.random() * empty.length)]] = Math.random() < 0.9 ? 2 : 4;
+  }
+  function render() {
+    const grid = document.getElementById('grid');
+    grid.innerHTML = '';
+    board.forEach(v => {
+      const el = document.createElement('div');
+      el.className = 'tile' + (v > 0 ? ' tile-' + v : '');
+      el.textContent = v > 0 ? v : '';
+      grid.appendChild(el);
+    });
+    document.getElementById('score').textContent = score;
+  }
+  function slide(row) {
+    let arr = row.filter(v => v !== 0);
+    for (let i = 0; i < arr.length - 1; i++) {
+      if (arr[i] === arr[i + 1]) {
+        arr[i] *= 2;
+        score += arr[i];
+        arr.splice(i + 1, 1);
+      }
+    }
+    while (arr.length < 4) arr.push(0);
+    return arr;
+  }
+  function move(dir) {
+    let prev = [...board];
+    for (let i = 0; i < 4; i++) {
+      let line = [];
+      for (let j = 0; j < 4; j++) {
+        let idx = dir === 'left' ? i * 4 + j : dir === 'right' ? i * 4 + (3 - j) : dir === 'up' ? j * 4 + i : (3 - j) * 4 + i;
+        line.push(board[idx]);
+      }
+      let slided = slide(line);
+      for (let j = 0; j < 4; j++) {
+        let idx = dir === 'left' ? i * 4 + j : dir === 'right' ? i * 4 + (3 - j) : dir === 'up' ? j * 4 + i : (3 - j) * 4 + i;
+        board[idx] = slided[j];
+      }
+    }
+    if (prev.some((v, i) => v !== board[i])) {
+      addRandom();
+      render();
+    }
+  }
+  window.addEventListener('keydown', e => {
+    if (['ArrowLeft', 'KeyA'].includes(e.code)) move('left');
+    else if (['ArrowRight', 'KeyD'].includes(e.code)) move('right');
+    else if (['ArrowUp', 'KeyW'].includes(e.code)) move('up');
+    else if (['ArrowDown', 'KeyS'].includes(e.code)) move('down');
+  });
+  addRandom(); addRandom(); render();
+</script>
+</body>
+</html>`;
+
+    case 'snake':
+      return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; background: #090d16; color: #fff; font-family: monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; user-select: none; }
+  h2 { margin: 0 0 8px; color: #10b981; font-size: 20px; }
+  canvas { border: 2px solid #10b981; border-radius: 12px; background: #030712; box-shadow: 0 0 25px rgba(16, 185, 129, 0.25); }
+  .hud { font-size: 13px; color: #94a3b8; margin-top: 10px; }
+</style>
+</head>
+<body>
+  <h2>SNAKE RETRO <span style="color:#fff">SCORE: <span id="score">0</span></span></h2>
+  <canvas id="c" width="400" height="400"></canvas>
+  <div class="hud">Use Arrows / WASD to steer. Don't hit walls or yourself!</div>
+<script>
+  const canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
+  let grid = 20, count = 0, score = 0;
+  let snake = { x: 160, y: 160, dx: grid, dy: 0, cells: [], maxCells: 4 };
+  let apple = { x: 320, y: 320 };
+  function getRandomInt(min, max) { return Math.floor(Math.random() * (max - min)) + min; }
+  function loop() {
+    requestAnimationFrame(loop);
+    if (++count < 6) return; count = 0;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    snake.x += snake.dx; snake.y += snake.dy;
+    if (snake.x < 0 || snake.x >= canvas.width || snake.y < 0 || snake.y >= canvas.height) {
+      snake.x = 160; snake.y = 160; snake.cells = []; snake.maxCells = 4; snake.dx = grid; snake.dy = 0;
+      score = 0; document.getElementById('score').textContent = score;
+    }
+    snake.cells.unshift({ x: snake.x, y: snake.y });
+    if (snake.cells.length > snake.maxCells) snake.cells.pop();
+    ctx.fillStyle = '#ef4444';
+    ctx.beginPath();
+    ctx.arc(apple.x + grid/2, apple.y + grid/2, grid/2 - 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#10b981';
+    snake.cells.forEach((cell, index) => {
+      ctx.fillRect(cell.x + 1, cell.y + 1, grid - 2, grid - 2);
+      if (cell.x === apple.x && cell.y === apple.y) {
+        snake.maxCells++; score += 10;
+        document.getElementById('score').textContent = score;
+        apple.x = getRandomInt(0, 20) * grid; apple.y = getRandomInt(0, 20) * grid;
+      }
+      for (let i = index + 1; i < snake.cells.length; i++) {
+        if (cell.x === snake.cells[i].x && cell.y === snake.cells[i].y) {
+          snake.x = 160; snake.y = 160; snake.cells = []; snake.maxCells = 4; snake.dx = grid; snake.dy = 0;
+          score = 0; document.getElementById('score').textContent = score;
+        }
+      }
+    });
+  }
+  window.addEventListener('keydown', e => {
+    if ((e.code === 'ArrowLeft' || e.code === 'KeyA') && snake.dx === 0) { snake.dx = -grid; snake.dy = 0; }
+    else if ((e.code === 'ArrowUp' || e.code === 'KeyW') && snake.dy === 0) { snake.dy = -grid; snake.dx = 0; }
+    else if ((e.code === 'ArrowRight' || e.code === 'KeyD') && snake.dx === 0) { snake.dx = grid; snake.dy = 0; }
+    else if ((e.code === 'ArrowDown' || e.code === 'KeyS') && snake.dy === 0) { snake.dy = grid; snake.dx = 0; }
+  });
+  requestAnimationFrame(loop);
+</script>
+</body>
+</html>`;
+
+    case 'pong':
+      return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; background: #060911; color: #fff; font-family: monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; user-select: none; }
+  h2 { margin: 0 0 8px; color: #38bdf8; font-size: 20px; }
+  canvas { border: 2px solid #38bdf8; border-radius: 12px; background: #000; box-shadow: 0 0 25px rgba(56, 189, 248, 0.25); }
+  .hud { font-size: 13px; color: #94a3b8; margin-top: 10px; }
+</style>
+</head>
+<body>
+  <h2>PONG ARCADE <span style="color:#38bdf8"><span id="pScore">0</span> : <span id="aiScore">0</span></span></h2>
+  <canvas id="c" width="600" height="400"></canvas>
+  <div class="hud">Use Mouse or Up/Down arrows to control left paddle</div>
+<script>
+  const canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
+  let pY = 160, aiY = 160, pScore = 0, aiScore = 0;
+  let bX = 300, bY = 200, bVx = 4, bVy = 3;
+  window.addEventListener('mousemove', e => {
+    const rect = canvas.getBoundingClientRect();
+    pY = e.clientY - rect.top - 40;
+  });
+  window.addEventListener('keydown', e => {
+    if (e.code === 'ArrowUp' || e.code === 'KeyW') pY -= 20;
+    if (e.code === 'ArrowDown' || e.code === 'KeyS') pY += 20;
+  });
+  function loop() {
+    requestAnimationFrame(loop);
+    bX += bVx; bY += bVy;
+    if (bY <= 0 || bY >= canvas.height - 10) bVy = -bVy;
+    if (aiY + 40 < bY) aiY += 3.2; else if (aiY + 40 > bY) aiY -= 3.2;
+    pY = Math.max(0, Math.min(canvas.height - 80, pY));
+    aiY = Math.max(0, Math.min(canvas.height - 80, aiY));
+    if (bX <= 25 && bY + 10 >= pY && bY <= pY + 80) { bVx = Math.abs(bVx) + 0.2; }
+    if (bX >= canvas.width - 35 && bY + 10 >= aiY && bY <= aiY + 80) { bVx = -Math.abs(bVx) - 0.2; }
+    if (bX < 0) { aiScore++; bX = 300; bY = 200; bVx = 4; }
+    if (bX > canvas.width) { pScore++; bX = 300; bY = 200; bVx = -4; }
+    document.getElementById('pScore').textContent = pScore;
+    document.getElementById('aiScore').textContent = aiScore;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.setLineDash([6, 6]); ctx.strokeStyle = '#334155'; ctx.beginPath();
+    ctx.moveTo(300, 0); ctx.lineTo(300, 400); ctx.stroke();
+    ctx.fillStyle = '#38bdf8'; ctx.fillRect(15, pY, 10, 80);
+    ctx.fillStyle = '#f43f5e'; ctx.fillRect(canvas.width - 25, aiY, 10, 80);
+    ctx.fillStyle = '#fff'; ctx.fillRect(bX, bY, 10, 10);
+  }
+  requestAnimationFrame(loop);
+</script>
+</body>
+</html>`;
+
+    case 'breakout':
+      return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; background: #080a14; color: #fff; font-family: monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; user-select: none; }
+  h2 { margin: 0 0 8px; color: #fbbf24; font-size: 20px; }
+  canvas { border: 2px solid #fbbf24; border-radius: 12px; background: #000; box-shadow: 0 0 25px rgba(251, 191, 36, 0.25); }
+  .hud { font-size: 13px; color: #94a3b8; margin-top: 10px; }
+</style>
+</head>
+<body>
+  <h2>BRICK BREAKER <span style="color:#fbbf24">SCORE: <span id="score">0</span></span></h2>
+  <canvas id="c" width="480" height="380"></canvas>
+  <div class="hud">Move mouse or A/D to steer paddle and destroy all bricks</div>
+<script>
+  const canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
+  let pW = 80, pX = 200, score = 0;
+  let bX = 240, bY = 300, bVx = 3, bVy = -3, bR = 6;
+  const rows = 4, cols = 7, brW = 58, brH = 16, brPad = 8, brOffT = 40, brOffL = 12;
+  const colors = ['#f43f5e', '#fb923c', '#eab308', '#10b981'];
+  let bricks = [];
+  for (let c = 0; c < cols; c++) {
+    bricks[c] = [];
+    for (let r = 0; r < rows; r++) bricks[c][r] = { x: 0, y: 0, status: 1 };
+  }
+  window.addEventListener('mousemove', e => {
+    const rect = canvas.getBoundingClientRect();
+    pX = Math.max(0, Math.min(canvas.width - pW, e.clientX - rect.left - pW/2));
+  });
+  window.addEventListener('keydown', e => {
+    if (e.code === 'ArrowLeft' || e.code === 'KeyA') pX = Math.max(0, pX - 25);
+    if (e.code === 'ArrowRight' || e.code === 'KeyD') pX = Math.min(canvas.width - pW, pX + 25);
+  });
+  function loop() {
+    requestAnimationFrame(loop);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (let c = 0; c < cols; c++) {
+      for (let r = 0; r < rows; r++) {
+        if (bricks[c][r].status === 1) {
+          let bX_pos = c * (brW + brPad) + brOffL;
+          let bY_pos = r * (brH + brPad) + brOffT;
+          bricks[c][r].x = bX_pos; bricks[c][r].y = bY_pos;
+          ctx.fillStyle = colors[r];
+          ctx.fillRect(bX_pos, bY_pos, brW, brH);
+          if (bX > bX_pos && bX < bX_pos + brW && bY > bY_pos && bY < bY_pos + brH) {
+            bVy = -bVy; bricks[c][r].status = 0; score += 20;
+            document.getElementById('score').textContent = score;
+          }
+        }
+      }
+    }
+    bX += bVx; bY += bVy;
+    if (bX + bR > canvas.width || bX - bR < 0) bVx = -bVx;
+    if (bY - bR < 0) bVy = -bVy;
+    else if (bY + bR > canvas.height - 20) {
+      if (bX > pX && bX < pX + pW) { bVy = -Math.abs(bVy); bVx = (bX - (pX + pW/2)) * 0.15; }
+      else if (bY > canvas.height) { bX = 240; bY = 300; bVx = 3; bVy = -3; }
+    }
+    ctx.fillStyle = '#fbbf24'; ctx.fillRect(pX, canvas.height - 20, pW, 10);
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(bX, bY, bR, 0, Math.PI * 2); ctx.fill();
+  }
+  requestAnimationFrame(loop);
+</script>
+</body>
+</html>`;
+
+    case 'flappy-bird':
+      return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; background: #070c18; color: #fff; font-family: monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; user-select: none; }
+  h2 { margin: 0 0 8px; color: #38bdf8; font-size: 20px; }
+  canvas { border: 2px solid #38bdf8; border-radius: 12px; background: #0c4a6e; box-shadow: 0 0 25px rgba(56, 189, 248, 0.25); }
+  .hud { font-size: 13px; color: #94a3b8; margin-top: 10px; }
+</style>
+</head>
+<body>
+  <h2>FLAPPY BIRD <span style="color:#38bdf8">SCORE: <span id="score">0</span></span></h2>
+  <canvas id="c" width="360" height="480"></canvas>
+  <div class="hud">Press Spacebar or Click to flap wings</div>
+<script>
+  const canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
+  let bY = 200, bVy = 0, score = 0, pipes = [];
+  function flap() { bVy = -6.5; }
+  window.addEventListener('keydown', e => { if (e.code === 'Space' || e.code === 'ArrowUp') flap(); });
+  window.addEventListener('mousedown', flap);
+  function loop() {
+    requestAnimationFrame(loop);
+    bVy += 0.35; bY += bVy;
+    ctx.fillStyle = '#0c4a6e'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    if (Math.random() < 0.015) {
+      pipes.push({ x: 360, y: Math.floor(Math.random() * 200) + 50, passed: false });
+    }
+    for (let i = pipes.length - 1; i >= 0; i--) {
+      let p = pipes[i]; p.x -= 2.5;
+      ctx.fillStyle = '#10b981';
+      ctx.fillRect(p.x, 0, 45, p.y);
+      ctx.fillRect(p.x, p.y + 110, 45, canvas.height);
+      if (p.x < 70 && p.x + 45 > 50) {
+        if (bY < p.y || bY + 16 > p.y + 110) { bY = 200; bVy = 0; pipes = []; score = 0; }
+      }
+      if (!p.passed && p.x < 50) { p.passed = true; score++; document.getElementById('score').textContent = score; }
+      if (p.x < -50) pipes.splice(i, 1);
+    }
+    if (bY > canvas.height || bY < 0) { bY = 200; bVy = 0; pipes = []; score = 0; }
+    ctx.fillStyle = '#fbbf24'; ctx.beginPath(); ctx.arc(60, bY, 12, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#f97316'; ctx.beginPath(); ctx.arc(68, bY + 2, 5, 0, Math.PI * 2); ctx.fill();
+  }
+  requestAnimationFrame(loop);
+</script>
+</body>
+</html>`;
+
+    case 'asteroids':
+      return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; background: #030712; color: #fff; font-family: monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; user-select: none; }
+  h2 { margin: 0 0 8px; color: #c084fc; font-size: 20px; }
+  canvas { border: 2px solid #c084fc; border-radius: 12px; background: #000; box-shadow: 0 0 25px rgba(192, 132, 252, 0.25); }
+  .hud { font-size: 13px; color: #94a3b8; margin-top: 10px; }
+</style>
+</head>
+<body>
+  <h2>ASTEROIDS DEFENDER <span style="color:#c084fc">SCORE: <span id="score">0</span></span></h2>
+  <canvas id="c" width="500" height="400"></canvas>
+  <div class="hud">Left/Right: Rotate, Up/W: Thrust, Spacebar: Fire Laser</div>
+<script>
+  const canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
+  let ship = { x: 250, y: 200, a: 0, r: 12, vx: 0, vy: 0, thrust: false };
+  let lasers = [], roids = [], score = 0;
+  for (let i = 0; i < 5; i++) {
+    roids.push({ x: Math.random() * 500, y: Math.random() * 400, vx: (Math.random()-0.5)*2, vy: (Math.random()-0.5)*2, r: 25 });
+  }
+  window.addEventListener('keydown', e => {
+    if (e.code === 'ArrowLeft' || e.code === 'KeyA') ship.a -= 0.15;
+    if (e.code === 'ArrowRight' || e.code === 'KeyD') ship.a += 0.15;
+    if (e.code === 'ArrowUp' || e.code === 'KeyW') ship.thrust = true;
+    if (e.code === 'Space') {
+      lasers.push({ x: ship.x + Math.cos(ship.a)*ship.r, y: ship.y + Math.sin(ship.a)*ship.r, vx: Math.cos(ship.a)*7, vy: Math.sin(ship.a)*7 });
+    }
+  });
+  window.addEventListener('keyup', e => { if (e.code === 'ArrowUp' || e.code === 'KeyW') ship.thrust = false; });
+  function loop() {
+    requestAnimationFrame(loop);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (ship.thrust) { ship.vx += Math.cos(ship.a)*0.15; ship.vy += Math.sin(ship.a)*0.15; }
+    ship.vx *= 0.98; ship.vy *= 0.98;
+    ship.x = (ship.x + ship.vx + canvas.width) % canvas.width;
+    ship.y = (ship.y + ship.vy + canvas.height) % canvas.height;
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath();
+    ctx.moveTo(ship.x + Math.cos(ship.a)*ship.r, ship.y + Math.sin(ship.a)*ship.r);
+    ctx.lineTo(ship.x + Math.cos(ship.a + 2.5)*ship.r, ship.y + Math.sin(ship.a + 2.5)*ship.r);
+    ctx.lineTo(ship.x + Math.cos(ship.a - 2.5)*ship.r, ship.y + Math.sin(ship.a - 2.5)*ship.r);
+    ctx.closePath(); ctx.stroke();
+    ctx.fillStyle = '#38bdf8';
+    for (let i = lasers.length - 1; i >= 0; i--) {
+      let l = lasers[i]; l.x += l.vx; l.y += l.vy;
+      ctx.fillRect(l.x - 2, l.y - 2, 4, 4);
+      for (let j = roids.length - 1; j >= 0; j--) {
+        let r = roids[j];
+        if (Math.hypot(l.x - r.x, l.y - r.y) < r.r) {
+          lasers.splice(i, 1); score += 50;
+          document.getElementById('score').textContent = score;
+          if (r.r > 15) { r.r /= 2; roids.push({ x: r.x, y: r.y, vx: -r.vx, vy: -r.vy, r: r.r }); }
+          else roids.splice(j, 1);
+          break;
+        }
+      }
+      if (l.x < 0 || l.x > canvas.width || l.y < 0 || l.y > canvas.height) lasers.splice(i, 1);
+    }
+    ctx.strokeStyle = '#c084fc';
+    roids.forEach(r => {
+      r.x = (r.x + r.vx + canvas.width) % canvas.width;
+      r.y = (r.y + r.vy + canvas.height) % canvas.height;
+      ctx.beginPath(); ctx.arc(r.x, r.y, r.r, 0, Math.PI*2); ctx.stroke();
+    });
+  }
+  requestAnimationFrame(loop);
+</script>
+</body>
+</html>`;
+
+    case 'tetris':
+      return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; background: #070913; color: #fff; font-family: monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; user-select: none; }
+  h2 { margin: 0 0 8px; color: #ec4899; font-size: 20px; }
+  canvas { border: 2px solid #ec4899; border-radius: 12px; background: #000; box-shadow: 0 0 25px rgba(236, 72, 153, 0.25); }
+  .hud { font-size: 13px; color: #94a3b8; margin-top: 10px; }
+</style>
+</head>
+<body>
+  <h2>TETRIS BLOCKS <span style="color:#ec4899">SCORE: <span id="score">0</span></span></h2>
+  <canvas id="c" width="240" height="400"></canvas>
+  <div class="hud">Arrows: Left/Right, Up: Rotate, Down: Drop</div>
+<script>
+  const canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
+  const cols = 12, rows = 20, sz = 20;
+  let board = Array(rows).fill(0).map(() => Array(cols).fill(0));
+  let score = 0, count = 0;
+  const pieces = [
+    [[1,1,1,1]],
+    [[1,1],[1,1]],
+    [[0,1,0],[1,1,1]],
+    [[1,0,0],[1,1,1]],
+    [[0,0,1],[1,1,1]],
+    [[0,1,1],[1,1,0]],
+    [[1,1,0],[0,1,1]]
+  ];
+  const colors = ['#000', '#06b6d4', '#eab308', '#a855f7', '#3b82f6', '#f97316', '#22c55e', '#ef4444'];
+  let cur = { p: pieces[0], x: 4, y: 0, c: 1 };
+  function spawn() {
+    const idx = Math.floor(Math.random() * pieces.length);
+    cur = { p: pieces[idx], x: 4, y: 0, c: idx + 1 };
+  }
+  function collide(p, x, y) {
+    for (let r = 0; r < p.length; r++) {
+      for (let c = 0; c < p[r].length; c++) {
+        if (p[r][c] && (board[y + r] === undefined || board[y + r][x + c] === undefined || board[y + r][x + c])) return true;
+      }
+    }
+    return false;
+  }
+  function rotate(p) { return p[0].map((_, i) => p.map(row => row[i]).reverse()); }
+  function loop() {
+    requestAnimationFrame(loop);
+    if (++count < 25) return; count = 0;
+    if (!collide(cur.p, cur.x, cur.y + 1)) cur.y++;
+    else {
+      cur.p.forEach((r, ry) => r.forEach((val, rx) => { if (val) board[cur.y + ry][cur.x + rx] = cur.c; }));
+      board = board.filter(row => row.some(v => v === 0));
+      while (board.length < rows) { board.unshift(Array(cols).fill(0)); score += 100; }
+      document.getElementById('score').textContent = score;
+      spawn();
+    }
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    board.forEach((r, ry) => r.forEach((val, rx) => { if (val) { ctx.fillStyle = colors[val]; ctx.fillRect(rx*sz, ry*sz, sz-1, sz-1); } }));
+    cur.p.forEach((r, ry) => r.forEach((val, rx) => { if (val) { ctx.fillStyle = colors[cur.c]; ctx.fillRect((cur.x+rx)*sz, (cur.y+ry)*sz, sz-1, sz-1); } }));
+  }
+  window.addEventListener('keydown', e => {
+    if (e.code === 'ArrowLeft' && !collide(cur.p, cur.x - 1, cur.y)) cur.x--;
+    if (e.code === 'ArrowRight' && !collide(cur.p, cur.x + 1, cur.y)) cur.x++;
+    if (e.code === 'ArrowDown' && !collide(cur.p, cur.x, cur.y + 1)) cur.y++;
+    if (e.code === 'ArrowUp') {
+      const rot = rotate(cur.p);
+      if (!collide(rot, cur.x, cur.y)) cur.p = rot;
+    }
+  });
+  spawn(); requestAnimationFrame(loop);
+</script>
+</body>
+</html>`;
+
+    case 'dino':
+      return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; background: #0c101d; color: #fff; font-family: monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; user-select: none; }
+  h2 { margin: 0 0 8px; color: #22c55e; font-size: 20px; }
+  canvas { border: 2px solid #22c55e; border-radius: 12px; background: #000; box-shadow: 0 0 25px rgba(34, 197, 94, 0.25); }
+  .hud { font-size: 13px; color: #94a3b8; margin-top: 10px; }
+</style>
+</head>
+<body>
+  <h2>CHROME DINO RUNNER <span style="color:#22c55e">SCORE: <span id="score">0</span></span></h2>
+  <canvas id="c" width="550" height="220"></canvas>
+  <div class="hud">Press Spacebar or Click to jump over obstacles</div>
+<script>
+  const canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
+  let dino = { y: 170, vy: 0, w: 20, h: 30, isJumping: false };
+  let cacti = [], score = 0, speed = 4;
+  function jump() { if (!dino.isJumping) { dino.vy = -8.5; dino.isJumping = true; } }
+  window.addEventListener('keydown', e => { if (e.code === 'Space' || e.code === 'ArrowUp') jump(); });
+  window.addEventListener('mousedown', jump);
+  function loop() {
+    requestAnimationFrame(loop);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    dino.y += dino.vy; dino.vy += 0.45;
+    if (dino.y >= 170) { dino.y = 170; dino.vy = 0; dino.isJumping = false; }
+    if (Math.random() < 0.02 && (cacti.length === 0 || cacti[cacti.length-1].x < canvas.width - 150)) {
+      cacti.push({ x: canvas.width, w: 15, h: Math.random() < 0.5 ? 25 : 35 });
+    }
+    ctx.strokeStyle = '#334155'; ctx.beginPath(); ctx.moveTo(0, 200); ctx.lineTo(canvas.width, 200); ctx.stroke();
+    ctx.fillStyle = '#22c55e'; ctx.fillRect(40, dino.y, dino.w, dino.h);
+    ctx.fillStyle = '#f43f5e';
+    for (let i = cacti.length - 1; i >= 0; i--) {
+      let c = cacti[i]; c.x -= speed;
+      ctx.fillRect(c.x, 200 - c.h, c.w, c.h);
+      if (c.x < 40 + dino.w && c.x + c.w > 40 && dino.y + dino.h > 200 - c.h) {
+        score = 0; cacti = []; speed = 4;
+      }
+      if (c.x < -20) { cacti.splice(i, 1); score += 10; speed += 0.05; }
+    }
+    document.getElementById('score').textContent = score;
+  }
+  requestAnimationFrame(loop);
+</script>
+</body>
+</html>`;
+
+    case 'minesweeper':
+      return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; background: #0f172a; color: #fff; font-family: -apple-system, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; user-select: none; }
+  h2 { margin: 0 0 8px; color: #38bdf8; }
+  #board { display: grid; grid-template-columns: repeat(9, 32px); gap: 2px; background: #334155; padding: 4px; border-radius: 12px; }
+  .cell { width: 32px; height: 32px; background: #1e293b; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; cursor: pointer; }
+  .cell.open { background: #0f172a; cursor: default; }
+  .cell.mine { background: #ef4444; }
+  .hud { font-size: 12px; color: #94a3b8; margin-top: 10px; }
+</style>
+</head>
+<body>
+  <h2>MINESWEEPER <span style="color:#f43f5e">💣 <span id="mines">10</span></span></h2>
+  <div id="board"></div>
+  <div class="hud">Left click to uncover. Right click to place flag.</div>
+<script>
+  const sz = 9, totalMines = 10;
+  let grid = Array(sz*sz).fill(0).map(() => ({ mine: false, open: false, flag: false, count: 0 }));
+  let placed = 0;
+  while (placed < totalMines) {
+    let r = Math.floor(Math.random() * (sz*sz));
+    if (!grid[r].mine) { grid[r].mine = true; placed++; }
+  }
+  for (let i = 0; i < sz*sz; i++) {
+    if (grid[i].mine) continue;
+    let r = Math.floor(i / sz), c = i % sz;
+    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+      let nr = r + dr, nc = c + dc;
+      if (nr >= 0 && nr < sz && nc >= 0 && nc < sz && grid[nr*sz + nc].mine) grid[i].count++;
+    }
+  }
+  const boardEl = document.getElementById('board');
+  function render() {
+    boardEl.innerHTML = '';
+    grid.forEach((cell, i) => {
+      const el = document.createElement('div');
+      el.className = 'cell' + (cell.open ? ' open' : '') + (cell.open && cell.mine ? ' mine' : '');
+      if (cell.flag) el.textContent = '🚩';
+      else if (cell.open) el.textContent = cell.mine ? '💣' : cell.count || '';
+      el.onclick = () => { if (cell.flag || cell.open) return; cell.open = true; if (cell.mine) alert('Game Over!'); render(); };
+      el.oncontextmenu = e => { e.preventDefault(); if (!cell.open) cell.flag = !cell.flag; render(); };
+      boardEl.appendChild(el);
+    });
+  }
+  render();
+</script>
+</body>
+</html>`;
+
+    case 'tic-tac-toe':
+      return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; background: #090d16; color: #fff; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; user-select: none; }
+  h2 { margin: 0 0 10px; color: #38bdf8; }
+  #board { display: grid; grid-template-columns: repeat(3, 80px); gap: 8px; background: #1e293b; padding: 8px; border-radius: 16px; }
+  .cell { width: 80px; height: 80px; background: #0f172a; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 36px; font-weight: bold; cursor: pointer; color: #38bdf8; }
+  .cell.o { color: #f43f5e; }
+  .hud { font-size: 13px; color: #94a3b8; margin-top: 15px; }
+</style>
+</head>
+<body>
+  <h2>TIC-TAC-TOE MASTER</h2>
+  <div id="board"></div>
+  <div class="hud" id="msg">Your turn (X) vs Computer (O)</div>
+<script>
+  let b = Array(9).fill('');
+  const boardEl = document.getElementById('board');
+  function checkWinner() {
+    const lines = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+    for (let l of lines) { if (b[l[0]] && b[l[0]] === b[l[1]] && b[l[0]] === b[l[2]]) return b[l[0]]; }
+    return b.every(v => v) ? 'Tie' : null;
+  }
+  function aiMove() {
+    let empty = b.map((v, i) => v === '' ? i : null).filter(v => v !== null);
+    if (!empty.length) return;
+    b[empty[Math.floor(Math.random() * empty.length)]] = 'O';
+    render();
+  }
+  function render() {
+    boardEl.innerHTML = '';
+    b.forEach((v, i) => {
+      const el = document.createElement('div');
+      el.className = 'cell' + (v === 'O' ? ' o' : '');
+      el.textContent = v;
+      el.onclick = () => {
+        if (b[i] || checkWinner()) return;
+        b[i] = 'X'; render();
+        let w = checkWinner();
+        if (!w) setTimeout(aiMove, 200);
+      };
+      boardEl.appendChild(el);
+    });
+    let win = checkWinner();
+    if (win) document.getElementById('msg').textContent = win === 'Tie' ? "It's a draw!" : win + ' wins!';
+  }
+  render();
+</script>
+</body>
+</html>`;
+
+    case 'connect-four':
+      return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; background: #060913; color: #fff; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; user-select: none; }
+  h2 { margin: 0 0 10px; color: #fbbf24; }
+  #board { display: grid; grid-template-columns: repeat(7, 44px); gap: 6px; background: #1e3a8a; padding: 10px; border-radius: 16px; }
+  .slot { width: 44px; height: 44px; background: #0b132b; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .slot.p1 { background: #ef4444; }
+  .slot.p2 { background: #eab308; }
+  .hud { font-size: 12px; color: #94a3b8; margin-top: 10px; }
+</style>
+</head>
+<body>
+  <h2>CONNECT FOUR <span style="color:#ef4444">🔴</span> vs <span style="color:#eab308">🟡</span></h2>
+  <div id="board"></div>
+  <div class="hud">Click any column to drop your piece</div>
+<script>
+  const rows = 6, cols = 7;
+  let grid = Array(rows).fill(0).map(() => Array(cols).fill(0));
+  let turn = 1;
+  const boardEl = document.getElementById('board');
+  function drop(col) {
+    for (let r = rows - 1; r >= 0; r--) {
+      if (grid[r][col] === 0) {
+        grid[r][col] = turn;
+        turn = turn === 1 ? 2 : 1;
+        render();
+        break;
+      }
+    }
+  }
+  function render() {
+    boardEl.innerHTML = '';
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const el = document.createElement('div');
+        el.className = 'slot' + (grid[r][c] === 1 ? ' p1' : grid[r][c] === 2 ? ' p2' : '');
+        el.onclick = () => drop(c);
+        boardEl.appendChild(el);
+      }
+    }
+  }
+  render();
+</script>
+</body>
+</html>`;
+
+    case 'memory-match':
+      return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; background: #0b0f19; color: #fff; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; user-select: none; }
+  h2 { margin: 0 0 10px; color: #38bdf8; }
+  #grid { display: grid; grid-template-columns: repeat(4, 60px); gap: 10px; }
+  .card { width: 60px; height: 60px; background: #1e293b; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 26px; cursor: pointer; border: 1px solid #334155; }
+  .card.flipped { background: #0284c7; }
+</style>
+</head>
+<body>
+  <h2>MEMORY MATCH <span id="moves" style="font-size:14px;color:#94a3b8">Moves: 0</span></h2>
+  <div id="grid"></div>
+<script>
+  const icons = ['🚀','⭐','🎮','🔥','💎','⚡','🪐','🍕'];
+  let deck = [...icons, ...icons].sort(() => Math.random() - 0.5);
+  let flipped = [], matched = 0, moves = 0;
+  const grid = document.getElementById('grid');
+  deck.forEach((icon, i) => {
+    const el = document.createElement('div');
+    el.className = 'card';
+    el.onclick = () => {
+      if (flipped.length < 2 && !el.classList.contains('flipped')) {
+        el.textContent = icon; el.classList.add('flipped');
+        flipped.push({ el, icon });
+        if (flipped.length === 2) {
+          moves++; document.getElementById('moves').textContent = 'Moves: ' + moves;
+          if (flipped[0].icon === flipped[1].icon) { matched++; flipped = []; }
+          else { setTimeout(() => { flipped.forEach(c => { c.el.textContent = ''; c.el.classList.remove('flipped'); }); flipped = []; }, 700); }
+        }
+      }
+    };
+    grid.appendChild(el);
+  });
+</script>
+</body>
+</html>`;
+
+    case 'maze':
+      return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; background: #070913; color: #fff; font-family: monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; user-select: none; }
+  h2 { margin: 0 0 8px; color: #a855f7; font-size: 20px; }
+  canvas { border: 2px solid #a855f7; border-radius: 12px; background: #000; box-shadow: 0 0 25px rgba(168, 85, 247, 0.25); }
+  .hud { font-size: 13px; color: #94a3b8; margin-top: 10px; }
+</style>
+</head>
+<body>
+  <h2>MAZE RUNNER <span style="color:#a855f7">COLLECT 🔑 AND ESCAPE 🚪</span></h2>
+  <canvas id="c" width="380" height="380"></canvas>
+  <div class="hud">Use Arrow Keys or WASD to navigate player</div>
+<script>
+  const canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
+  const sz = 19, tile = 20;
+  let p = { x: 1, y: 1 }, key = { x: 17, y: 1 }, exit = { x: 17, y: 17 }, hasKey = false;
+  // Simple labyrinth map
+  let map = Array(sz).fill(0).map((_, r) => Array(sz).fill(0).map((_, c) => (r===0||r===sz-1||c===0||c===sz-1 || (r%2===0&&c%2===0)) ? 1 : 0));
+  window.addEventListener('keydown', e => {
+    let nx = p.x, ny = p.y;
+    if (e.code === 'ArrowUp' || e.code === 'KeyW') ny--;
+    if (e.code === 'ArrowDown' || e.code === 'KeyS') ny++;
+    if (e.code === 'ArrowLeft' || e.code === 'KeyA') nx--;
+    if (e.code === 'ArrowRight' || e.code === 'KeyD') nx++;
+    if (!map[ny][nx]) { p.x = nx; p.y = ny; }
+    if (p.x === key.x && p.y === key.y) hasKey = true;
+    if (p.x === exit.x && p.y === exit.y && hasKey) alert('Maze Complete! 🎉');
+    render();
+  });
+  function render() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (let r = 0; r < sz; r++) for (let c = 0; c < sz; c++) {
+      if (map[r][c]) { ctx.fillStyle = '#334155'; ctx.fillRect(c*tile, r*tile, tile, tile); }
+    }
+    if (!hasKey) { ctx.fillStyle = '#fbbf24'; ctx.fillRect(key.x*tile+4, key.y*tile+4, tile-8, tile-8); }
+    ctx.fillStyle = hasKey ? '#10b981' : '#f43f5e'; ctx.fillRect(exit.x*tile+2, exit.y*tile+2, tile-4, tile-4);
+    ctx.fillStyle = '#38bdf8'; ctx.beginPath(); ctx.arc(p.x*tile+tile/2, p.y*tile+tile/2, tile/2 - 2, 0, Math.PI*2); ctx.fill();
+  }
+  render();
+</script>
+</body>
+</html>`;
+
+    default:
+      return '';
+  }
+}

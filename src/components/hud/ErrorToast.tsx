@@ -1,6 +1,6 @@
 import React from 'react';
 import { usePlayerStore } from '../../store/playerStore';
-import { AlertCircle, RefreshCw, X, Bookmark, Trash2, FileQuestion } from 'lucide-react';
+import { AlertCircle, RefreshCw, X, Bookmark, Trash2, FileQuestion, Globe } from 'lucide-react';
 
 export const ErrorToast: React.FC = () => {
   const lastError = usePlayerStore((s) => s.lastError);
@@ -109,6 +109,26 @@ export const ErrorToast: React.FC = () => {
             <div className="mt-1 flex items-center gap-1.5 text-xs text-sky-400">
               <RefreshCw className="w-3.5 h-3.5 animate-spin" />
               <span>Self-healing: {lastError.recovery.replace(/_/g, ' ')}</span>
+            </div>
+          )}
+
+          {currentUri && currentUri.startsWith('http') && (
+            <div className="mt-2 pt-2 border-t border-white/10 flex items-center justify-between gap-2">
+              <span className="text-[11px] text-white/60">Protected playback:</span>
+              <button
+                onClick={() => {
+                  window.dispatchEvent(
+                    new CustomEvent('miki:navigate-web-browser', {
+                      detail: { url: currentUri },
+                    })
+                  );
+                  dismissError();
+                }}
+                className="px-2.5 py-1 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400/30 text-[11px] font-semibold text-cyan-300 hover:text-white transition-all flex items-center gap-1.5"
+              >
+                <Globe className="w-3.5 h-3.5" />
+                <span>Open in Web Browser</span>
+              </button>
             </div>
           )}
         </div>

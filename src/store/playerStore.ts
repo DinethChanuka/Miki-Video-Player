@@ -33,6 +33,7 @@ import {
   getOSPresetDirectories,
   extractCleanFileName,
 } from '../utils/pathUtils';
+import { isDirectMediaUrl } from '../utils/webStreamUtils';
 
 export interface MediaHistoryItem {
   mediaId: string;
@@ -1081,6 +1082,44 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
       return;
     }
 
+    // Check if it's an external website portal (CineSubz, FMovies, etc.) that is NOT a direct video stream
+    const isHttp = uri.startsWith('http://') || uri.startsWith('https://');
+    if (isHttp && !isDirectMediaUrl(uri)) {
+      const domain = extractDomain(uri);
+      const defaultThumb = getWebsiteFaviconUrl(uri, 128);
+      const webHistoryItem: MediaHistoryItem = {
+        mediaId: uri,
+        uri,
+        title: resolvedTitle,
+        durationMs: 0,
+        lastPositionMs: 0,
+        progressPercent: 0,
+        isCompleted: false,
+        playCount: 1,
+        lastPlayedAt: Date.now(),
+        thumbnailUri: defaultThumb,
+        webPlatform: 'cinema',
+        webDomain: domain,
+      };
+      const existingRecent = get().recentMedia;
+      const updatedRecent = [
+        webHistoryItem,
+        ...existingRecent.filter((m) => m.uri !== uri),
+      ].slice(0, 30);
+      set({ recentMedia: updatedRecent, lastError: null });
+      saveStoredRecentMedia(updatedRecent);
+
+      // Route directly to protected web browser view with Ad-Shield instead of feeding HTML to <video>
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('miki:navigate-web-browser', {
+            detail: { url: uri },
+          })
+        );
+      }
+      return;
+    }
+
     // Record and persist to recent media (both web/local & Tauri)
     const existingRecent = get().recentMedia;
     const existingItem = existingRecent.find((m) => m.uri === uri);
@@ -1090,7 +1129,6 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     } else if (!isTauriRuntime()) {
       startPos = autoResume ? savedPos : 0;
     }
-    const isHttp = uri.startsWith('http://') || uri.startsWith('https://');
     const domain = isHttp ? extractDomain(uri) : undefined;
     const defaultThumb = isHttp ? getWebsiteFaviconUrl(uri, 128) : undefined;
     const mediaId = uri;

@@ -7,6 +7,8 @@ import { EqualizerModal } from './components/hud/EqualizerModal';
 import { VideoSettingsModal } from './components/hud/VideoSettingsModal';
 import { FileBrowserModal } from './components/hud/FileBrowserModal';
 import { WebBrowserModal } from './components/hud/WebBrowserModal';
+import { FullWindowGamesModal } from './components/games/FullWindowGamesModal';
+import { LiveChannelsModal } from './components/hud/LiveChannelsModal';
 import { ResumeChoiceModal } from './components/hud/ResumeChoiceModal';
 import { SystemAccessModal } from './components/hud/SystemAccessModal';
 import { ErrorToast } from './components/hud/ErrorToast';
@@ -128,6 +130,9 @@ export const App: React.FC = () => {
   >('cinema');
   const [isWebBrowserOpen, setIsWebBrowserOpen] = useState(false);
   const [webBrowserUrl, setWebBrowserUrl] = useState('https://www.youtube.com');
+  const [isGamesOpen, setIsGamesOpen] = useState(false);
+  const [selectedGameId, setSelectedGameId] = useState<string | undefined>(undefined);
+  const [isChannelsOpen, setIsChannelsOpen] = useState(false);
   const [isSystemAccessOpen, setIsSystemAccessOpen] = useState(false);
   const [isGmailSignInOpen, setIsGmailSignInOpen] = useState(false);
   const [pendingResumeItem, setPendingResumeItem] = useState<MediaHistoryItem | null>(null);
@@ -262,12 +267,22 @@ export const App: React.FC = () => {
       if (detail?.url) setWebBrowserUrl(detail.url);
       setIsWebBrowserOpen(true);
     };
+    const handleOpenGamesEvent = (e: Event) => {
+      const detail = (e as CustomEvent<{ gameId?: string }>).detail;
+      if (detail?.gameId) setSelectedGameId(detail.gameId);
+      setIsGamesOpen(true);
+    };
+    const handleOpenChannelsEvent = () => {
+      setIsChannelsOpen(true);
+    };
     window.addEventListener('miki:open-gmail-signin', handleOpenGmail);
     window.addEventListener('miki:open-settings', handleOpenSettings);
     window.addEventListener('miki:open-eq', handleOpenEq);
     window.addEventListener('miki:open-library', handleOpenLibrary);
     window.addEventListener('miki:open-web-stream', handleOpenStream);
     window.addEventListener('miki:open-web-browser', handleOpenBrowser);
+    window.addEventListener('miki:open-games', handleOpenGamesEvent);
+    window.addEventListener('miki:open-channels', handleOpenChannelsEvent);
     return () => {
       window.removeEventListener('miki:open-gmail-signin', handleOpenGmail);
       window.removeEventListener('miki:open-settings', handleOpenSettings);
@@ -275,6 +290,8 @@ export const App: React.FC = () => {
       window.removeEventListener('miki:open-library', handleOpenLibrary);
       window.removeEventListener('miki:open-web-stream', handleOpenStream);
       window.removeEventListener('miki:open-web-browser', handleOpenBrowser);
+      window.removeEventListener('miki:open-games', handleOpenGamesEvent);
+      window.removeEventListener('miki:open-channels', handleOpenChannelsEvent);
     };
   }, []);
 
@@ -337,6 +354,19 @@ export const App: React.FC = () => {
     const handleOpenAccess = () => setIsSystemAccessOpen(true);
     window.addEventListener('miki:open-system-access', handleOpenAccess);
     return () => window.removeEventListener('miki:open-system-access', handleOpenAccess);
+  }, []);
+
+  // Listen for web browser navigation requests
+  useEffect(() => {
+    const handleNavigateBrowser = (e: Event) => {
+      const detail = (e as CustomEvent<{ url?: string }>).detail;
+      if (detail?.url) {
+        setWebBrowserUrl(detail.url);
+        setIsWebBrowserOpen(true);
+      }
+    };
+    window.addEventListener('miki:navigate-web-browser', handleNavigateBrowser);
+    return () => window.removeEventListener('miki:navigate-web-browser', handleNavigateBrowser);
   }, []);
 
   // Listen to Cocoa native directory picker and screenshot saved events
@@ -597,6 +627,11 @@ export const App: React.FC = () => {
             onOpenEq={() => setIsEqOpen(true)}
             onOpenLocalFile={handleOpenLocalFileDialog}
             onOpenSystemAccess={() => setIsSystemAccessOpen(true)}
+            onOpenGames={(gameId?: string) => {
+              if (gameId) setSelectedGameId(gameId);
+              setIsGamesOpen(true);
+            }}
+            onOpenChannels={() => setIsChannelsOpen(true)}
           />
 
           {currentUri && (
@@ -685,7 +720,6 @@ export const App: React.FC = () => {
             <video
               id="aether-video-viewport"
               ref={videoRef}
-              crossOrigin="anonymous"
               className={`w-full h-full object-contain z-10 cursor-pointer ${!currentUri ? 'hidden' : ''}`}
               playsInline
               preload="auto"
@@ -1205,6 +1239,28 @@ export const App: React.FC = () => {
           isOpen={isFileBrowserOpen}
           onClose={() => setIsFileBrowserOpen(false)}
           initialTab={fileBrowserInitialTab}
+          onOpenGames={(gameId) => {
+            if (gameId) setSelectedGameId(gameId);
+            setIsGamesOpen(true);
+          }}
+        />
+      </ErrorBoundary>
+
+      <ErrorBoundary onReset={() => setIsGamesOpen(false)}>
+        <FullWindowGamesModal
+          isOpen={isGamesOpen}
+          initialGameId={selectedGameId}
+          onClose={() => setIsGamesOpen(false)}
+        />
+      </ErrorBoundary>
+
+      <ErrorBoundary onReset={() => setIsChannelsOpen(false)}>
+        <LiveChannelsModal
+          isOpen={isChannelsOpen}
+          onClose={() => setIsChannelsOpen(false)}
+          onPlayChannel={(channel) => {
+            openMedia(channel.streamUrl, channel.name);
+          }}
         />
       </ErrorBoundary>
 
