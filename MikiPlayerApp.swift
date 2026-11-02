@@ -26,6 +26,36 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
     var isAdShieldEnabled: Bool = true
     var isCustomFullScreen = false
     var savedFrame: NSRect = .zero
+    var currentVolume: Double = 1.0
+    var isMuted: Bool = false
+
+    private func applySoundToBrowserWebView() {
+        guard let bView = self.browserWebView else { return }
+        let js = """
+        (function() {
+            window.__mikiVolume = \(self.currentVolume);
+            window.__mikiMuted = \(self.isMuted ? "true" : "false");
+            var syncMediaSound = function() {
+                try {
+                    var media = document.querySelectorAll('video, audio');
+                    media.forEach(function(el) {
+                        try {
+                            el.volume = window.__mikiVolume;
+                            el.muted = window.__mikiMuted;
+                        } catch(e) {}
+                    });
+                } catch(e) {}
+            };
+            syncMediaSound();
+            if (!window.__mikiSoundObserver) {
+                window.__mikiSoundObserver = new MutationObserver(syncMediaSound);
+                window.__mikiSoundObserver.observe(document.body || document.documentElement, { childList: true, subtree: true });
+                setInterval(syncMediaSound, 1000);
+            }
+        })();
+        """
+        bView.evaluateJavaScript(js, completionHandler: nil)
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupMainMenu()
@@ -433,6 +463,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
             let cleanTitle = title.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "'", with: "\\'")
             let js = "window.dispatchEvent(new CustomEvent('miki:browser-loading-finish', { detail: { url: '\(cleanUrl)', title: '\(cleanTitle)' } }));"
             self.webView.evaluateJavaScript(js, completionHandler: nil)
+            self.applySoundToBrowserWebView()
         }
     }
 
@@ -644,6 +675,23 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
                                 }
                             }
                         }
+                    case "setVolume":
+                        let vol = dict["volume"] as? Double ?? 100.0
+                        let muted = dict["isMuted"] as? Bool ?? false
+                        self.currentVolume = max(0.0, min(1.0, vol / 100.0))
+                        self.isMuted = muted
+                        self.applySoundToBrowserWebView()
+                    case "setEqualizer":
+                        let gains = dict["gainsDb"] as? [Double] ?? []
+                        let nightMode = dict["nightMode"] as? Bool ?? false
+                        let js = """
+                        (function() {
+                            window.__mikiEqGains = \(gains);
+                            window.__mikiNightMode = \(nightMode ? "true" : "false");
+                            window.dispatchEvent(new CustomEvent('miki:equalizer-sync', { detail: { gains: \(gains), nightMode: \(nightMode ? "true" : "false") } }));
+                        })();
+                        """
+                        self.browserWebView?.evaluateJavaScript(js, completionHandler: nil)
                     default:
                         break
                     }

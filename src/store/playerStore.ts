@@ -179,6 +179,8 @@ export interface PlayerStoreState {
   togglePlay: () => Promise<void>;
   seek: (timestampMs: number, exact?: boolean) => Promise<void>;
   setVolume: (volume: number) => Promise<void>;
+  setMuted: (muted: boolean) => Promise<void>;
+  toggleMute: () => Promise<void>;
   setPlaybackRate: (rate: number) => Promise<void>;
   setEqualizer: (gainsDb: number[], nightMode: boolean) => Promise<void>;
   updateShaderConfig: (config: Partial<VideoShaderConfig>) => Promise<void>;
@@ -1283,8 +1285,54 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
   setVolume: async (volume) => {
     // Allows 0% to 200% VLC overdrive
     const clamped = Math.max(0, Math.min(200, volume));
-    set({ volume: clamped, isMuted: clamped === 0 });
+    const isMuted = clamped === 0;
+    set({ volume: clamped, isMuted });
     await get().engine?.setVolume(clamped);
+
+    // Broadcast sound change across web streams, YouTube & native WKWebView
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('miki:volume-change', {
+          detail: { volume: clamped, isMuted },
+        })
+      );
+      const webkit = (window as unknown as { webkit?: { messageHandlers?: { browserViewAction?: { postMessage: (msg: unknown) => void } } } }).webkit;
+      if (webkit?.messageHandlers?.browserViewAction) {
+        webkit.messageHandlers.browserViewAction.postMessage({
+          action: 'setVolume',
+          volume: clamped,
+          isMuted,
+        });
+      }
+    }
+  },
+
+  setMuted: async (muted) => {
+    set({ isMuted: muted });
+    const currentVol = get().volume;
+    const effectiveVol = muted ? 0 : currentVol;
+    await get().engine?.setVolume(effectiveVol);
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('miki:volume-change', {
+          detail: { volume: effectiveVol, isMuted: muted },
+        })
+      );
+      const webkit = (window as unknown as { webkit?: { messageHandlers?: { browserViewAction?: { postMessage: (msg: unknown) => void } } } }).webkit;
+      if (webkit?.messageHandlers?.browserViewAction) {
+        webkit.messageHandlers.browserViewAction.postMessage({
+          action: 'setVolume',
+          volume: effectiveVol,
+          isMuted: muted,
+        });
+      }
+    }
+  },
+
+  toggleMute: async () => {
+    const nextMuted = !get().isMuted;
+    await get().setMuted(nextMuted);
   },
 
   setPlaybackRate: async (rate) => {
@@ -1295,6 +1343,23 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
   setEqualizer: async (gainsDb, nightMode) => {
     set({ eqGainsDb: gainsDb, nightModeEnabled: nightMode });
     await get().engine?.setEqualizer(gainsDb, nightMode);
+
+    // Broadcast equalizer update across web streams and native WKWebView
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('miki:equalizer-change', {
+          detail: { gainsDb, nightMode },
+        })
+      );
+      const webkit = (window as unknown as { webkit?: { messageHandlers?: { browserViewAction?: { postMessage: (msg: unknown) => void } } } }).webkit;
+      if (webkit?.messageHandlers?.browserViewAction) {
+        webkit.messageHandlers.browserViewAction.postMessage({
+          action: 'setEqualizer',
+          gainsDb,
+          nightMode,
+        });
+      }
+    }
 
     const {
       currentMediaId,
