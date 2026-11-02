@@ -1,9 +1,9 @@
 /**
  * Web Stream Parsing & Embed URL Generation Utilities
- * Supports YouTube, TikTok, and Instagram standalone web playback
+ * Supports YouTube, TikTok, Instagram, and Facebook standalone web playback
  */
 
-export type WebPlatform = 'youtube' | 'tiktok' | 'instagram';
+export type WebPlatform = 'youtube' | 'tiktok' | 'instagram' | 'facebook';
 
 export interface ParsedWebStream {
   platform: WebPlatform;
@@ -31,6 +31,19 @@ export function parseInstagramCode(url: string): string | null {
   if (!url) return null;
   const match = url.match(/(?:instagram\.com\/(?:p|reel|tv)\/([a-zA-Z0-9_-]+))/i);
   return match ? match[1] : null;
+}
+
+export function parseFacebookUrl(url: string): { id: string; embedUrl: string } | null {
+  if (!url) return null;
+  const trimmed = url.trim();
+  const isFb = /(?:facebook\.com|fb\.watch)/i.test(trimmed);
+  if (!isFb) return null;
+
+  // Extract ID if available
+  const match = trimmed.match(/(?:videos\/|reel\/|\?v=)(\d+)/i) || trimmed.match(/fb\.watch\/([a-zA-Z0-9_-]+)/i);
+  const id = match ? match[1] : `fb_${Date.now()}`;
+  const embedUrl = `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(trimmed)}&show_text=0`;
+  return { id, embedUrl };
 }
 
 export function parseWebStream(url: string): ParsedWebStream | null {
@@ -66,6 +79,17 @@ export function parseWebStream(url: string): ParsedWebStream | null {
       platform: 'instagram',
       id: igCode,
       embedUrl: `https://www.instagram.com/reel/${igCode}/embed`,
+      originalUrl: trimmed,
+    };
+  }
+
+  // 4. Facebook
+  const fb = parseFacebookUrl(trimmed);
+  if (fb) {
+    return {
+      platform: 'facebook',
+      id: fb.id,
+      embedUrl: fb.embedUrl,
       originalUrl: trimmed,
     };
   }
