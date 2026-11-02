@@ -56,6 +56,9 @@ pub enum PlayerError {
     #[error("Failed to initialize mpv render context: {0}")]
     MpvInitFailed(String),
 
+    #[error("Native mpv command execution failed: {0}")]
+    MpvCommandFailed(String),
+
     #[error("Native GPU surface attachment failed on {platform}: {reason}")]
     GpuSurfaceLost { platform: String, reason: String },
 
@@ -102,6 +105,14 @@ impl PlayerError {
                 details: Some(details.clone()),
                 severity: ErrorSeverity::Recoverable,
                 recovery: RecoveryStrategy::FallbackToWebEngine,
+                timestamp_ms: now,
+            },
+            Self::MpvCommandFailed(details) => PlayerErrorEnvelope {
+                code: ErrorCode::CodecUnsupported,
+                message: "Native player command failed.".into(),
+                details: Some(details.clone()),
+                severity: ErrorSeverity::Recoverable,
+                recovery: RecoveryStrategy::RetryWithBackoff,
                 timestamp_ms: now,
             },
             Self::GpuSurfaceLost { platform, reason } => PlayerErrorEnvelope {

@@ -76,30 +76,16 @@ impl MpvController {
         Ok(())
     }
 
-    /// Loads a media file or URL with optional resume timestamp
+    /// Loads a media file or URL with optional resume timestamp safely using mpv_command array
     pub fn load_file(&self, uri: &str, start_pos_ms: i64) -> PlayerResult<()> {
-        let handle = self.require_handle()?;
-        let lib = self.lib.as_ref().unwrap();
-
-        let cmd = if start_pos_ms > 0 {
+        let start_str;
+        let mut args = vec!["loadfile", uri, "replace"];
+        if start_pos_ms > 0 {
             let start_sec = start_pos_ms as f64 / 1000.0;
-            format!("loadfile \"{}\" replace start={:.3}", uri, start_sec)
-        } else {
-            format!("loadfile \"{}\" replace", uri)
-        };
-
-        let c_cmd = CString::new(cmd).map_err(|e| PlayerError::MediaNotFound {
-            path: format!("Invalid URI string: {e}"),
-        })?;
-
-        let status = unsafe { (lib.fns().command_string)(handle, c_cmd.as_ptr()) };
-        if status < 0 {
-            return Err(PlayerError::CodecUnsupported(format!(
-                "Failed to load file '{uri}', mpv error: {status}"
-            )));
+            start_str = format!("start={:.3}", start_sec);
+            args.push(&start_str);
         }
-
-        Ok(())
+        self.run_command_args(&args)
     }
 
     pub fn play(&self) -> PlayerResult<()> {
@@ -113,12 +99,12 @@ impl MpvController {
     pub fn seek(&self, timestamp_ms: i64, exact: bool) -> PlayerResult<()> {
         let seconds = (timestamp_ms.max(0) as f64) / 1000.0;
         let mode = if exact { "exact" } else { "keyframes" };
-        let cmd = format!("seek {:.3} absolute {}", seconds, mode);
-        self.run_command_string(&cmd)
+        let sec_str = format!("{:.3}", seconds);
+        self.run_command_args(&["seek", &sec_str, "absolute", mode])
     }
 
     pub fn set_volume(&self, volume: i64) -> PlayerResult<()> {
-        let clamped = volume.clamp(0, 100);
+        let clamped = volume.clamp(0, 200);
         self.set_property_string("volume", &clamped.to_string())
     }
 
@@ -166,12 +152,12 @@ impl MpvController {
         let handle = self.require_handle()?;
         let lib = self.lib.as_ref().unwrap();
 
-        let c_name = CString::new(name).unwrap();
-        let c_val = CString::new(val).unwrap();
+        let c_name = CString::new(name).map_err(|e| PlayerError::MpvCommandFailed(format!("Invalid property name '{name}': {e}")))?;
+        let c_val = CString::new(val).map_err(|e| PlayerError::MpvCommandFailed(format!("Invalid property value '{val}': {e}")))?;
 
         let status = unsafe { (lib.fns().set_property_string)(handle, c_name.as_ptr(), c_val.as_ptr()) };
         if status < 0 {
-            log::warn!("mpv set_property_string failed for {name}={val}: {status}");
+            return Err(PlayerError::MpvCommandFailed(format!("mpv set_property_string failed for {name}={val} (error code: {status})")));
         }
         Ok(())
     }
@@ -180,10 +166,32 @@ impl MpvController {
         let handle = self.require_handle()?;
         let lib = self.lib.as_ref().unwrap();
 
-        let c_cmd = CString::new(cmd).unwrap();
+        let c_cmd = CString::new(cmd).map_err(|e| PlayerError::MpvCommandFailed(format!("Invalid command string: {e}")))?;
         let status = unsafe { (lib.fns().command_string)(handle, c_cmd.as_ptr()) };
         if status < 0 {
-            log::warn!("mpv command failed: {cmd} (code: {status})");
+            return Err(PlayerError::MpvCommandFailed(format!("mpv command_string failed: '{cmd}' (error code: {status})")));
+        }
+        Ok(())
+    }
+
+    /// Invokes mpv_command using a null-terminated array of string pointers (command injection safe)
+    pub fn run_command_args(&self, args: &[&str]) -> PlayerResult<()> {
+        let handle = self.require_handle()?;
+        let lib = self.lib.as_ref().unwrap();
+
+        let mut c_strings = Vec::with_capacity(args.len());
+        for &arg in args {
+            let c_str = CString::new(arg).map_err(|e| PlayerError::MpvCommandFailed(format!("Invalid argument '{arg}': {e}")))?;
+            c_strings.push(c_str);
+        }
+
+        let mut c_ptrs: Vec<*const std::ffi::c_char> = c_strings.iter().map(|s| s.as_ptr()).collect();
+        c_ptrs.push(std::ptr::null());
+
+        let status = unsafe { (lib.fns().command)(handle, c_ptrs.as_mut_ptr() as *mut *const std::ffi::c_char) };
+        if status < 0 {
+            let summary = args.join(" ");
+            return Err(PlayerError::MpvCommandFailed(format!("mpv_command failed for '{summary}' (code: {status})")));
         }
         Ok(())
     }

@@ -1,7 +1,7 @@
 use crate::error::{PlayerError, PlayerResult};
 use libloading::{Library, Symbol};
 use std::ffi::{c_char, c_int, c_void};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 pub type MpvHandle = *mut c_void;
 
@@ -90,13 +90,23 @@ pub struct MpvLib {
     inner: Arc<MpvLibInner>,
 }
 
+static CACHED_LIB: OnceLock<Result<MpvLib, String>> = OnceLock::new();
+
 struct MpvLibInner {
-    _lib: Library,
+    _lib: Arc<Library>,
     fns: MpvFunctions,
 }
 
 impl MpvLib {
     pub fn load() -> PlayerResult<Self> {
+        let cached = CACHED_LIB.get_or_init(|| Self::load_internal().map_err(|e| e.to_string()));
+        match cached {
+            Ok(lib) => Ok(lib.clone()),
+            Err(e) => Err(PlayerError::MpvLibraryMissing(e.clone())),
+        }
+    }
+
+    fn load_internal() -> PlayerResult<Self> {
         let candidates = if cfg!(target_os = "macos") {
             vec![
                 "libmpv.2.dylib",
@@ -121,8 +131,8 @@ impl MpvLib {
         for path in candidates {
             match unsafe { Library::new(path) } {
                 Ok(lib) => {
-                    // Leak library to obtain 'static symbols safe for long-lived app lifetime
-                    let static_lib: &'static Library = Box::leak(Box::new(lib));
+                    let arc_lib = Arc::new(lib);
+                    let static_lib: &'static Library = unsafe { &*Arc::as_ptr(&arc_lib) };
                     unsafe {
                         let create = match static_lib.get(b"mpv_create") {
                             Ok(s) => s,
@@ -183,7 +193,7 @@ impl MpvLib {
                         log::info!("Successfully loaded libmpv from path: {path}");
                         return Ok(Self {
                             inner: Arc::new(MpvLibInner {
-                                _lib: Library::new(path).unwrap(),
+                                _lib: arc_lib,
                                 fns,
                             }),
                         });
