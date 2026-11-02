@@ -7,6 +7,7 @@ import { EqualizerModal } from './components/hud/EqualizerModal';
 import { VideoSettingsModal } from './components/hud/VideoSettingsModal';
 import { FileBrowserModal } from './components/hud/FileBrowserModal';
 import { WebBrowserModal } from './components/hud/WebBrowserModal';
+import { FullWindowGamesModal } from './components/games/FullWindowGamesModal';
 import { ResumeChoiceModal } from './components/hud/ResumeChoiceModal';
 import { SystemAccessModal } from './components/hud/SystemAccessModal';
 import { ErrorToast } from './components/hud/ErrorToast';
@@ -128,6 +129,8 @@ export const App: React.FC = () => {
   >('cinema');
   const [isWebBrowserOpen, setIsWebBrowserOpen] = useState(false);
   const [webBrowserUrl, setWebBrowserUrl] = useState('https://www.youtube.com');
+  const [isGamesOpen, setIsGamesOpen] = useState(false);
+  const [selectedGameId, setSelectedGameId] = useState<string | undefined>(undefined);
   const [isSystemAccessOpen, setIsSystemAccessOpen] = useState(false);
   const [isGmailSignInOpen, setIsGmailSignInOpen] = useState(false);
   const [pendingResumeItem, setPendingResumeItem] = useState<MediaHistoryItem | null>(null);
@@ -262,12 +265,18 @@ export const App: React.FC = () => {
       if (detail?.url) setWebBrowserUrl(detail.url);
       setIsWebBrowserOpen(true);
     };
+    const handleOpenGamesEvent = (e: Event) => {
+      const detail = (e as CustomEvent<{ gameId?: string }>).detail;
+      if (detail?.gameId) setSelectedGameId(detail.gameId);
+      setIsGamesOpen(true);
+    };
     window.addEventListener('miki:open-gmail-signin', handleOpenGmail);
     window.addEventListener('miki:open-settings', handleOpenSettings);
     window.addEventListener('miki:open-eq', handleOpenEq);
     window.addEventListener('miki:open-library', handleOpenLibrary);
     window.addEventListener('miki:open-web-stream', handleOpenStream);
     window.addEventListener('miki:open-web-browser', handleOpenBrowser);
+    window.addEventListener('miki:open-games', handleOpenGamesEvent);
     return () => {
       window.removeEventListener('miki:open-gmail-signin', handleOpenGmail);
       window.removeEventListener('miki:open-settings', handleOpenSettings);
@@ -275,6 +284,7 @@ export const App: React.FC = () => {
       window.removeEventListener('miki:open-library', handleOpenLibrary);
       window.removeEventListener('miki:open-web-stream', handleOpenStream);
       window.removeEventListener('miki:open-web-browser', handleOpenBrowser);
+      window.removeEventListener('miki:open-games', handleOpenGamesEvent);
     };
   }, []);
 
@@ -610,6 +620,10 @@ export const App: React.FC = () => {
             onOpenEq={() => setIsEqOpen(true)}
             onOpenLocalFile={handleOpenLocalFileDialog}
             onOpenSystemAccess={() => setIsSystemAccessOpen(true)}
+            onOpenGames={(gameId) => {
+              if (gameId) setSelectedGameId(gameId);
+              setIsGamesOpen(true);
+            }}
           />
 
           {currentUri && (
@@ -1217,6 +1231,18 @@ export const App: React.FC = () => {
           isOpen={isFileBrowserOpen}
           onClose={() => setIsFileBrowserOpen(false)}
           initialTab={fileBrowserInitialTab}
+          onOpenGames={(gameId) => {
+            if (gameId) setSelectedGameId(gameId);
+            setIsGamesOpen(true);
+          }}
+        />
+      </ErrorBoundary>
+
+      <ErrorBoundary onReset={() => setIsGamesOpen(false)}>
+        <FullWindowGamesModal
+          isOpen={isGamesOpen}
+          initialGameId={selectedGameId}
+          onClose={() => setIsGamesOpen(false)}
         />
       </ErrorBoundary>
 
