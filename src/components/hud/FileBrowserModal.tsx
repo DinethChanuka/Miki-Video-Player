@@ -735,11 +735,15 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({
 
                           <button
                             onClick={() => {
-                              openMedia(site.url, site.name);
+                              window.dispatchEvent(
+                                new CustomEvent('miki:navigate-web-browser', {
+                                  detail: { url: site.url },
+                                })
+                              );
                               onClose();
                             }}
                             className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-all"
-                            title="Play in system engine"
+                            title="Play stream with Ad-Shield"
                           >
                             <Play className="w-3 h-3 fill-white" />
                             <span>Play</span>
@@ -1215,11 +1219,15 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({
 
                           <button
                             onClick={() => {
-                              openMedia(site.url, site.title);
+                              window.dispatchEvent(
+                                new CustomEvent('miki:navigate-web-browser', {
+                                  detail: { url: site.url },
+                                })
+                              );
                               onClose();
                             }}
                             className="p-1.5 rounded-xl bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30 transition-colors"
-                            title="Play in system engine"
+                            title="Play stream with Ad-Shield"
                           >
                             <Play className="w-3.5 h-3.5 fill-cyan-300" />
                           </button>

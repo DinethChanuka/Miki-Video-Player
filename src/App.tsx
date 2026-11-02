@@ -339,6 +339,19 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('miki:open-system-access', handleOpenAccess);
   }, []);
 
+  // Listen for web browser navigation requests
+  useEffect(() => {
+    const handleNavigateBrowser = (e: Event) => {
+      const detail = (e as CustomEvent<{ url?: string }>).detail;
+      if (detail?.url) {
+        setWebBrowserUrl(detail.url);
+        setIsWebBrowserOpen(true);
+      }
+    };
+    window.addEventListener('miki:navigate-web-browser', handleNavigateBrowser);
+    return () => window.removeEventListener('miki:navigate-web-browser', handleNavigateBrowser);
+  }, []);
+
   // Listen to Cocoa native directory picker and screenshot saved events
   useEffect(() => {
     const handleDirPicked = (e: Event) => {
@@ -685,7 +698,6 @@ export const App: React.FC = () => {
             <video
               id="aether-video-viewport"
               ref={videoRef}
-              crossOrigin="anonymous"
               className={`w-full h-full object-contain z-10 cursor-pointer ${!currentUri ? 'hidden' : ''}`}
               playsInline
               preload="auto"
