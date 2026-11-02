@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { ExternalLink, RefreshCw, AlertCircle, Share2 } from 'lucide-react';
+import { ExternalLink, RefreshCw, AlertCircle, Share2, Volume2, VolumeX, Volume1, Sliders } from 'lucide-react';
 import { WebPlatform } from '../../utils/webStreamUtils';
+import { usePlayerStore } from '../../store/playerStore';
 
 interface WebEmbedPlayerProps {
   platform: WebPlatform;
@@ -8,17 +9,39 @@ interface WebEmbedPlayerProps {
   originalUrl: string;
   title?: string;
   onEnded?: () => void;
+  onOpenEq?: () => void;
 }
+
+const EQ_PRESETS = [
+  { name: 'Flat', gains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
+  { name: 'Bass Boost', gains: [6, 5, 4, 2, 0, 0, 0, 0, 0, 0] },
+  { name: 'Vocal', gains: [-2, -1, 1, 3, 5, 4, 3, 1, 0, -1] },
+  { name: 'Cinema', gains: [4, 3, 1, 0, -1, 1, 3, 4, 5, 5] },
+];
 
 export const WebEmbedPlayer: React.FC<WebEmbedPlayerProps> = ({
   platform,
   embedUrl,
   originalUrl,
   title,
+  onOpenEq,
 }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [key, setKey] = useState(0);
+  const [activePreset, setActivePreset] = useState<string>('Flat');
+
+  const volume = usePlayerStore((s) => s.volume);
+  const isMuted = usePlayerStore((s) => s.isMuted);
+  const setVolume = usePlayerStore((s) => s.setVolume);
+  const toggleMute = usePlayerStore((s) => s.toggleMute);
+  const setEqualizer = usePlayerStore((s) => s.setEqualizer);
+  const nightModeEnabled = usePlayerStore((s) => s.nightModeEnabled);
+
+  const handleApplyPreset = (name: string, gains: number[]) => {
+    setActivePreset(name);
+    setEqualizer(gains, nightModeEnabled);
+  };
 
   const getPlatformDetails = () => {
     switch (platform) {
@@ -27,21 +50,28 @@ export const WebEmbedPlayer: React.FC<WebEmbedPlayerProps> = ({
           name: 'TikTok Web Player',
           gradient: 'from-cyan-400 via-rose-500 to-amber-400',
           badgeBg: 'bg-black/80 text-rose-300 border-rose-500/40',
-          aspect: 'max-w-[420px] aspect-[9/16] sm:aspect-[9/16] h-full max-h-[92vh]',
+          aspect: 'max-w-[420px] aspect-[9/16] sm:aspect-[9/16] h-full max-h-[82vh]',
         };
       case 'instagram':
         return {
           name: 'Instagram Web Player',
           gradient: 'from-purple-500 via-pink-500 to-amber-500',
           badgeBg: 'bg-black/80 text-pink-300 border-pink-500/40',
-          aspect: 'max-w-[480px] aspect-[9/16] sm:aspect-[4/5] h-full max-h-[92vh]',
+          aspect: 'max-w-[480px] aspect-[9/16] sm:aspect-[4/5] h-full max-h-[82vh]',
+        };
+      case 'facebook':
+        return {
+          name: 'Facebook Video Player',
+          gradient: 'from-blue-600 via-indigo-600 to-sky-500',
+          badgeBg: 'bg-black/80 text-blue-300 border-blue-500/40',
+          aspect: 'max-w-[720px] aspect-video w-full h-full max-h-[82vh]',
         };
       default:
         return {
           name: 'Web Stream',
           gradient: 'from-cyan-500 to-blue-600',
           badgeBg: 'bg-black/80 text-cyan-300 border-cyan-500/40',
-          aspect: 'w-full h-full',
+          aspect: 'w-full h-full max-h-[82vh]',
         };
     }
   };
@@ -49,9 +79,9 @@ export const WebEmbedPlayer: React.FC<WebEmbedPlayerProps> = ({
   const details = getPlatformDetails();
 
   return (
-    <div className="relative w-full h-full flex flex-col items-center justify-center bg-black/95 overflow-hidden select-none">
+    <div className="relative w-full h-full flex flex-col items-center justify-between p-4 bg-black/95 overflow-hidden select-none">
       {/* Top Floating Mini-Nav for Web Stream */}
-      <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-black/75 backdrop-blur-md border border-white/15 shadow-xl text-xs">
+      <div className="relative z-30 flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-black/75 backdrop-blur-md border border-white/15 shadow-xl text-xs mb-2">
         <span
           className={`px-2 py-0.5 rounded-full font-bold uppercase text-[10px] tracking-wider border ${details.badgeBg}`}
         >
@@ -96,7 +126,7 @@ export const WebEmbedPlayer: React.FC<WebEmbedPlayerProps> = ({
       )}
 
       {/* Embedded IFrame Viewport */}
-      <div className={`relative ${details.aspect} flex items-center justify-center shadow-2xl rounded-2xl overflow-hidden border border-white/10 bg-black`}>
+      <div className={`relative ${details.aspect} flex items-center justify-center shadow-2xl rounded-2xl overflow-hidden border border-white/10 bg-black flex-1`}>
         <iframe
           key={key}
           src={embedUrl}
@@ -128,6 +158,76 @@ export const WebEmbedPlayer: React.FC<WebEmbedPlayerProps> = ({
             </a>
           </div>
         )}
+      </div>
+
+      {/* Bottom Floating Sound Control Bar (0-200% VLC Overdrive & Audio DSP Options) */}
+      <div className="relative z-30 mt-3 flex items-center flex-wrap justify-center gap-3 px-4 py-2 rounded-2xl bg-black/85 backdrop-blur-xl border border-white/15 shadow-2xl text-xs">
+        {/* Mute & Volume Slider */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => toggleMute()}
+            className="p-1.5 rounded-xl hover:bg-white/10 text-white/80 hover:text-white transition-colors"
+            title={isMuted ? 'Unmute Sound' : 'Mute Sound'}
+          >
+            {isMuted || volume === 0 ? (
+              <VolumeX className="w-4 h-4 text-rose-400" />
+            ) : volume > 100 ? (
+              <Volume2 className="w-4 h-4 text-amber-400" />
+            ) : volume > 50 ? (
+              <Volume2 className="w-4 h-4 text-cyan-400" />
+            ) : (
+              <Volume1 className="w-4 h-4 text-white/80" />
+            )}
+          </button>
+
+          <input
+            type="range"
+            min={0}
+            max={200}
+            step={1}
+            value={isMuted ? 0 : volume}
+            onChange={(e) => setVolume(parseInt(e.target.value, 10))}
+            className="w-24 sm:w-32 h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-cyan-400"
+            title={`Sound Volume: ${volume}% (up to 200% VLC overdrive)`}
+          />
+
+          <span
+            className={`font-mono text-[11px] font-bold w-11 ${
+              volume > 100 ? 'text-amber-400' : 'text-cyan-300'
+            }`}
+          >
+            {isMuted ? 'Muted' : `${volume}%`}
+          </span>
+        </div>
+
+        <div className="w-[1px] h-4 bg-white/20 hidden sm:block" />
+
+        {/* Quick EQ Profile Presets */}
+        <div className="flex items-center gap-1.5">
+          {EQ_PRESETS.map((p) => (
+            <button
+              key={p.name}
+              onClick={() => handleApplyPreset(p.name, p.gains)}
+              className={`px-2.5 py-1 rounded-xl text-[10px] font-semibold transition-all ${
+                activePreset === p.name
+                  ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-sm'
+                  : 'bg-white/5 hover:bg-white/15 text-white/70 hover:text-white border border-white/10'
+              }`}
+            >
+              {p.name}
+            </button>
+          ))}
+
+          {onOpenEq && (
+            <button
+              onClick={onOpenEq}
+              className="p-1.5 rounded-xl bg-white/5 hover:bg-white/15 text-white/70 hover:text-white border border-white/10 transition-colors ml-1"
+              title="Open Full 10-Band Equalizer"
+            >
+              <Sliders className="w-3.5 h-3.5 text-cyan-400" />
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

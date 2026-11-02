@@ -47,7 +47,7 @@ export interface MediaHistoryItem {
   lastPlayedAt: number;
   isYouTube?: boolean;
   youtubeId?: string;
-  webPlatform?: 'youtube' | 'tiktok' | 'instagram' | 'cinema' | 'web';
+  webPlatform?: 'youtube' | 'tiktok' | 'instagram' | 'facebook' | 'cinema' | 'web';
   webStreamId?: string;
   webDomain?: string;
   faviconUrl?: string;
@@ -985,17 +985,23 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     const igMatch = uri.match(/(?:instagram\.com\/(?:p|reel|tv)\/([a-zA-Z0-9_-]+))/i);
     const igCode = igMatch ? igMatch[1] : null;
 
-    if (isYouTube || isTikTok || isInstagram) {
+    const isFacebook = /(?:facebook\.com|fb\.watch)/i.test(uri);
+    const fbMatch = uri.match(/(?:videos\/|reel\/|\?v=)(\d+)/i) || uri.match(/fb\.watch\/([a-zA-Z0-9_-]+)/i);
+    const fbCode = fbMatch ? fbMatch[1] : null;
+
+    if (isYouTube || isTikTok || isInstagram || isFacebook) {
       if (isYouTube) {
         get().addYouTubeHistory(uri, resolvedTitle);
       }
 
-      const platform: 'youtube' | 'tiktok' | 'instagram' = isYouTube
+      const platform: 'youtube' | 'tiktok' | 'instagram' | 'facebook' = isYouTube
         ? 'youtube'
         : isTikTok
         ? 'tiktok'
-        : 'instagram';
-      const streamId = ytId || ttId || igCode || undefined;
+        : isInstagram
+        ? 'instagram'
+        : 'facebook';
+      const streamId = ytId || ttId || igCode || fbCode || undefined;
 
       const existingRecent = get().recentMedia;
       const existingWeb = existingRecent.find(
@@ -1016,7 +1022,7 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
         uri,
         title:
           resolvedTitle ||
-          (isTikTok ? `TikTok Video (${ttId || 'Web'})` : isInstagram ? `Instagram Reel (${igCode || 'Web'})` : `YouTube (${ytId || 'Web'})`),
+          (isTikTok ? `TikTok Video (${ttId || 'Web'})` : isInstagram ? `Instagram Reel (${igCode || 'Web'})` : isFacebook ? `Facebook Video (${fbCode || 'Web'})` : `YouTube (${ytId || 'Web'})`),
         durationMs: existingWeb?.durationMs || 0,
         lastPositionMs: startPos,
         progressPercent: existingWeb?.progressPercent || 0,

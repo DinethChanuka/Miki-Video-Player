@@ -33,13 +33,30 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
   // Track last command sent to avoid echo loops
   const lastCommandRef = useRef<string | null>(null);
 
-  // Send listening command safely to iframe
+  // Send listening command and initial sound calibration safely to iframe
   const sendListeningPing = useCallback(() => {
     if (iframeRef.current?.contentWindow) {
       iframeRef.current.contentWindow.postMessage(
         JSON.stringify({ event: 'listening' }),
         '*'
       );
+      const currentVol = usePlayerStore.getState().volume;
+      const currentMuted = usePlayerStore.getState().isMuted;
+      if (currentMuted) {
+        iframeRef.current.contentWindow.postMessage(
+          JSON.stringify({ event: 'command', func: 'mute', args: [] }),
+          '*'
+        );
+      } else {
+        iframeRef.current.contentWindow.postMessage(
+          JSON.stringify({ event: 'command', func: 'unMute', args: [] }),
+          '*'
+        );
+        iframeRef.current.contentWindow.postMessage(
+          JSON.stringify({ event: 'command', func: 'setVolume', args: [Math.min(100, currentVol)] }),
+          '*'
+        );
+      }
     }
   }, []);
 
@@ -54,8 +71,34 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
         );
       }
     };
+
+    const handleVolumeEvent = (e: Event) => {
+      const detail = (e as CustomEvent<{ volume: number; isMuted: boolean }>).detail;
+      if (detail && iframeRef.current?.contentWindow) {
+        if (detail.isMuted) {
+          iframeRef.current.contentWindow.postMessage(
+            JSON.stringify({ event: 'command', func: 'mute', args: [] }),
+            '*'
+          );
+        } else {
+          iframeRef.current.contentWindow.postMessage(
+            JSON.stringify({ event: 'command', func: 'unMute', args: [] }),
+            '*'
+          );
+          iframeRef.current.contentWindow.postMessage(
+            JSON.stringify({ event: 'command', func: 'setVolume', args: [Math.min(100, detail.volume)] }),
+            '*'
+          );
+        }
+      }
+    };
+
     window.addEventListener('miki:youtube-seek', handleSeek);
-    return () => window.removeEventListener('miki:youtube-seek', handleSeek);
+    window.addEventListener('miki:volume-change', handleVolumeEvent);
+    return () => {
+      window.removeEventListener('miki:youtube-seek', handleSeek);
+      window.removeEventListener('miki:volume-change', handleVolumeEvent);
+    };
   }, []);
 
   // Main YouTube message & time sync effect

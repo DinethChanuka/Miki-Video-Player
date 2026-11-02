@@ -9,6 +9,10 @@ import {
   ExternalLink,
   Sparkles,
   Star,
+  Volume2,
+  VolumeX,
+  Volume1,
+  Sliders,
 } from 'lucide-react';
 import { getCleanUrl, isBlockedUrl } from '../../utils/adBlockFilter';
 import { parseYouTubeId } from '../../App';
@@ -23,6 +27,7 @@ interface WebBrowserModalProps {
   onStartWindowDrag?: (e: React.MouseEvent) => void;
   onMinimizeWindow?: () => void;
   onMaximizeWindow?: () => void;
+  onOpenEq?: () => void;
 }
 
 interface WebkitMessageHandlers {
@@ -75,6 +80,7 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
   onStartWindowDrag,
   onMinimizeWindow,
   onMaximizeWindow,
+  onOpenEq,
 }) => {
   const [currentUrl, setCurrentUrl] = useState<string>(initialUrl);
   const [isAdShieldActive, setIsAdShieldActive] = useState<boolean>(true);
@@ -83,6 +89,11 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
   const [detectedMediaUrl, setDetectedMediaUrl] = useState<string | null>(null);
   const [detectedMediaTitle, setDetectedMediaTitle] = useState<string | null>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
+
+  const volume = usePlayerStore((s) => s.volume);
+  const isMuted = usePlayerStore((s) => s.isMuted);
+  const setVolume = usePlayerStore((s) => s.setVolume);
+  const toggleMute = usePlayerStore((s) => s.toggleMute);
 
   const toggleWebsiteBookmark = usePlayerStore((s) => s.toggleWebsiteBookmark);
   const isWebsiteBookmarked = usePlayerStore((s) => s.isWebsiteBookmarked);
@@ -340,6 +351,50 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
           className="flex items-center gap-2 shrink-0"
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
+          {/* Web Stream Sound Volume & Equalizer Control */}
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white/5 border border-white/10 shadow-sm">
+            <button
+              onClick={() => toggleMute()}
+              className="p-1 rounded-lg hover:bg-white/10 text-white/80 hover:text-white transition-colors"
+              title={isMuted ? 'Unmute Sound' : 'Mute Sound'}
+            >
+              {isMuted || volume === 0 ? (
+                <VolumeX className="w-3.5 h-3.5 text-rose-400" />
+              ) : volume > 100 ? (
+                <Volume2 className="w-3.5 h-3.5 text-amber-400" />
+              ) : volume > 50 ? (
+                <Volume2 className="w-3.5 h-3.5 text-cyan-400" />
+              ) : (
+                <Volume1 className="w-3.5 h-3.5 text-white/80" />
+              )}
+            </button>
+
+            <input
+              type="range"
+              min={0}
+              max={200}
+              step={1}
+              value={isMuted ? 0 : volume}
+              onChange={(e) => setVolume(parseInt(e.target.value, 10))}
+              className="w-16 sm:w-20 h-1 bg-white/20 rounded-lg appearance-none cursor-pointer accent-cyan-400"
+              title={`Web Stream Volume: ${volume}% (0-200% VLC overdrive)`}
+            />
+
+            <span className={`font-mono text-[10px] font-bold w-9 ${volume > 100 ? 'text-amber-400' : 'text-cyan-300'}`}>
+              {isMuted ? 'Mute' : `${volume}%`}
+            </span>
+
+            {onOpenEq && (
+              <button
+                onClick={onOpenEq}
+                className="p-1 rounded-lg hover:bg-white/10 text-white/70 hover:text-white transition-colors ml-0.5"
+                title="Open 10-Band Equalizer"
+              >
+                <Sliders className="w-3.5 h-3.5 text-cyan-400" />
+              </button>
+            )}
+          </div>
+
           {/* Play in Player Button (when media or youtube detected) */}
           {isPlayableInPlayer() && (
             <button
