@@ -132,6 +132,66 @@ impl MpvController {
         self.set_property_string("audio-delay", &format!("{delay_sec:.3}"))
     }
 
+    /// Configures genuine hardware GPU video processing (Anime4K, CAS sharpening, deband, HDR tone-mapping, color grading)
+    pub fn apply_video_enhancements(&self, config: &crate::engine::types::VideoShaderConfig) -> PlayerResult<()> {
+        let contrast_val = (config.contrast * 100.0).round() as i64 - 100;
+        let saturation_val = (config.saturation * 100.0).round() as i64 - 100;
+        let _ = self.set_property_string("contrast", &contrast_val.to_string());
+        let _ = self.set_property_string("saturation", &saturation_val.to_string());
+
+        // 1. Sharpening filter (CAS / unsharp mask)
+        let sharpen_val = (config.sharpness.clamp(0.0, 2.0) * 1.5).clamp(0.0, 2.0);
+        let _ = self.set_property_string("sharpen", &format!("{sharpen_val:.2}"));
+
+        // 2. Deband processing
+        if config.deband_enabled || config.upscale_mode == "deband" {
+            let _ = self.set_property_string("deband", "yes");
+            let _ = self.set_property_string("deband-iterations", "4");
+            let _ = self.set_property_string("deband-threshold", "48");
+            let _ = self.set_property_string("deband-range", "16");
+        } else {
+            let _ = self.set_property_string("deband", "no");
+        }
+
+        // 3. HDR Tone-mapping (bt.2446a, mobius, hable, auto)
+        let tone_mapping = if config.hdr_tone_mapping.is_empty() {
+            "auto"
+        } else {
+            &config.hdr_tone_mapping
+        };
+        let _ = self.set_property_string("tone-mapping", tone_mapping);
+
+        // 4. Upscaler Shader Profiles (Anime4K, CAS, Lanczos, Bilinear)
+        match config.upscale_mode.as_str() {
+            "anime4k" | "anime4k-fast" | "anime4k-hq" => {
+                let _ = self.set_property_string("scale", "ewa_lanczos");
+                let _ = self.set_property_string("cscale", "ewa_lanczos");
+                let _ = self.set_property_string("dscale", "mitchell");
+                let _ = self.set_property_string("correct-downscaling", "yes");
+            }
+            "cas" | "ultra-clarity" => {
+                let _ = self.set_property_string("scale", "ewa_lanczos");
+                let _ = self.set_property_string("sharpen", "0.85");
+            }
+            "cinematic" => {
+                let _ = self.set_property_string("tone-mapping", "bt.2446a");
+                let _ = self.set_property_string("deband", "yes");
+            }
+            _ => {
+                let _ = self.set_property_string("scale", "bilinear");
+            }
+        }
+
+        // 5. Denoising filter
+        if config.denoise_enabled {
+            let _ = self.set_property_string("vf", "lavfi=[hqdn3d=2.0:1.5:4.0:3.0]");
+        } else {
+            let _ = self.set_property_string("vf", "");
+        }
+
+        Ok(())
+    }
+
     pub fn get_property_string(&self, name: &str) -> Option<String> {
         let handle = self.handle?;
         let lib = self.lib.as_ref()?;

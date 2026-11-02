@@ -127,12 +127,7 @@ pub async fn player_apply_shader(
     controller: State<'_, Arc<Mutex<MpvController>>>,
 ) -> PlayerResult<()> {
     let guard = controller.lock();
-    // Configure mpv built-in filters corresponding to shader adjustments
-    let contrast_val = (config.contrast * 100.0).round() as i64 - 100; // -100 to 100
-    let saturation_val = (config.saturation * 100.0).round() as i64 - 100;
-    let _ = guard.set_property_string("contrast", &contrast_val.to_string());
-    let _ = guard.set_property_string("saturation", &saturation_val.to_string());
-    Ok(())
+    guard.apply_video_enhancements(&config)
 }
 
 #[tauri::command]

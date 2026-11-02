@@ -69,7 +69,17 @@ pub struct VideoShaderConfig {
     pub sharpness: f32, // 0.0 to 1.0
     pub contrast: f32,  // 0.5 to 1.5
     pub saturation: f32, // 0.0 to 2.0
-    pub upscale_mode: String, // "none", "anime4k-fast", "anime4k-hq"
+    pub upscale_mode: String, // "none", "anime4k", "cas", "hdr", "deband"
+    #[serde(default)]
+    pub deband_enabled: bool,
+    #[serde(default)]
+    pub denoise_enabled: bool,
+    #[serde(default = "default_hdr_tone_mapping")]
+    pub hdr_tone_mapping: String, // "auto", "bt.2446a", "mobius", "hable", "reinhard"
+}
+
+fn default_hdr_tone_mapping() -> String {
+    "auto".into()
 }
 
 impl Default for VideoShaderConfig {
@@ -80,6 +90,9 @@ impl Default for VideoShaderConfig {
             contrast: 1.0,
             saturation: 1.0,
             upscale_mode: "none".into(),
+            deband_enabled: false,
+            denoise_enabled: false,
+            hdr_tone_mapping: "auto".into(),
         }
     }
 }
