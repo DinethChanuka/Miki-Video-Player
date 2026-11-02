@@ -319,7 +319,11 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
             srcDoc={selectedGame.srcDoc}
             src={!selectedGame.srcDoc ? selectedGame.url : undefined}
             title={selectedGame.title}
-            sandbox="allow-scripts allow-same-origin allow-pointer-lock allow-forms allow-popups"
+            sandbox={
+              selectedGame.srcDoc
+                ? 'allow-scripts allow-pointer-lock allow-forms'
+                : 'allow-scripts allow-forms allow-pointer-lock allow-popups'
+            }
             allow="fullscreen; autoplay"
             className="w-full h-full border-0 bg-black"
           />
