@@ -94,3 +94,4 @@ describe('Web Stream URL Parsing & Embed Generation', () => {
     assert.equal(parseWebStream('/path/to/local/movie.mkv'), null);
   });
 });
+

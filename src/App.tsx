@@ -402,14 +402,17 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [seek, resetControlsTimer, playNextMedia, playPreviousMedia]);
 
-  const handleOpenLocalFileDialog = () => {
+  const handleOpenLocalFileDialog = useCallback(() => {
     if (
       typeof window !== 'undefined' &&
       (window as unknown as { webkit?: { messageHandlers?: { openNativeFileDialog?: { postMessage: (msg: string) => void } } } }).webkit?.messageHandlers?.openNativeFileDialog
     ) {
       (window as unknown as { webkit: { messageHandlers: { openNativeFileDialog: { postMessage: (msg: string) => void } } } }).webkit.messageHandlers.openNativeFileDialog.postMessage('open');
+    } else {
+      const input = document.getElementById('miki-main-file-input') as HTMLInputElement | null;
+      input?.click();
     }
-  };
+  }, []);
 
   const handleFileDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -464,26 +467,31 @@ export const App: React.FC = () => {
       {/* Custom Background Image Layer (Below all Glassmorphic Layers with Extended Spread) */}
       {customBgImage && (
         <div className="absolute -inset-10 z-0 pointer-events-none overflow-hidden">
-          <div
-            className="w-full h-full bg-cover bg-center transition-all duration-300 ease-out transform scale-105"
+          <img
+            src={customBgImage}
+            alt="Custom background wallpaper"
+            className="w-full h-full object-cover transition-all duration-200 ease-out"
             style={{
-              backgroundImage: `url(${customBgImage})`,
               opacity: customBgOpacity,
+              WebkitFilter: `blur(${customBgBlur}px) brightness(${customBgBrightness ?? 1.0})`,
               filter: `blur(${customBgBlur}px) brightness(${customBgBrightness ?? 1.0})`,
+              transform: 'scale(1.10) translateZ(0)',
+              WebkitTransform: 'scale(1.10) translateZ(0)',
+              willChange: 'filter, transform, opacity',
             }}
           />
           {/* Dynamic Tint Overlay Layer */}
           <div
             className={`absolute inset-0 pointer-events-none transition-colors duration-300 ${
               customBgTint === 'navy'
-                ? 'bg-blue-950/40'
+                ? 'bg-blue-950/45'
                 : customBgTint === 'aurora'
-                  ? 'bg-emerald-950/30'
+                  ? 'bg-emerald-950/35'
                   : customBgTint === 'amethyst'
-                    ? 'bg-purple-950/30'
+                    ? 'bg-purple-950/35'
                     : customBgTint === 'clear'
                       ? 'bg-transparent'
-                      : 'bg-black/40'
+                      : 'bg-black/45'
             }`}
             style={{
               opacity: customBgTint === 'clear' ? 0 : Math.min(1, (customBgOpacity ?? 1) * 0.9),
@@ -491,6 +499,16 @@ export const App: React.FC = () => {
           />
         </div>
       )}
+
+      {/* Global Theme Ambient Atmosphere Layer */}
+      <div
+        className="absolute inset-0 pointer-events-none z-0 transition-all duration-700 overflow-hidden"
+        style={{
+          background: `radial-gradient(ellipse 95% 70% at 50% -10%, ${theme.haloGlow}, transparent 70%), radial-gradient(circle 800px at 0% 100%, ${theme.previewColors[0]}33, transparent 65%), radial-gradient(circle 800px at 100% 100%, ${theme.previewColors[1]}33, transparent 65%)`,
+          mixBlendMode: customBgImage ? 'screen' : 'normal',
+          opacity: customBgImage ? 0.75 : 1,
+        }}
+      />
 
       {/* Sleek, Clean Frameless Titlebar - Drag & Always Visible Menubar */}
       <div
@@ -541,11 +559,7 @@ export const App: React.FC = () => {
             }}
             onOpenSettings={() => setIsSettingsOpen(true)}
             onOpenEq={() => setIsEqOpen(true)}
-            onOpenLocalFile={() => {
-              handleOpenLocalFileDialog();
-              const input = document.getElementById('miki-main-file-input') as HTMLInputElement | null;
-              input?.click();
-            }}
+            onOpenLocalFile={handleOpenLocalFileDialog}
             onOpenSystemAccess={() => setIsSystemAccessOpen(true)}
           />
 
@@ -817,7 +831,7 @@ export const App: React.FC = () => {
         {!currentUri && (
           <div
             className={`absolute inset-0 z-30 flex flex-col items-center justify-start pt-6 sm:pt-8 pb-12 px-6 sm:px-10 pointer-events-auto animate-in fade-in duration-300 overflow-y-auto ${
-              customBgImage ? 'bg-black/25' : 'bg-black/75 backdrop-blur-md'
+              customBgImage ? 'bg-black/30' : 'bg-black/20'
             }`}
           >
             {recentMedia.length > 0 ? (
@@ -844,11 +858,7 @@ export const App: React.FC = () => {
 
                   <div className="flex items-center gap-2.5">
                     <button
-                      onClick={() => {
-                        handleOpenLocalFileDialog();
-                        const input = document.getElementById('miki-main-file-input') as HTMLInputElement | null;
-                        input?.click();
-                      }}
+                      onClick={handleOpenLocalFileDialog}
                       className={`px-4 py-2.5 rounded-2xl bg-gradient-to-r ${theme.accentGradient} text-white font-bold text-xs cursor-pointer transition-all shadow-lg active:scale-95 flex items-center gap-1.5`}
                       style={{ boxShadow: `0 4px 15px ${theme.haloGlow}` }}
                     >

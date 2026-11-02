@@ -63,3 +63,4 @@ describe('Gmail Account Validation & Storage Schema', () => {
     assert.equal(acc.displayName, 'Alex Dev');
   });
 });
+

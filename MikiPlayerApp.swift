@@ -147,6 +147,21 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         webView.evaluateJavaScript(js, completionHandler: nil)
     }
 
+    final class SafeCompletionWrapper {
+        private var handler: (([URL]?) -> Void)?
+        init(_ handler: @escaping ([URL]?) -> Void) {
+            self.handler = handler
+        }
+        func complete(with urls: [URL]?) {
+            let h = handler
+            handler = nil
+            h?(urls)
+        }
+        deinit {
+            handler?(nil)
+        }
+    }
+
     // WKUIDelegate: native file picker when <input type="file"> is clicked
     func webView(
         _ webView: WKWebView,
@@ -154,7 +169,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         initiatedByFrame frame: WKFrameInfo,
         completionHandler: @escaping ([URL]?) -> Void
     ) {
+        let wrapper = SafeCompletionWrapper(completionHandler)
         let openPanel = NSOpenPanel()
+        openPanel.title = "Select Media File - Miki Player"
         openPanel.canChooseFiles = true
         openPanel.canChooseDirectories = false
         openPanel.allowsMultipleSelection = parameters.allowsMultipleSelection
@@ -163,9 +180,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         }
         openPanel.begin { response in
             if response == .OK {
-                completionHandler(openPanel.urls)
+                wrapper.complete(with: openPanel.urls)
             } else {
-                completionHandler(nil)
+                wrapper.complete(with: nil)
             }
         }
     }

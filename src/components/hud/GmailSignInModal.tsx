@@ -287,3 +287,4 @@ export const GmailSignInModal: React.FC<GmailSignInModalProps> = ({ isOpen, onCl
     </div>
   );
 };
+

@@ -76,3 +76,4 @@ export function parseWebStream(url: string): ParsedWebStream | null {
 export function isSocialWebStream(url: string): boolean {
   return parseWebStream(url) !== null;
 }
+

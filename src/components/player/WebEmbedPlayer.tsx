@@ -132,3 +132,4 @@ export const WebEmbedPlayer: React.FC<WebEmbedPlayerProps> = ({
     </div>
   );
 };
+
