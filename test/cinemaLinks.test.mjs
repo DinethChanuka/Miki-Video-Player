@@ -49,3 +49,4 @@ describe('Cinema & Fast Streaming Links Catalog', () => {
     assert.equal(emptyMatches.length, 0);
   });
 });
+
