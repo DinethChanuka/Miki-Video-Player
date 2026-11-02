@@ -8,15 +8,18 @@ import {
   Play,
   ExternalLink,
   Sparkles,
+  Star,
 } from 'lucide-react';
 import { getCleanUrl, isBlockedUrl } from '../../utils/adBlockFilter';
 import { parseYouTubeId } from '../../App';
+import { getWebsiteFaviconUrl } from '../../utils/faviconService';
+import { usePlayerStore } from '../../store/playerStore';
 
 interface WebBrowserModalProps {
   isOpen: boolean;
   initialUrl?: string;
   onClose: () => void;
-  onPlayInNativePlayer: (url: string) => void;
+  onPlayInNativePlayer: (url: string, title?: string) => void;
   onStartWindowDrag?: (e: React.MouseEvent) => void;
   onMinimizeWindow?: () => void;
   onMaximizeWindow?: () => void;
@@ -78,7 +81,12 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [blockedCount, setBlockedCount] = useState<number>(18);
   const [detectedMediaUrl, setDetectedMediaUrl] = useState<string | null>(null);
+  const [detectedMediaTitle, setDetectedMediaTitle] = useState<string | null>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
+
+  const toggleWebsiteBookmark = usePlayerStore((s) => s.toggleWebsiteBookmark);
+  const isWebsiteBookmarked = usePlayerStore((s) => s.isWebsiteBookmarked);
+  const isBookmarked = isWebsiteBookmarked(currentUrl);
 
   const getWebkitHandlers = () => {
     if (typeof window === 'undefined') return undefined;
@@ -127,6 +135,9 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
       const detail = (e as CustomEvent<{ url?: string; title?: string }>).detail;
       if (detail?.url) {
         setDetectedMediaUrl(detail.url);
+        if (detail.title) {
+          setDetectedMediaTitle(detail.title);
+        }
       }
     };
 
@@ -215,8 +226,9 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
 
   const handlePlayInPlayer = () => {
     const target = detectedMediaUrl || currentUrl;
+    const title = detectedMediaTitle || siteHostname;
     handleClose();
-    onPlayInNativePlayer(target);
+    onPlayInNativePlayer(target, title);
   };
 
   const resolvedFrameUrl = resolveBrowserFrameUrl(currentUrl);
@@ -253,11 +265,33 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
             <RotateCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-cyan-400' : ''}`} />
           </button>
 
-          {/* Website Hostname Badge */}
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white/5 border border-white/10 text-xs text-white/90 font-medium">
+          {/* Website Hostname Badge with Authentic Logo */}
+          <div className="flex items-center gap-2 px-2.5 py-1 rounded-xl bg-white/5 border border-white/10 text-xs text-white/90 font-medium shadow-sm">
+            <img
+              src={getWebsiteFaviconUrl(currentUrl, 64)}
+              alt={siteHostname}
+              className="w-4 h-4 rounded-md object-contain shrink-0"
+              onError={(e) => {
+                (e.currentTarget as HTMLElement).style.display = 'none';
+              }}
+            />
             <Globe className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-            <span className="truncate max-w-[180px] font-mono text-[11px]">{siteHostname}</span>
+            <span className="truncate max-w-[160px] font-mono text-[11px]">{siteHostname}</span>
           </div>
+
+          {/* Website Bookmark Toggle Button */}
+          <button
+            onClick={() => toggleWebsiteBookmark(currentUrl, siteHostname)}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-[11px] font-semibold transition-all shadow-sm ${
+              isBookmarked
+                ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30'
+                : 'bg-white/5 text-white/70 hover:text-white border-white/10 hover:bg-white/10'
+            }`}
+            title={isBookmarked ? 'Bookmarked in Saved Library' : 'Bookmark this website'}
+          >
+            <Star className="w-3.5 h-3.5 text-amber-400" fill={isBookmarked ? '#fbbf24' : 'none'} />
+            <span>{isBookmarked ? 'Bookmarked' : 'Bookmark'}</span>
+          </button>
 
           {/* Ad Shield Toggle Pill */}
           <button
