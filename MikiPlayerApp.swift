@@ -109,11 +109,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         signInItem.target = self
         accountMenu.addItem(signInItem)
 
-        // Web Streams Menu (YouTube, TikTok, Instagram)
+        // Web Streams Menu (YouTube, TikTok, Instagram, Cinema, Web Browser)
         let streamMenuItem = NSMenuItem()
         mainMenu.addItem(streamMenuItem)
         let streamMenu = NSMenu(title: "Streams")
         streamMenuItem.submenu = streamMenu
+        let browseItem = NSMenuItem(title: "Browse Protected Web...", action: #selector(openWebBrowser), keyEquivalent: "b")
+        browseItem.target = self
+        streamMenu.addItem(browseItem)
+        let cinemaItem = NSMenuItem(title: "Cinema & CineSubz Streams...", action: #selector(openCinemaPortal), keyEquivalent: "m")
+        cinemaItem.target = self
+        streamMenu.addItem(cinemaItem)
+        streamMenu.addItem(NSMenuItem.separator())
         let ytItem = NSMenuItem(title: "YouTube Web Stream...", action: #selector(openYouTubeStream), keyEquivalent: "y")
         ytItem.target = self
         streamMenu.addItem(ytItem)
@@ -125,6 +132,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         streamMenu.addItem(igItem)
 
         NSApp.mainMenu = mainMenu
+    }
+
+    @objc func openWebBrowser() {
+        let js = "window.dispatchEvent(new CustomEvent('miki:open-web-browser', { detail: { url: 'https://www.youtube.com' } }));"
+        webView.evaluateJavaScript(js, completionHandler: nil)
+    }
+
+    @objc func openCinemaPortal() {
+        let js = "window.dispatchEvent(new CustomEvent('miki:open-web-browser', { detail: { url: 'https://cinesubz.co' } }));"
+        webView.evaluateJavaScript(js, completionHandler: nil)
     }
 
     @objc func openGmailSignIn() {
@@ -160,6 +177,19 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         deinit {
             handler?(nil)
         }
+    }
+
+    // WKUIDelegate: Intercept & block intrusive popups and unauthorized new window spawns
+    func webView(
+        _ webView: WKWebView,
+        createWebViewWith configuration: WKWebViewConfiguration,
+        for navigationAction: WKNavigationAction,
+        windowFeatures: WKWindowFeatures
+    ) -> WKWebView? {
+        if let targetUrl = navigationAction.request.url?.absoluteString {
+            NSLog("[Miki Shield] Intercepted and blocked popup window creation for: %@", targetUrl)
+        }
+        return nil
     }
 
     // WKUIDelegate: native file picker when <input type="file"> is clicked

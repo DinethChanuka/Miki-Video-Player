@@ -11,12 +11,15 @@ import {
   Share2,
   CheckCircle2,
   Plus,
+  Globe,
+  Film,
 } from 'lucide-react';
 import { StoredGmailAccount, getStoredGmailAccount } from './GmailSignInModal';
 
 interface ApplicationMenuProps {
   onOpenGmailSignIn: () => void;
-  onOpenLibrary: (initialTab?: 'youtube' | 'tiktok' | 'instagram' | 'demos' | 'recent' | 'bookmarks') => void;
+  onOpenLibrary: (initialTab?: 'youtube' | 'tiktok' | 'instagram' | 'demos' | 'recent' | 'bookmarks' | 'cinema') => void;
+  onOpenWebBrowser?: (url?: string) => void;
   onOpenSettings: () => void;
   onOpenEq: () => void;
   onOpenLocalFile: () => void;
@@ -26,6 +29,7 @@ interface ApplicationMenuProps {
 export const ApplicationMenu: React.FC<ApplicationMenuProps> = ({
   onOpenGmailSignIn,
   onOpenLibrary,
+  onOpenWebBrowser,
   onOpenSettings,
   onOpenEq,
   onOpenLocalFile,
@@ -131,11 +135,37 @@ export const ApplicationMenu: React.FC<ApplicationMenuProps> = ({
 
           <div className="h-px bg-white/15 my-0.5" />
 
-          {/* Section 2: Web Streams */}
+          {/* Section 2: Web Streams & Browser */}
           <div className="flex flex-col gap-1">
             <span className="text-[10px] uppercase font-mono tracking-wider text-slate-300 font-bold px-2 py-0.5">
-              Web Streams
+              Streams & Web
             </span>
+
+            <button
+              onClick={() => {
+                setIsOpen(false);
+                if (onOpenWebBrowser) {
+                  onOpenWebBrowser('https://www.youtube.com');
+                } else {
+                  onOpenLibrary('youtube');
+                }
+              }}
+              className="flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/15 text-xs font-medium text-white transition-all text-left"
+            >
+              <Globe className="w-4 h-4 text-cyan-400 shrink-0" />
+              <span>Browse Web (Ad-Shielded)</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setIsOpen(false);
+                onOpenLibrary('cinema');
+              }}
+              className="flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/15 text-xs font-medium text-white transition-all text-left"
+            >
+              <Film className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>Cinema & CineSubz</span>
+            </button>
 
             <button
               onClick={() => {
@@ -145,7 +175,7 @@ export const ApplicationMenu: React.FC<ApplicationMenuProps> = ({
               className="flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/15 text-xs font-medium text-white transition-all text-left"
             >
               <Youtube className="w-4 h-4 text-rose-400 shrink-0" />
-              <span>YouTube Web Stream</span>
+              <span>YouTube Stream</span>
             </button>
 
             <button

@@ -6,6 +6,7 @@ import { ControlsOverlay } from './components/hud/ControlsOverlay';
 import { EqualizerModal } from './components/hud/EqualizerModal';
 import { VideoSettingsModal } from './components/hud/VideoSettingsModal';
 import { FileBrowserModal } from './components/hud/FileBrowserModal';
+import { WebBrowserModal } from './components/hud/WebBrowserModal';
 import { ResumeChoiceModal } from './components/hud/ResumeChoiceModal';
 import { SystemAccessModal } from './components/hud/SystemAccessModal';
 import { ErrorToast } from './components/hud/ErrorToast';
@@ -110,7 +111,9 @@ export const App: React.FC = () => {
   const [isEqOpen, setIsEqOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isFileBrowserOpen, setIsFileBrowserOpen] = useState(false);
-  const [fileBrowserInitialTab, setFileBrowserInitialTab] = useState<'youtube' | 'tiktok' | 'instagram' | 'demos' | 'recent' | 'bookmarks'>('youtube');
+  const [fileBrowserInitialTab, setFileBrowserInitialTab] = useState<'youtube' | 'tiktok' | 'instagram' | 'demos' | 'recent' | 'bookmarks' | 'cinema'>('youtube');
+  const [isWebBrowserOpen, setIsWebBrowserOpen] = useState(false);
+  const [webBrowserUrl, setWebBrowserUrl] = useState('https://www.youtube.com');
   const [isSystemAccessOpen, setIsSystemAccessOpen] = useState(false);
   const [isGmailSignInOpen, setIsGmailSignInOpen] = useState(false);
   const [pendingResumeItem, setPendingResumeItem] = useState<MediaHistoryItem | null>(null);
@@ -229,19 +232,26 @@ export const App: React.FC = () => {
   const webStream = useMemo(() => (currentUri ? parseWebStream(currentUri) : null), [currentUri]);
   const youtubeId = webStream?.platform === 'youtube' ? webStream.id : null;
 
-  // Listen for native / global triggers for Gmail signin & web streams
+  // Listen for native / global triggers for Gmail signin, web streams & browser
   useEffect(() => {
     const handleOpenGmail = () => setIsGmailSignInOpen(true);
     const handleOpenStream = (e: Event) => {
-      const detail = (e as CustomEvent<{ tab?: 'youtube' | 'tiktok' | 'instagram' }>).detail;
+      const detail = (e as CustomEvent<{ tab?: 'youtube' | 'tiktok' | 'instagram' | 'cinema' }>).detail;
       if (detail?.tab) setFileBrowserInitialTab(detail.tab);
       setIsFileBrowserOpen(true);
     };
+    const handleOpenBrowser = (e: Event) => {
+      const detail = (e as CustomEvent<{ url?: string }>).detail;
+      if (detail?.url) setWebBrowserUrl(detail.url);
+      setIsWebBrowserOpen(true);
+    };
     window.addEventListener('miki:open-gmail-signin', handleOpenGmail);
     window.addEventListener('miki:open-web-stream', handleOpenStream);
+    window.addEventListener('miki:open-web-browser', handleOpenBrowser);
     return () => {
       window.removeEventListener('miki:open-gmail-signin', handleOpenGmail);
       window.removeEventListener('miki:open-web-stream', handleOpenStream);
+      window.removeEventListener('miki:open-web-browser', handleOpenBrowser);
     };
   }, []);
 
@@ -556,6 +566,10 @@ export const App: React.FC = () => {
             onOpenLibrary={(tab) => {
               if (tab) setFileBrowserInitialTab(tab);
               setIsFileBrowserOpen(true);
+            }}
+            onOpenWebBrowser={(url) => {
+              if (url) setWebBrowserUrl(url);
+              setIsWebBrowserOpen(true);
             }}
             onOpenSettings={() => setIsSettingsOpen(true)}
             onOpenEq={() => setIsEqOpen(true)}
@@ -1118,6 +1132,17 @@ export const App: React.FC = () => {
       </div>
 
       {/* Modals wrapped in ErrorBoundary to guarantee uninterrupted UI */}
+      <ErrorBoundary onReset={() => setIsWebBrowserOpen(false)}>
+        <WebBrowserModal
+          isOpen={isWebBrowserOpen}
+          initialUrl={webBrowserUrl}
+          onClose={() => setIsWebBrowserOpen(false)}
+          onPlayInNativePlayer={(url) => {
+            openMedia(url);
+          }}
+        />
+      </ErrorBoundary>
+
       <ErrorBoundary onReset={() => setIsFileBrowserOpen(false)}>
         <FileBrowserModal
           isOpen={isFileBrowserOpen}
