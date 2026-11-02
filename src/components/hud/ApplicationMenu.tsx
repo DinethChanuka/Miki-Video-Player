@@ -170,21 +170,6 @@ export const ApplicationMenu: React.FC<ApplicationMenuProps> = ({
             <button
               onClick={() => {
                 setIsOpen(false);
-                if (onOpenWebBrowser) {
-                  onOpenWebBrowser('https://www.youtube.com');
-                } else {
-                  onOpenLibrary('cinema');
-                }
-              }}
-              className="flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/15 text-xs font-medium text-white transition-all text-left"
-            >
-              <Globe className="w-4 h-4 text-cyan-400 shrink-0" />
-              <span>Browse Web</span>
-            </button>
-
-            <button
-              onClick={() => {
-                setIsOpen(false);
                 onOpenLibrary('cinema');
               }}
               className="flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/15 text-xs font-medium text-white transition-all text-left"
