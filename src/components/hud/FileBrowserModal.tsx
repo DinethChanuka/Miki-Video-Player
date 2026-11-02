@@ -19,10 +19,12 @@ import {
   Globe,
   ShieldCheck,
   ExternalLink,
+  Star,
 } from 'lucide-react';
 import { parseYouTubeId } from '../../App';
 import { formatPathForOS } from '../../utils/pathUtils';
 import { CINEMA_LINKS, filterCinemaLinks, CinemaCategory } from '../../utils/cinemaLinks';
+import { getWebsiteFaviconUrl } from '../../utils/faviconService';
 
 interface FileBrowserModalProps {
   isOpen: boolean;
@@ -197,6 +199,10 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({
   const recentMedia = usePlayerStore((s) => s.recentMedia);
   const removeRecentMedia = usePlayerStore((s) => s.removeRecentMedia);
   const bookmarks = usePlayerStore((s) => s.bookmarks);
+  const bookmarkedWebsites = usePlayerStore((s) => s.bookmarkedWebsites);
+  const removeWebsiteBookmark = usePlayerStore((s) => s.removeWebsiteBookmark);
+  const toggleWebsiteBookmark = usePlayerStore((s) => s.toggleWebsiteBookmark);
+  const isWebsiteBookmarked = usePlayerStore((s) => s.isWebsiteBookmarked);
   const seek = usePlayerStore((s) => s.seek);
   const currentUri = usePlayerStore((s) => s.currentUri);
   const youtubeHistory = usePlayerStore((s) => s.youtubeHistory);
@@ -494,7 +500,7 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({
             }`}
           >
             <Bookmark className="w-3.5 h-3.5 text-amber-400" />
-            <span>Saved ({bookmarks.length})</span>
+            <span>Saved ({bookmarks.length + (bookmarkedWebsites?.length || 0)})</span>
           </button>
         </div>
 
@@ -929,13 +935,34 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({
                         onClose();
                       }}
                     >
-                      <span className="text-sm font-medium text-white truncate group-hover:text-cyan-300 transition-colors">
-                        {item.title || 'Untitled Video'}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        {item.faviconUrl ? (
+                          <img
+                            src={item.faviconUrl}
+                            alt="favicon"
+                            className="w-4 h-4 object-contain rounded shrink-0 bg-black/40 p-0.5 border border-white/10"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLElement).style.display = 'none';
+                            }}
+                          />
+                        ) : item.uri && item.uri.startsWith('http') ? (
+                          <img
+                            src={getWebsiteFaviconUrl(item.uri, 32)}
+                            alt="favicon"
+                            className="w-4 h-4 object-contain rounded shrink-0 bg-black/40 p-0.5 border border-white/10"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLElement).style.display = 'none';
+                            }}
+                          />
+                        ) : null}
+                        <span className="text-sm font-medium text-white truncate group-hover:text-cyan-300 transition-colors">
+                          {item.title || 'Untitled Video'}
+                        </span>
+                      </div>
                       <div className="flex items-center gap-3 text-xs text-white/50">
                         <span>{(item.progressPercent || 0).toFixed(0)}% watched</span>
                         <span>•</span>
-                        <span className="font-mono truncate">{formatPathForOS(item.uri || '')}</span>
+                        <span className="font-mono truncate">{item.webDomain ? item.webDomain : formatPathForOS(item.uri || '')}</span>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
@@ -967,38 +994,126 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({
           )}
 
           {activeTab === 'bookmarks' && (
-            <div className="flex flex-col gap-2">
-              {bookmarks.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-48 text-white/40 text-xs gap-2">
-                  <Bookmark className="w-8 h-8 opacity-40 text-amber-400" />
-                  No bookmarks saved. Click the bookmark icon in controls during playback to save one.
-                </div>
-              ) : (
-                bookmarks.map((bm) => (
-                  <div
-                    key={bm.id}
-                    onClick={() => {
-                      if (currentUri !== bm.mediaId) {
-                        openMedia(bm.mediaId);
-                      }
-                      seek(bm.timestampMs);
-                      onClose();
-                    }}
-                    className="flex items-center justify-between p-3.5 rounded-2xl bg-white/5 border border-white/10 hover:border-amber-400/40 hover:bg-white/10 cursor-pointer transition-all active:scale-[0.99] group"
-                    title="Click to jump to bookmark"
-                  >
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-sm font-medium text-white group-hover:text-amber-300 transition-colors">
-                        {bm.label || 'Bookmark'}
-                      </span>
-                      <span className="text-xs font-mono text-amber-400">
-                        Jump to: {((bm.timestampMs || 0) / 1000).toFixed(1)}s
-                      </span>
-                    </div>
-                    <Play className="w-4 h-4 text-amber-400 shrink-0" />
+            <div className="flex flex-col gap-4">
+              {/* Bookmarked Websites & Web Streams */}
+              {bookmarkedWebsites && bookmarkedWebsites.length > 0 && (
+                <div className="flex flex-col gap-2.5">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-amber-300">
+                    <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                    <span>Saved Web Portals & Streams ({bookmarkedWebsites.length})</span>
                   </div>
-                ))
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                    {bookmarkedWebsites.map((site) => (
+                      <div
+                        key={site.id}
+                        className="p-3 rounded-2xl bg-white/5 border border-white/10 hover:border-amber-400/40 hover:bg-white/10 transition-all flex items-center justify-between gap-3 group"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-8 h-8 rounded-xl bg-black/60 border border-white/15 p-1 flex items-center justify-center shrink-0">
+                            <img
+                              src={site.faviconUrl || getWebsiteFaviconUrl(site.url, 64)}
+                              alt={site.title}
+                              className="w-6 h-6 object-contain rounded-lg"
+                              onError={(e) => {
+                                (e.currentTarget as HTMLElement).style.display = 'none';
+                              }}
+                            />
+                          </div>
+
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-xs font-bold text-white group-hover:text-amber-300 transition-colors truncate">
+                              {site.title || site.domain}
+                            </span>
+                            <span className="text-[10px] font-mono text-cyan-400 truncate">
+                              {site.domain}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            onClick={() => {
+                              window.dispatchEvent(
+                                new CustomEvent('miki:open-web-browser', {
+                                  detail: { url: site.url },
+                                })
+                              );
+                              onClose();
+                            }}
+                            className="p-1.5 rounded-xl bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 transition-colors"
+                            title="Browse in web view"
+                          >
+                            <Globe className="w-3.5 h-3.5" />
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              openMedia(site.url, site.title);
+                              onClose();
+                            }}
+                            className="p-1.5 rounded-xl bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30 transition-colors"
+                            title="Play in system engine"
+                          >
+                            <Play className="w-3.5 h-3.5 fill-cyan-300" />
+                          </button>
+
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeWebsiteBookmark(site.id);
+                            }}
+                            className="p-1.5 rounded-xl hover:bg-rose-500/20 text-white/40 hover:text-rose-300 transition-colors"
+                            title="Remove bookmark"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
+
+              {/* Video Timeline Bookmarks */}
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2 text-xs font-semibold text-white/70">
+                  <Bookmark className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Timeline Frame Bookmarks ({bookmarks.length})</span>
+                </div>
+
+                {bookmarks.length === 0 && (!bookmarkedWebsites || bookmarkedWebsites.length === 0) ? (
+                  <div className="flex flex-col items-center justify-center h-48 text-white/40 text-xs gap-2">
+                    <Bookmark className="w-8 h-8 opacity-40 text-amber-400" />
+                    No bookmarks saved. Click the bookmark icon in controls or browser header to save one.
+                  </div>
+                ) : (
+                  bookmarks.map((bm) => (
+                    <div
+                      key={bm.id}
+                      onClick={() => {
+                        if (currentUri !== bm.mediaId) {
+                          openMedia(bm.mediaId);
+                        }
+                        seek(bm.timestampMs);
+                        onClose();
+                      }}
+                      className="flex items-center justify-between p-3.5 rounded-2xl bg-white/5 border border-white/10 hover:border-amber-400/40 hover:bg-white/10 cursor-pointer transition-all active:scale-[0.99] group"
+                      title="Click to jump to bookmark"
+                    >
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-sm font-medium text-white group-hover:text-amber-300 transition-colors">
+                          {bm.label || 'Bookmark'}
+                        </span>
+                        <span className="text-xs font-mono text-amber-400">
+                          Jump to: {((bm.timestampMs || 0) / 1000).toFixed(1)}s
+                        </span>
+                      </div>
+                      <Play className="w-4 h-4 text-amber-400 shrink-0" />
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           )}
 
@@ -1049,8 +1164,15 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-2.5">
-                        <div className={`w-8 h-8 rounded-xl bg-gradient-to-tr ${item.accentColor} flex items-center justify-center text-white shadow-sm shrink-0`}>
-                          <Film className="w-4 h-4" />
+                        <div className="w-9 h-9 rounded-xl bg-black/60 border border-white/15 p-1 flex items-center justify-center text-white shadow-sm shrink-0 overflow-hidden">
+                          <img
+                            src={item.logoUrl || getWebsiteFaviconUrl(item.url, 64)}
+                            alt={item.name}
+                            className="w-7 h-7 object-contain rounded-lg"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLElement).style.display = 'none';
+                            }}
+                          />
                         </div>
                         <div>
                           <h4 className="text-xs font-bold text-white group-hover:text-amber-300 transition-colors">
@@ -1062,9 +1184,30 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({
                         </div>
                       </div>
 
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-lg bg-black/60 border border-white/10 text-white/80 shrink-0">
-                        {item.badge}
-                      </span>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleWebsiteBookmark({
+                              url: item.url,
+                              title: item.name,
+                              faviconUrl: item.logoUrl || getWebsiteFaviconUrl(item.url, 128),
+                              badge: item.badge,
+                            });
+                          }}
+                          className={`p-1.5 rounded-xl border transition-all ${
+                            isWebsiteBookmarked(item.url)
+                              ? 'bg-amber-500/20 text-amber-300 border-amber-400/40'
+                              : 'bg-white/5 text-white/50 border-white/10 hover:text-white hover:bg-white/10'
+                          }`}
+                          title={isWebsiteBookmarked(item.url) ? 'Remove Bookmark' : 'Bookmark Site'}
+                        >
+                          <Star className={`w-3.5 h-3.5 ${isWebsiteBookmarked(item.url) ? 'fill-amber-400' : ''}`} />
+                        </button>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-lg bg-black/60 border border-white/10 text-white/80 shrink-0">
+                          {item.badge}
+                        </span>
+                      </div>
                     </div>
 
                     <p className="text-[11px] text-slate-300 leading-relaxed line-clamp-2">

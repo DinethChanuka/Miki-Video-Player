@@ -20,6 +20,9 @@ declare module 'lucide-react' {
   export const Sliders: LucideIcon;
   export const SlidersHorizontal: LucideIcon;
   export const Bookmark: LucideIcon;
+  export const BookmarkCheck: LucideIcon;
+  export const BookmarkPlus: LucideIcon;
+  export const Star: LucideIcon;
   export const Subtitles: LucideIcon;
   export const Maximize: LucideIcon;
   export const Minimize: LucideIcon;

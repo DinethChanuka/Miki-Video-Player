@@ -28,6 +28,7 @@ import {
   memorizeSubtitleForVideo,
   getMemorizedSubtitleForVideo,
 } from '../core/SubtitleManager';
+import { getWebsiteFaviconUrl, extractDomain } from '../utils/faviconService';
 import {
   getOSPresetDirectories,
   extractCleanFileName,
@@ -46,8 +47,20 @@ export interface MediaHistoryItem {
   lastPlayedAt: number;
   isYouTube?: boolean;
   youtubeId?: string;
-  webPlatform?: 'youtube' | 'tiktok' | 'instagram';
+  webPlatform?: 'youtube' | 'tiktok' | 'instagram' | 'cinema' | 'web';
   webStreamId?: string;
+  webDomain?: string;
+  faviconUrl?: string;
+}
+
+export interface BookmarkedWebsite {
+  id: string;
+  title: string;
+  url: string;
+  domain: string;
+  faviconUrl?: string;
+  badge?: string;
+  addedAt: number;
 }
 
 export interface MediaBookmark {
@@ -124,6 +137,14 @@ export interface PlayerStoreState {
   // Hydrated State & History
   recentMedia: MediaHistoryItem[];
   bookmarks: MediaBookmark[];
+  bookmarkedWebsites: BookmarkedWebsite[];
+  toggleWebsiteBookmark: (
+    urlOrObj: string | { url: string; title?: string; badge?: string; faviconUrl?: string },
+    title?: string,
+    badge?: string
+  ) => void;
+  removeWebsiteBookmark: (urlOrId: string) => void;
+  isWebsiteBookmarked: (url: string) => boolean;
   youtubeHistory: YouTubeHistoryItem[];
   resumeBannerPositionMs: number | null;
 
@@ -268,6 +289,25 @@ const saveStoredBookmarks = (items: MediaBookmark[]) => {
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(STORAGE_KEY_BOOKMARKS, JSON.stringify(items.slice(0, 50)));
+  } catch {}
+};
+
+const STORAGE_KEY_BOOKMARKED_WEBSITES = 'miki_bookmarked_websites';
+
+const loadStoredBookmarkedWebsites = (): BookmarkedWebsite[] => {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_BOOKMARKED_WEBSITES);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveStoredBookmarkedWebsites = (items: BookmarkedWebsite[]) => {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(STORAGE_KEY_BOOKMARKED_WEBSITES, JSON.stringify(items.slice(0, 100)));
   } catch {}
 };
 
@@ -510,6 +550,50 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
 
   recentMedia: loadStoredRecentMedia(),
   bookmarks: loadStoredBookmarks(),
+  bookmarkedWebsites: loadStoredBookmarkedWebsites(),
+  toggleWebsiteBookmark: (
+    urlOrObj: string | { url: string; title?: string; badge?: string; faviconUrl?: string },
+    titleArg?: string,
+    badgeArg?: string
+  ) => {
+    const rawUrl = typeof urlOrObj === 'string' ? urlOrObj : urlOrObj.url;
+    const cleanUrl = (rawUrl || '').trim();
+    if (!cleanUrl) return;
+    const finalTitle = typeof urlOrObj === 'string' ? titleArg : (urlOrObj.title || titleArg);
+    const finalBadge = typeof urlOrObj === 'string' ? badgeArg : (urlOrObj.badge || badgeArg);
+    const customFavicon = typeof urlOrObj === 'object' ? urlOrObj.faviconUrl : undefined;
+
+    const domain = extractDomain(cleanUrl);
+    const existing = get().bookmarkedWebsites;
+    const isAlreadyBookmarked = existing.some((b) => b.url === cleanUrl || (domain && b.domain === domain));
+    let updated: BookmarkedWebsite[];
+    if (isAlreadyBookmarked) {
+      updated = existing.filter((b) => b.url !== cleanUrl && b.domain !== domain);
+    } else {
+      const newItem: BookmarkedWebsite = {
+        id: `bm_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        title: finalTitle || domain || 'Website Bookmark',
+        url: cleanUrl,
+        domain,
+        faviconUrl: customFavicon || getWebsiteFaviconUrl(cleanUrl, 64),
+        badge: finalBadge || 'Web Portal',
+        addedAt: Date.now(),
+      };
+      updated = [newItem, ...existing];
+    }
+    set({ bookmarkedWebsites: updated });
+    saveStoredBookmarkedWebsites(updated);
+  },
+  removeWebsiteBookmark: (urlOrId: string) => {
+    const updated = get().bookmarkedWebsites.filter((b) => b.id !== urlOrId && b.url !== urlOrId);
+    set({ bookmarkedWebsites: updated });
+    saveStoredBookmarkedWebsites(updated);
+  },
+  isWebsiteBookmarked: (url: string) => {
+    if (!url) return false;
+    const domain = extractDomain(url);
+    return get().bookmarkedWebsites.some((b) => b.url === url.trim() || (domain && b.domain === domain));
+  },
   youtubeHistory: loadStoredYouTubeHistory(),
   resumeBannerPositionMs: null,
   screenshotDirectory: loadStoredScreenshotDirectory(),
@@ -998,6 +1082,9 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     } else if (!isTauriRuntime()) {
       startPos = autoResume ? savedPos : 0;
     }
+    const isHttp = uri.startsWith('http://') || uri.startsWith('https://');
+    const domain = isHttp ? extractDomain(uri) : undefined;
+    const defaultThumb = isHttp ? getWebsiteFaviconUrl(uri, 128) : undefined;
     const mediaId = uri;
     const newHistoryItem: MediaHistoryItem = {
       mediaId,
@@ -1009,7 +1096,9 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
       isCompleted: false,
       playCount: (existingItem?.playCount ?? 0) + 1,
       lastPlayedAt: Date.now(),
-      thumbnailUri: existingItem?.thumbnailUri,
+      thumbnailUri: existingItem?.thumbnailUri || defaultThumb,
+      webPlatform: isHttp ? 'cinema' : undefined,
+      webDomain: domain,
     };
 
     const updatedRecent = [

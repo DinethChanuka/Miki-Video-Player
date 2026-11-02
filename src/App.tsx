@@ -19,6 +19,7 @@ import { SubtitleOverlay } from './components/player/SubtitleOverlay';
 import { ApplicationMenu } from './components/hud/ApplicationMenu';
 import { GmailSignInModal } from './components/hud/GmailSignInModal';
 import { parseWebStream } from './utils/webStreamUtils';
+import { getWebsiteFaviconUrl } from './utils/faviconService';
 import {
   FolderOpen,
   Sparkles,
@@ -921,12 +922,24 @@ export const App: React.FC = () => {
                       >
                         {/* 16:9 Stopped-Point Video Preview Thumbnail / YouTube Placeholder */}
                         <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-black/60 border border-white/10 group-hover:border-cyan-400/40 transition-colors">
-                          {item.isYouTube && (
+                          {item.isYouTube ? (
                             <div className="absolute top-2.5 left-2.5 z-20 px-2.5 py-0.5 rounded-lg bg-red-600 text-white font-extrabold text-[10px] tracking-wide flex items-center gap-1 shadow-lg shadow-red-900/40">
                               <Play className="w-2.5 h-2.5 fill-white" />
                               <span>YouTube</span>
                             </div>
-                          )}
+                          ) : item.faviconUrl || (item.uri && item.uri.startsWith('http') && item.webPlatform) ? (
+                            <div className="absolute top-2.5 left-2.5 z-20 px-2.5 py-1 rounded-lg bg-black/85 backdrop-blur-md border border-white/20 text-white font-semibold text-[10px] tracking-wide flex items-center gap-1.5 shadow-lg">
+                              <img
+                                src={item.faviconUrl || getWebsiteFaviconUrl(item.uri, 32)}
+                                alt="site logo"
+                                className="w-3.5 h-3.5 object-contain rounded-sm"
+                                onError={(e) => {
+                                  (e.currentTarget as HTMLElement).style.display = 'none';
+                                }}
+                              />
+                              <span className="capitalize">{item.webDomain || 'Web Video'}</span>
+                            </div>
+                          ) : null}
 
                           {item.thumbnailUri ? (
                             <img
@@ -943,6 +956,20 @@ export const App: React.FC = () => {
                                 <Play className="w-6 h-6 fill-red-500" />
                               </div>
                               <span className="text-[11px] font-mono text-white/70 font-semibold">YouTube Stream</span>
+                            </div>
+                          ) : item.webPlatform || item.faviconUrl || (item.uri && item.uri.startsWith('http')) ? (
+                            <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-indigo-950/40 via-slate-900 to-black text-white/70 gap-2.5 p-4">
+                              <div className="p-3 rounded-2xl bg-black/50 border border-white/15 backdrop-blur-md shadow-lg flex items-center justify-center">
+                                <img
+                                  src={item.faviconUrl || getWebsiteFaviconUrl(item.uri, 64)}
+                                  alt="site"
+                                  className="w-8 h-8 object-contain"
+                                  onError={(e) => {
+                                    (e.currentTarget as HTMLElement).style.display = 'none';
+                                  }}
+                                />
+                              </div>
+                              <span className="text-[11px] font-mono text-cyan-300 font-semibold">{item.webDomain || 'Web Stream Video'}</span>
                             </div>
                           ) : (
                             <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 to-black text-white/30 gap-2">
@@ -974,14 +1001,18 @@ export const App: React.FC = () => {
                               className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg shrink-0 ${
                                 item.isYouTube && (!item.lastPositionMs || percent === 0)
                                   ? 'bg-red-500/20 text-red-300 border border-red-400/30'
-                                  : percent > 80
-                                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/30'
-                                    : `${theme.badgeClass}`
+                                  : item.webPlatform
+                                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/30'
+                                    : percent > 80
+                                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/30'
+                                      : `${theme.badgeClass}`
                               }`}
                             >
                               {item.isYouTube && (!item.lastPositionMs || percent === 0)
                                 ? 'YouTube'
-                                : `${percent.toFixed(0)}% watched`}
+                                : item.webPlatform
+                                  ? (item.webDomain || 'Web')
+                                  : `${percent.toFixed(0)}% watched`}
                             </span>
                           </div>
                         </div>
@@ -1145,8 +1176,8 @@ export const App: React.FC = () => {
           isOpen={isWebBrowserOpen}
           initialUrl={webBrowserUrl}
           onClose={() => setIsWebBrowserOpen(false)}
-          onPlayInNativePlayer={(url) => {
-            openMedia(url);
+          onPlayInNativePlayer={(url, title) => {
+            openMedia(url, title);
           }}
           onStartWindowDrag={handleStartWindowDrag}
           onMinimizeWindow={handleWindowMinimize}
