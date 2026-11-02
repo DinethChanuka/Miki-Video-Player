@@ -12,6 +12,10 @@ pub struct MpvController {
     handle: Option<MpvHandle>,
     surface_id: Option<i64>,
     is_destroyed: Arc<AtomicBool>,
+    cached_audio_tracks: Vec<TrackInfo>,
+    cached_subtitle_tracks: Vec<TrackInfo>,
+    cached_chapters: Vec<ChapterInfo>,
+    last_metadata_query: Option<std::time::Instant>,
 }
 
 unsafe impl Send for MpvController {}
@@ -24,6 +28,10 @@ impl MpvController {
             handle: None,
             surface_id: None,
             is_destroyed: Arc::new(AtomicBool::new(false)),
+            cached_audio_tracks: Vec::new(),
+            cached_subtitle_tracks: Vec::new(),
+            cached_chapters: Vec::new(),
+            last_metadata_query: None,
         }
     }
 
@@ -77,7 +85,7 @@ impl MpvController {
     }
 
     /// Loads a media file or URL with optional resume timestamp safely using mpv_command array
-    pub fn load_file(&self, uri: &str, start_pos_ms: i64) -> PlayerResult<()> {
+    pub fn load_file(&mut self, uri: &str, start_pos_ms: i64) -> PlayerResult<()> {
         let start_str;
         let mut args = vec!["loadfile", uri, "replace"];
         if start_pos_ms > 0 {
@@ -85,6 +93,7 @@ impl MpvController {
             start_str = format!("start={:.3}", start_sec);
             args.push(&start_str);
         }
+        self.last_metadata_query = None;
         self.run_command_args(&args)
     }
 
@@ -256,8 +265,8 @@ impl MpvController {
         Ok(())
     }
 
-    /// Queries current snapshot of playback state
-    pub fn query_playback_state(&self) -> PlaybackState {
+    /// Queries current snapshot of playback state with decoupled, throttled metadata updates
+    pub fn query_playback_state(&mut self) -> PlaybackState {
         let pos_sec: f64 = self
             .get_property_string("time-pos")
             .and_then(|s| s.parse().ok())
@@ -284,6 +293,21 @@ impl MpvController {
             .map(|s| s == "yes")
             .unwrap_or(false);
 
+        // Throttle expensive track-list and chapter-list queries to once every 1000ms
+        // instead of querying dozens of string FFI properties on every 16ms frame (60 FPS)
+        let now = std::time::Instant::now();
+        let metadata_interval = Duration::from_millis(1000);
+        let should_refresh_metadata = self.last_metadata_query
+            .map(|last| now.duration_since(last) >= metadata_interval)
+            .unwrap_or(true);
+
+        if should_refresh_metadata {
+            self.cached_audio_tracks = self.query_tracks(TrackKind::Audio);
+            self.cached_subtitle_tracks = self.query_tracks(TrackKind::Subtitle);
+            self.cached_chapters = self.query_chapters();
+            self.last_metadata_query = Some(now);
+        }
+
         PlaybackState {
             position_ms: (pos_sec * 1000.0).round() as i64,
             duration_ms: (duration_sec * 1000.0).round() as i64,
@@ -293,9 +317,9 @@ impl MpvController {
             playback_rate: speed,
             volume,
             is_muted,
-            audio_tracks: self.query_tracks(TrackKind::Audio),
-            subtitle_tracks: self.query_tracks(TrackKind::Subtitle),
-            chapters: self.query_chapters(),
+            audio_tracks: self.cached_audio_tracks.clone(),
+            subtitle_tracks: self.cached_subtitle_tracks.clone(),
+            chapters: self.cached_chapters.clone(),
         }
     }
 
@@ -383,7 +407,7 @@ impl MpvController {
 
             while !is_destroyed.load(Ordering::Relaxed) {
                 let current_state = {
-                    let guard = controller.lock();
+                    let mut guard = controller.lock();
                     guard.query_playback_state()
                 };
 
