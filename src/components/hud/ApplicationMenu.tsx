@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Menu,
   Mail,
-  Youtube,
   FolderOpen,
   Sliders,
   Sparkles,
@@ -18,12 +17,14 @@ import { StoredGmailAccount, getStoredGmailAccount } from './GmailSignInModal';
 
 interface ApplicationMenuProps {
   onOpenGmailSignIn: () => void;
-  onOpenLibrary: (initialTab?: 'youtube' | 'tiktok' | 'instagram' | 'demos' | 'recent' | 'bookmarks' | 'cinema') => void;
+  onOpenLibrary: (initialTab?: 'youtube' | 'tiktok' | 'instagram' | 'demos' | 'recent' | 'bookmarks' | 'cinema' | 'social' | 'games' | 'music') => void;
   onOpenWebBrowser?: (url?: string) => void;
   onOpenSettings: () => void;
   onOpenEq: () => void;
   onOpenLocalFile: () => void;
   onOpenSystemAccess: () => void;
+  onOpenGames?: () => void;
+  onOpenMusic?: () => void;
 }
 
 export const ApplicationMenu: React.FC<ApplicationMenuProps> = ({
@@ -34,10 +35,26 @@ export const ApplicationMenu: React.FC<ApplicationMenuProps> = ({
   onOpenEq,
   onOpenLocalFile,
   onOpenSystemAccess,
+  onOpenGames,
+  onOpenMusic,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [account, setAccount] = useState<StoredGmailAccount | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // Synchronize native browser web view overlay visibility so menu always appears on top
+  useEffect(() => {
+    if (typeof window !== 'undefined' && (window as any).webkit?.messageHandlers?.browserViewAction) {
+      try {
+        (window as any).webkit.messageHandlers.browserViewAction.postMessage({
+          action: 'setOverlayVisible',
+          visible: isOpen,
+        });
+      } catch (err) {
+        // Fallback gracefully in web/mock modes
+      }
+    }
+  }, [isOpen]);
 
   // Listen for account updates
   useEffect(() => {
@@ -144,10 +161,10 @@ export const ApplicationMenu: React.FC<ApplicationMenuProps> = ({
 
           <div className="h-px bg-white/15 my-0.5" />
 
-          {/* Section 2: Web Streams & Browser */}
+          {/* Section 2: Streams */}
           <div className="flex flex-col gap-1">
             <span className="text-[10px] uppercase font-mono tracking-wider text-slate-300 font-bold px-2 py-0.5">
-              Streams & Web
+              Streams
             </span>
 
             <button
@@ -156,13 +173,13 @@ export const ApplicationMenu: React.FC<ApplicationMenuProps> = ({
                 if (onOpenWebBrowser) {
                   onOpenWebBrowser('https://www.youtube.com');
                 } else {
-                  onOpenLibrary('youtube');
+                  onOpenLibrary('cinema');
                 }
               }}
               className="flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/15 text-xs font-medium text-white transition-all text-left"
             >
               <Globe className="w-4 h-4 text-cyan-400 shrink-0" />
-              <span>Browse Web (Ad-Shielded)</span>
+              <span>Browse Web</span>
             </button>
 
             <button
@@ -173,49 +190,27 @@ export const ApplicationMenu: React.FC<ApplicationMenuProps> = ({
               className="flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/15 text-xs font-medium text-white transition-all text-left"
             >
               <Film className="w-4 h-4 text-amber-400 shrink-0" />
-              <span>Cinema & CineSubz</span>
+              <span>Cinema</span>
             </button>
 
             <button
               onClick={() => {
                 setIsOpen(false);
-                onOpenLibrary('youtube');
-              }}
-              className="flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/15 text-xs font-medium text-white transition-all text-left"
-            >
-              <Youtube className="w-4 h-4 text-rose-400 shrink-0" />
-              <span>YouTube Stream</span>
-            </button>
-
-            <button
-              onClick={() => {
-                setIsOpen(false);
-                onOpenLibrary('tiktok');
+                onOpenLibrary('social');
               }}
               className="flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/15 text-xs font-medium text-white transition-all text-left"
             >
               <Share2 className="w-4 h-4 text-cyan-400 shrink-0" />
-              <span>TikTok Web Stream</span>
-            </button>
-
-            <button
-              onClick={() => {
-                setIsOpen(false);
-                onOpenLibrary('instagram');
-              }}
-              className="flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/15 text-xs font-medium text-white transition-all text-left"
-            >
-              <Sparkles className="w-4 h-4 text-pink-400 shrink-0" />
-              <span>Instagram Web Stream</span>
+              <span>Social</span>
             </button>
           </div>
 
           <div className="h-px bg-white/15 my-0.5" />
 
-          {/* Section 3: Media & Library */}
+          {/* Section 3: Media */}
           <div className="flex flex-col gap-1">
             <span className="text-[10px] uppercase font-mono tracking-wider text-slate-300 font-bold px-2 py-0.5">
-              Media & Storage
+              Media
             </span>
 
             <button
@@ -226,7 +221,7 @@ export const ApplicationMenu: React.FC<ApplicationMenuProps> = ({
               className="flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/15 text-xs font-medium text-white transition-all text-left"
             >
               <Plus className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>Open Local Video / Audio</span>
+              <span>Open Local</span>
             </button>
 
             <button
@@ -237,14 +232,48 @@ export const ApplicationMenu: React.FC<ApplicationMenuProps> = ({
               className="flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/15 text-xs font-medium text-white transition-all text-left"
             >
               <FolderOpen className="w-4 h-4 text-cyan-400 shrink-0" />
-              <span>Media Explorer & Streams</span>
+              <span>Library</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setIsOpen(false);
+                if (onOpenMusic) {
+                  onOpenMusic();
+                } else {
+                  onOpenLibrary('music');
+                }
+              }}
+              className="flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/15 text-xs font-medium text-white transition-all text-left"
+            >
+              <Sparkles className="w-4 h-4 text-rose-400 shrink-0" />
+              <span>Music Player</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setIsOpen(false);
+                if (onOpenGames) {
+                  onOpenGames();
+                } else {
+                  onOpenLibrary('games');
+                }
+              }}
+              className="flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/15 text-xs font-medium text-white transition-all text-left"
+            >
+              <Sliders className="w-4 h-4 text-purple-400 shrink-0" />
+              <span>Games</span>
             </button>
           </div>
 
           <div className="h-px bg-white/15 my-0.5" />
 
-          {/* Section 4: Tools & System */}
+          {/* Section 4: System */}
           <div className="flex flex-col gap-1">
+            <span className="text-[10px] uppercase font-mono tracking-wider text-slate-300 font-bold px-2 py-0.5">
+              System
+            </span>
+
             <button
               onClick={() => {
                 setIsOpen(false);
@@ -253,7 +282,7 @@ export const ApplicationMenu: React.FC<ApplicationMenuProps> = ({
               className="flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/15 text-xs font-medium text-white transition-all text-left"
             >
               <Sliders className="w-4 h-4 text-purple-400 shrink-0" />
-              <span>3D Spatial Sound & EQ</span>
+              <span>Equalizer</span>
             </button>
 
             <button
@@ -264,7 +293,7 @@ export const ApplicationMenu: React.FC<ApplicationMenuProps> = ({
               className="flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/15 text-xs font-medium text-white transition-all text-left"
             >
               <Sparkles className="w-4 h-4 text-fuchsia-400 shrink-0" />
-              <span>Themes & Video Filters</span>
+              <span>Settings</span>
             </button>
 
             <button
@@ -275,7 +304,7 @@ export const ApplicationMenu: React.FC<ApplicationMenuProps> = ({
               className="flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/15 text-xs font-medium text-white transition-all text-left"
             >
               <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>OS Permissions Access</span>
+              <span>Permissions</span>
             </button>
           </div>
         </div>

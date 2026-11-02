@@ -26,6 +26,36 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
     var isAdShieldEnabled: Bool = true
     var isCustomFullScreen = false
     var savedFrame: NSRect = .zero
+    var currentVolume: Double = 1.0
+    var isMuted: Bool = false
+
+    private func applySoundToBrowserWebView() {
+        guard let bView = self.browserWebView else { return }
+        let js = """
+        (function() {
+            window.__mikiVolume = \(self.currentVolume);
+            window.__mikiMuted = \(self.isMuted ? "true" : "false");
+            var syncMediaSound = function() {
+                try {
+                    var media = document.querySelectorAll('video, audio');
+                    media.forEach(function(el) {
+                        try {
+                            el.volume = window.__mikiVolume;
+                            el.muted = window.__mikiMuted;
+                        } catch(e) {}
+                    });
+                } catch(e) {}
+            };
+            syncMediaSound();
+            if (!window.__mikiSoundObserver) {
+                window.__mikiSoundObserver = new MutationObserver(syncMediaSound);
+                window.__mikiSoundObserver.observe(document.body || document.documentElement, { childList: true, subtree: true });
+                setInterval(syncMediaSound, 1000);
+            }
+        })();
+        """
+        bView.evaluateJavaScript(js, completionHandler: nil)
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupMainMenu()
@@ -253,30 +283,111 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         let bContentController = WKUserContentController()
         bContentController.add(self, name: "browserMediaDetected")
 
-        // Injected ad-blocking & video detection script
+        // Injected intelligent ad-blocking & universal media detection script
+        // Supported formats: .m3u8, .mpd, .mp4, .mkv, .webm, .flv, .ts, .avi, .mov
         let helperScript = """
         (function() {
-            window.open = function(url) {
-                if (url) { window.location.href = url; }
-                return null;
-            };
-            function scanMedia() {
-                var videos = document.querySelectorAll('video');
-                for (var i = 0; i < videos.length; i++) {
-                    var v = videos[i];
-                    var src = v.currentSrc || v.src;
-                    if (src && src.indexOf('http') === 0 && src.indexOf('blob:') === -1) {
-                        window.webkit.messageHandlers.browserMediaDetected.postMessage({
-                            url: src,
-                            title: document.title || 'Movie Stream'
-                        });
-                        return;
+            var reportedMedia = new Set();
+            var mediaRegex = /\\.(m3u8|mpd|mp4|mkv|webm|avi|mov|flv|ts|m4v|3gp|mp3|m4a|aac|wav|ogg|opus)(\\?|$)/i;
+            var streamRegex = /(master\\.m3u8|playlist\\.m3u8|\\/hls\\/|\\/dash\\/|\\/manifest|\\/stream\\/|googlevideo\\.com\\/videoplayback)/i;
+
+            function reportMedia(url, type) {
+                if (!url || typeof url !== 'string' || reportedMedia.has(url)) return;
+                if (url.indexOf('blob:') === 0 || url.indexOf('data:') === 0) return;
+                reportedMedia.add(url);
+                try {
+                    window.webkit.messageHandlers.browserMediaDetected.postMessage({
+                        url: url,
+                        title: document.title || 'Detected Video Stream',
+                        format: type || 'video'
+                    });
+                } catch(e) {}
+            }
+
+            // Monkey-patch window.fetch for async manifest & video segment requests
+            var origFetch = window.fetch;
+            if (origFetch) {
+                window.fetch = function(input, init) {
+                    try {
+                        var url = typeof input === 'string' ? input : (input && input.url);
+                        if (url && (mediaRegex.test(url) || streamRegex.test(url))) {
+                            reportMedia(url, 'stream');
+                        }
+                    } catch(e) {}
+                    return origFetch.apply(this, arguments);
+                };
+            }
+
+            // Monkey-patch XMLHttpRequest.prototype.open
+            var origXhrOpen = XMLHttpRequest.prototype.open;
+            if (origXhrOpen) {
+                XMLHttpRequest.prototype.open = function(method, url) {
+                    try {
+                        if (url && (mediaRegex.test(url) || streamRegex.test(url))) {
+                            reportMedia(url, 'xhr');
+                        }
+                    } catch(e) {}
+                    return origXhrOpen.apply(this, arguments);
+                };
+            }
+
+            // Monkey-patch HTMLMediaElement.prototype.play
+            var origPlay = HTMLMediaElement.prototype.play;
+            if (origPlay) {
+                HTMLMediaElement.prototype.play = function() {
+                    try {
+                        var src = this.currentSrc || this.src;
+                        if (src && src.indexOf('blob:') === -1) {
+                            reportMedia(src, 'element');
+                        }
+                    } catch(e) {}
+                    return origPlay.apply(this, arguments);
+                };
+            }
+
+            // Scan DOM video elements
+            function scanElements() {
+                var mediaEls = document.querySelectorAll('video, audio, source');
+                for (var i = 0; i < mediaEls.length; i++) {
+                    var el = mediaEls[i];
+                    var src = el.currentSrc || el.src;
+                    if (src && src.indexOf('blob:') === -1) {
+                        reportMedia(src, 'element');
                     }
                 }
             }
-            document.addEventListener('play', scanMedia, true);
-            document.addEventListener('loadeddata', scanMedia, true);
-            setInterval(scanMedia, 4000);
+
+            // MutationObserver to capture dynamically injected video players & iframes
+            var observer = new MutationObserver(function(mutations) {
+                for (var i = 0; i < mutations.length; i++) {
+                    var mut = mutations[i];
+                    for (var j = 0; j < mut.addedNodes.length; j++) {
+                        var node = mut.addedNodes[j];
+                        if (node.nodeType === 1) {
+                            if (node.tagName === 'VIDEO' || node.tagName === 'SOURCE' || node.tagName === 'AUDIO') {
+                                var src = node.currentSrc || node.src;
+                                if (src && src.indexOf('blob:') === -1) reportMedia(src, 'dom');
+                            }
+                        }
+                    }
+                }
+            });
+
+            if (document.body) {
+                observer.observe(document.body, { childList: true, subtree: true });
+            } else {
+                document.addEventListener('DOMContentLoaded', function() {
+                    if (document.body) {
+                        observer.observe(document.body, { childList: true, subtree: true });
+                    }
+                });
+            }
+
+            // Anti-popup & redirect trapping suppression
+            window.open = function() { return null; };
+            document.addEventListener('play', scanElements, true);
+            document.addEventListener('loadeddata', scanElements, true);
+            setInterval(scanElements, 2500);
         })();
         """
         let userScript = WKUserScript(source: helperScript, injectionTime: .atDocumentEnd, forMainFrameOnly: false)
@@ -296,6 +407,19 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         return bView
     }
 
+    func isAdUrl(_ urlStr: String) -> Bool {
+        let adKeywords = [
+            "doubleclick", "popads", "bet365", "onclick", "adsterra", "adservice",
+            "syndication", "monetag", "adcash", "propellerads", "exoclick", "popcash",
+            "hilltopads", "adnxs", "trafficjunky", "zeroredirect", "ad-delivery",
+            "track", "popup", "promotions", "banner", "affiliate", "casino", "1xbet",
+            "betting", "crypto-ad", "adkeeper", "clickadu", "richpush", "juicyads",
+            "adoperator", "trafficstars", "coinhive", "directrev", "deloton"
+        ]
+        let lower = urlStr.lowercased()
+        return adKeywords.contains { lower.contains($0) }
+    }
+
     // WKUIDelegate: Intercept & block intrusive popups while allowing legitimate movie/video page links
     func webView(
         _ webView: WKWebView,
@@ -305,8 +429,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
     ) -> WKWebView? {
         if let targetUrl = navigationAction.request.url {
             let urlStr = targetUrl.absoluteString
-            let isAd = urlStr.contains("doubleclick") || urlStr.contains("popads") || urlStr.contains("bet365") || urlStr.contains("onclick") || urlStr.contains("adsterra") || urlStr.contains("adservice") || urlStr.contains("syndication")
-            if !isAd {
+            if !isAdUrl(urlStr) {
                 if webView == self.browserWebView {
                     self.browserWebView?.load(navigationAction.request)
                 } else {
@@ -340,6 +463,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
             let cleanTitle = title.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "'", with: "\\'")
             let js = "window.dispatchEvent(new CustomEvent('miki:browser-loading-finish', { detail: { url: '\(cleanUrl)', title: '\(cleanTitle)' } }));"
             self.webView.evaluateJavaScript(js, completionHandler: nil)
+            self.applySoundToBrowserWebView()
         }
     }
 
@@ -359,8 +483,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
         if webView == self.browserWebView, self.isAdShieldEnabled, let targetUrl = navigationAction.request.url?.absoluteString {
-            let isAd = targetUrl.contains("doubleclick") || targetUrl.contains("popads") || targetUrl.contains("bet365") || targetUrl.contains("onclick") || targetUrl.contains("adsterra") || targetUrl.contains("adservice") || targetUrl.contains("syndication")
-            if isAd {
+            if isAdUrl(targetUrl) {
                 NSLog("[Miki Shield] Blocked ad navigation: %@", targetUrl)
                 let js = "window.dispatchEvent(new CustomEvent('miki:browser-ad-blocked'));"
                 self.webView.evaluateJavaScript(js, completionHandler: nil)
@@ -536,6 +659,39 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
                         if let enabled = dict["enabled"] as? Bool {
                             self.isAdShieldEnabled = enabled
                         }
+                    case "setOverlayVisible":
+                        if let visible = dict["visible"] as? Bool {
+                            if visible {
+                                self.browserWebView?.alphaValue = 0.0
+                                if let wView = self.webView {
+                                    self.window.contentView?.addSubview(wView, positioned: .above, relativeTo: self.browserWebView)
+                                    self.window.makeFirstResponder(wView)
+                                }
+                            } else {
+                                self.browserWebView?.alphaValue = 1.0
+                                if let bView = self.browserWebView, !bView.isHidden {
+                                    self.window.contentView?.addSubview(bView, positioned: .above, relativeTo: self.webView)
+                                    self.window.makeFirstResponder(bView)
+                                }
+                            }
+                        }
+                    case "setVolume":
+                        let vol = dict["volume"] as? Double ?? 100.0
+                        let muted = dict["isMuted"] as? Bool ?? false
+                        self.currentVolume = max(0.0, min(1.0, vol / 100.0))
+                        self.isMuted = muted
+                        self.applySoundToBrowserWebView()
+                    case "setEqualizer":
+                        let gains = dict["gainsDb"] as? [Double] ?? []
+                        let nightMode = dict["nightMode"] as? Bool ?? false
+                        let js = """
+                        (function() {
+                            window.__mikiEqGains = \(gains);
+                            window.__mikiNightMode = \(nightMode ? "true" : "false");
+                            window.dispatchEvent(new CustomEvent('miki:equalizer-sync', { detail: { gains: \(gains), nightMode: \(nightMode ? "true" : "false") } }));
+                        })();
+                        """
+                        self.browserWebView?.evaluateJavaScript(js, completionHandler: nil)
                     default:
                         break
                     }

@@ -47,7 +47,7 @@ export interface MediaHistoryItem {
   lastPlayedAt: number;
   isYouTube?: boolean;
   youtubeId?: string;
-  webPlatform?: 'youtube' | 'tiktok' | 'instagram' | 'cinema' | 'web';
+  webPlatform?: 'youtube' | 'tiktok' | 'instagram' | 'facebook' | 'cinema' | 'web';
   webStreamId?: string;
   webDomain?: string;
   faviconUrl?: string;
@@ -179,6 +179,8 @@ export interface PlayerStoreState {
   togglePlay: () => Promise<void>;
   seek: (timestampMs: number, exact?: boolean) => Promise<void>;
   setVolume: (volume: number) => Promise<void>;
+  setMuted: (muted: boolean) => Promise<void>;
+  toggleMute: () => Promise<void>;
   setPlaybackRate: (rate: number) => Promise<void>;
   setEqualizer: (gainsDb: number[], nightMode: boolean) => Promise<void>;
   updateShaderConfig: (config: Partial<VideoShaderConfig>) => Promise<void>;
@@ -983,17 +985,23 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     const igMatch = uri.match(/(?:instagram\.com\/(?:p|reel|tv)\/([a-zA-Z0-9_-]+))/i);
     const igCode = igMatch ? igMatch[1] : null;
 
-    if (isYouTube || isTikTok || isInstagram) {
+    const isFacebook = /(?:facebook\.com|fb\.watch)/i.test(uri);
+    const fbMatch = uri.match(/(?:videos\/|reel\/|\?v=)(\d+)/i) || uri.match(/fb\.watch\/([a-zA-Z0-9_-]+)/i);
+    const fbCode = fbMatch ? fbMatch[1] : null;
+
+    if (isYouTube || isTikTok || isInstagram || isFacebook) {
       if (isYouTube) {
         get().addYouTubeHistory(uri, resolvedTitle);
       }
 
-      const platform: 'youtube' | 'tiktok' | 'instagram' = isYouTube
+      const platform: 'youtube' | 'tiktok' | 'instagram' | 'facebook' = isYouTube
         ? 'youtube'
         : isTikTok
         ? 'tiktok'
-        : 'instagram';
-      const streamId = ytId || ttId || igCode || undefined;
+        : isInstagram
+        ? 'instagram'
+        : 'facebook';
+      const streamId = ytId || ttId || igCode || fbCode || undefined;
 
       const existingRecent = get().recentMedia;
       const existingWeb = existingRecent.find(
@@ -1014,7 +1022,7 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
         uri,
         title:
           resolvedTitle ||
-          (isTikTok ? `TikTok Video (${ttId || 'Web'})` : isInstagram ? `Instagram Reel (${igCode || 'Web'})` : `YouTube (${ytId || 'Web'})`),
+          (isTikTok ? `TikTok Video (${ttId || 'Web'})` : isInstagram ? `Instagram Reel (${igCode || 'Web'})` : isFacebook ? `Facebook Video (${fbCode || 'Web'})` : `YouTube (${ytId || 'Web'})`),
         durationMs: existingWeb?.durationMs || 0,
         lastPositionMs: startPos,
         progressPercent: existingWeb?.progressPercent || 0,
@@ -1283,8 +1291,54 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
   setVolume: async (volume) => {
     // Allows 0% to 200% VLC overdrive
     const clamped = Math.max(0, Math.min(200, volume));
-    set({ volume: clamped, isMuted: clamped === 0 });
+    const isMuted = clamped === 0;
+    set({ volume: clamped, isMuted });
     await get().engine?.setVolume(clamped);
+
+    // Broadcast sound change across web streams, YouTube & native WKWebView
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('miki:volume-change', {
+          detail: { volume: clamped, isMuted },
+        })
+      );
+      const webkit = (window as unknown as { webkit?: { messageHandlers?: { browserViewAction?: { postMessage: (msg: unknown) => void } } } }).webkit;
+      if (webkit?.messageHandlers?.browserViewAction) {
+        webkit.messageHandlers.browserViewAction.postMessage({
+          action: 'setVolume',
+          volume: clamped,
+          isMuted,
+        });
+      }
+    }
+  },
+
+  setMuted: async (muted) => {
+    set({ isMuted: muted });
+    const currentVol = get().volume;
+    const effectiveVol = muted ? 0 : currentVol;
+    await get().engine?.setVolume(effectiveVol);
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('miki:volume-change', {
+          detail: { volume: effectiveVol, isMuted: muted },
+        })
+      );
+      const webkit = (window as unknown as { webkit?: { messageHandlers?: { browserViewAction?: { postMessage: (msg: unknown) => void } } } }).webkit;
+      if (webkit?.messageHandlers?.browserViewAction) {
+        webkit.messageHandlers.browserViewAction.postMessage({
+          action: 'setVolume',
+          volume: effectiveVol,
+          isMuted: muted,
+        });
+      }
+    }
+  },
+
+  toggleMute: async () => {
+    const nextMuted = !get().isMuted;
+    await get().setMuted(nextMuted);
   },
 
   setPlaybackRate: async (rate) => {
@@ -1295,6 +1349,23 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
   setEqualizer: async (gainsDb, nightMode) => {
     set({ eqGainsDb: gainsDb, nightModeEnabled: nightMode });
     await get().engine?.setEqualizer(gainsDb, nightMode);
+
+    // Broadcast equalizer update across web streams and native WKWebView
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('miki:equalizer-change', {
+          detail: { gainsDb, nightMode },
+        })
+      );
+      const webkit = (window as unknown as { webkit?: { messageHandlers?: { browserViewAction?: { postMessage: (msg: unknown) => void } } } }).webkit;
+      if (webkit?.messageHandlers?.browserViewAction) {
+        webkit.messageHandlers.browserViewAction.postMessage({
+          action: 'setEqualizer',
+          gainsDb,
+          nightMode,
+        });
+      }
+    }
 
     const {
       currentMediaId,

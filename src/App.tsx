@@ -112,7 +112,20 @@ export const App: React.FC = () => {
   const [isEqOpen, setIsEqOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isFileBrowserOpen, setIsFileBrowserOpen] = useState(false);
-  const [fileBrowserInitialTab, setFileBrowserInitialTab] = useState<'youtube' | 'tiktok' | 'instagram' | 'demos' | 'recent' | 'bookmarks' | 'cinema'>('youtube');
+  const [fileBrowserInitialTab, setFileBrowserInitialTab] = useState<
+    | 'youtube'
+    | 'tiktok'
+    | 'instagram'
+    | 'demos'
+    | 'recent'
+    | 'bookmarks'
+    | 'cinema'
+    | 'social'
+    | 'games'
+    | 'music'
+    | 'history'
+    | 'saved'
+  >('cinema');
   const [isWebBrowserOpen, setIsWebBrowserOpen] = useState(false);
   const [webBrowserUrl, setWebBrowserUrl] = useState('https://www.youtube.com');
   const [isSystemAccessOpen, setIsSystemAccessOpen] = useState(false);
@@ -665,6 +678,7 @@ export const App: React.FC = () => {
             embedUrl={webStream.embedUrl}
             originalUrl={webStream.originalUrl}
             title={currentTitle}
+            onOpenEq={() => setIsEqOpen(true)}
           />
         ) : activeEngineType === 'web-media' ? (
           <div ref={viewportRef} className={`relative w-full h-full flex items-center justify-center overflow-hidden ${!currentUri ? 'hidden' : ''}`}>
@@ -1158,8 +1172,8 @@ export const App: React.FC = () => {
           </div>
         )}
 
-        {/* Glassmorphic Controls Overlay (for native/local/HLS video) */}
-        {currentUri && !youtubeId && !webStream && (
+        {/* Glassmorphic Controls Overlay (for native/local/HLS video & streams) */}
+        {currentUri && !webStream && (
           <ControlsOverlay
             onOpenEq={() => setIsEqOpen(true)}
             onOpenSettings={() => setIsSettingsOpen(true)}
@@ -1182,6 +1196,7 @@ export const App: React.FC = () => {
           onStartWindowDrag={handleStartWindowDrag}
           onMinimizeWindow={handleWindowMinimize}
           onMaximizeWindow={handleWindowMaximize}
+          onOpenEq={() => setIsEqOpen(true)}
         />
       </ErrorBoundary>
 

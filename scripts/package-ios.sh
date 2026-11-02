@@ -23,7 +23,7 @@ if command -v npx >/dev/null 2>&1; then
 
   # Copy generated iOS artifacts to Build/ios
   if [ -d "src-tauri/gen/apple/build" ]; then
-    find src-tauri/gen/apple/build -name "*.ipa" -o -name "*.app" -exec cp -R {} Build/ios/ \;
+    find src-tauri/gen/apple/build \( -name "*.ipa" -o -name "*.app" \) -exec cp -R {} Build/ios/ \;
   fi
 fi
 
