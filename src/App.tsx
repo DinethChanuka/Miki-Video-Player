@@ -232,9 +232,12 @@ export const App: React.FC = () => {
   const webStream = useMemo(() => (currentUri ? parseWebStream(currentUri) : null), [currentUri]);
   const youtubeId = webStream?.platform === 'youtube' ? webStream.id : null;
 
-  // Listen for native / global triggers for Gmail signin, web streams & browser
+  // Listen for native / global triggers for Gmail signin, web streams, browser, settings & EQ
   useEffect(() => {
     const handleOpenGmail = () => setIsGmailSignInOpen(true);
+    const handleOpenSettings = () => setIsSettingsOpen(true);
+    const handleOpenEq = () => setIsEqOpen(true);
+    const handleOpenLibrary = () => setIsFileBrowserOpen(true);
     const handleOpenStream = (e: Event) => {
       const detail = (e as CustomEvent<{ tab?: 'youtube' | 'tiktok' | 'instagram' | 'cinema' }>).detail;
       if (detail?.tab) setFileBrowserInitialTab(detail.tab);
@@ -246,10 +249,16 @@ export const App: React.FC = () => {
       setIsWebBrowserOpen(true);
     };
     window.addEventListener('miki:open-gmail-signin', handleOpenGmail);
+    window.addEventListener('miki:open-settings', handleOpenSettings);
+    window.addEventListener('miki:open-eq', handleOpenEq);
+    window.addEventListener('miki:open-library', handleOpenLibrary);
     window.addEventListener('miki:open-web-stream', handleOpenStream);
     window.addEventListener('miki:open-web-browser', handleOpenBrowser);
     return () => {
       window.removeEventListener('miki:open-gmail-signin', handleOpenGmail);
+      window.removeEventListener('miki:open-settings', handleOpenSettings);
+      window.removeEventListener('miki:open-eq', handleOpenEq);
+      window.removeEventListener('miki:open-library', handleOpenLibrary);
       window.removeEventListener('miki:open-web-stream', handleOpenStream);
       window.removeEventListener('miki:open-web-browser', handleOpenBrowser);
     };
@@ -485,26 +494,25 @@ export const App: React.FC = () => {
               opacity: customBgOpacity,
               WebkitFilter: `blur(${customBgBlur}px) brightness(${customBgBrightness ?? 1.0})`,
               filter: `blur(${customBgBlur}px) brightness(${customBgBrightness ?? 1.0})`,
-              transform: 'scale(1.10) translateZ(0)',
-              WebkitTransform: 'scale(1.10) translateZ(0)',
-              willChange: 'filter, transform, opacity',
+              transform: `scale(${1.08 + (customBgBlur / 80) * 0.12})`,
+              WebkitTransform: `scale(${1.08 + (customBgBlur / 80) * 0.12})`,
             }}
           />
           {/* Dynamic Tint Overlay Layer */}
           <div
             className={`absolute inset-0 pointer-events-none transition-colors duration-300 ${
               customBgTint === 'navy'
-                ? 'bg-blue-950/45'
+                ? 'bg-blue-950/60'
                 : customBgTint === 'aurora'
-                  ? 'bg-emerald-950/35'
+                  ? 'bg-emerald-950/50'
                   : customBgTint === 'amethyst'
-                    ? 'bg-purple-950/35'
+                    ? 'bg-purple-950/50'
                     : customBgTint === 'clear'
                       ? 'bg-transparent'
-                      : 'bg-black/45'
+                      : 'bg-black/55'
             }`}
             style={{
-              opacity: customBgTint === 'clear' ? 0 : Math.min(1, (customBgOpacity ?? 1) * 0.9),
+              opacity: customBgTint === 'clear' ? 0 : Math.min(1, Math.max(0.2, (customBgOpacity ?? 1) * 0.85)),
             }}
           />
         </div>
@@ -514,9 +522,9 @@ export const App: React.FC = () => {
       <div
         className="absolute inset-0 pointer-events-none z-0 transition-all duration-700 overflow-hidden"
         style={{
-          background: `radial-gradient(ellipse 95% 70% at 50% -10%, ${theme.haloGlow}, transparent 70%), radial-gradient(circle 800px at 0% 100%, ${theme.previewColors[0]}33, transparent 65%), radial-gradient(circle 800px at 100% 100%, ${theme.previewColors[1]}33, transparent 65%)`,
+          background: `radial-gradient(ellipse 95% 70% at 50% -10%, ${theme.haloGlow}, transparent 70%), radial-gradient(circle 800px at 0% 100%, ${theme.previewColors[0]}44, transparent 65%), radial-gradient(circle 800px at 100% 100%, ${theme.previewColors[1]}44, transparent 65%)`,
           mixBlendMode: customBgImage ? 'screen' : 'normal',
-          opacity: customBgImage ? 0.75 : 1,
+          opacity: customBgImage ? 0.85 : 1,
         }}
       />
 
@@ -658,12 +666,12 @@ export const App: React.FC = () => {
             title={currentTitle}
           />
         ) : activeEngineType === 'web-media' ? (
-          <div ref={viewportRef} className="relative w-full h-full flex items-center justify-center overflow-hidden">
+          <div ref={viewportRef} className={`relative w-full h-full flex items-center justify-center overflow-hidden ${!currentUri ? 'hidden' : ''}`}>
             <video
               id="aether-video-viewport"
               ref={videoRef}
               crossOrigin="anonymous"
-              className="w-full h-full object-contain z-10 cursor-pointer"
+              className={`w-full h-full object-contain z-10 cursor-pointer ${!currentUri ? 'hidden' : ''}`}
               playsInline
               preload="auto"
               onWaiting={() => usePlayerStore.setState({ isBuffering: true })}
@@ -1140,6 +1148,9 @@ export const App: React.FC = () => {
           onPlayInNativePlayer={(url) => {
             openMedia(url);
           }}
+          onStartWindowDrag={handleStartWindowDrag}
+          onMinimizeWindow={handleWindowMinimize}
+          onMaximizeWindow={handleWindowMaximize}
         />
       </ErrorBoundary>
 

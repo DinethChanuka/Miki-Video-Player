@@ -40,3 +40,4 @@ describe('Task 3 Audit: Audio DSP, Single Authoritative Volume & 5.1 Routing', (
     assert.equal(engine.getMasterVolume(), 2.0);
   });
 });
+

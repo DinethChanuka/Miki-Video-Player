@@ -1104,6 +1104,15 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     if (engine) {
       await engine.pause();
     }
+    // Cleanly purge HTML5 video viewport DOM element so stale video frames do not bleed into the UI
+    if (typeof document !== 'undefined') {
+      const videoEl = document.getElementById('aether-video-viewport') as HTMLVideoElement | null;
+      if (videoEl) {
+        videoEl.pause();
+        videoEl.removeAttribute('src');
+        videoEl.load();
+      }
+    }
     set({
       currentUri: null,
       currentTitle: '',

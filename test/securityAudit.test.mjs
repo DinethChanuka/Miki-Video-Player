@@ -38,3 +38,4 @@ describe('Task 7 Audit: Tauri Security, Strict CSP & URI Validation', () => {
     assert.equal(validateSafeMediaUri('blob:http://localhost:1420/some-guid'), true);
   });
 });
+

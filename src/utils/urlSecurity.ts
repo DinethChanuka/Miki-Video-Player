@@ -34,3 +34,4 @@ export function validateSafeMediaUri(uri: unknown): boolean {
     /^[a-zA-Z]:[\\/]/.test(trimmed)
   );
 }
+
