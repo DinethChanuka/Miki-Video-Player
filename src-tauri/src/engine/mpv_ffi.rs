@@ -109,11 +109,16 @@ impl MpvLib {
     fn load_internal() -> PlayerResult<Self> {
         let candidates = if cfg!(target_os = "macos") {
             vec![
+                "@executable_path/../Frameworks/libmpv.2.dylib",
+                "@executable_path/../Frameworks/libmpv.dylib",
+                "@loader_path/../Frameworks/libmpv.2.dylib",
+                "@loader_path/../Frameworks/libmpv.dylib",
                 "libmpv.2.dylib",
                 "libmpv.dylib",
                 "/opt/homebrew/lib/libmpv.dylib",
                 "/usr/local/lib/libmpv.dylib",
                 "@rpath/libmpv.2.dylib",
+                "@rpath/libmpv.dylib",
             ]
         } else if cfg!(target_os = "windows") {
             vec!["mpv-2.dll", "mpv-1.dll", "libmpv-2.dll"]
