@@ -1,5 +1,10 @@
 import React from 'react';
-import { SubtitleCue, SubtitleStyleConfig, DEFAULT_SUBTITLE_STYLE } from '../../core/SubtitleManager';
+import {
+  SubtitleCue,
+  SubtitleStyleConfig,
+  DEFAULT_SUBTITLE_STYLE,
+  parseSubtitleToReactNodes,
+} from '../../core/SubtitleManager';
 
 interface SubtitleOverlayProps {
   cues: SubtitleCue[];
@@ -54,10 +59,9 @@ export const SubtitleOverlay: React.FC<SubtitleOverlayProps> = ({
         }}
       >
         {activeCues.map((cue, idx) => (
-          <div
-            key={cue.id || idx}
-            dangerouslySetInnerHTML={{ __html: cue.text }}
-          />
+          <div key={cue.id || idx}>
+            {parseSubtitleToReactNodes(cue.text)}
+          </div>
         ))}
       </div>
     </div>

@@ -5,6 +5,9 @@
  * persistent video-to-subtitle association, and custom styling.
  */
 
+import React from 'react';
+import type { ReactNode } from 'react';
+
 export interface SubtitleCue {
   id: string;
   startTime: number; // in seconds
@@ -117,6 +120,81 @@ function sha256Hex(ascii: string): string {
 export function computeSubtitleMediaHash(uri: string): string {
   if (!uri) return '0'.repeat(64);
   return sha256Hex(uri.trim());
+}
+
+/**
+ * Safely parses subtitle text into React virtual nodes, supporting safe formatting tags
+ * (italic, bold, underline, font color) while completely neutralizing HTML/XSS injection.
+ */
+export function parseSubtitleToReactNodes(rawText: string): ReactNode[] {
+  if (!rawText) return [];
+
+  // Strip dangerous tags completely
+  const cleaned = rawText
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+    .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
+    .replace(/<(?:object|embed|svg|img|link|meta|input|form|button)\b[^>]*>/gi, '');
+
+  const nodes: ReactNode[] = [];
+  const tagRegex = /<\/?(?:i|b|u|font)(?:\s+color=["']?([#a-zA-Z0-9]+)["']?)?>/gi;
+
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  let isItalic = false;
+  let isBold = false;
+  let isUnderline = false;
+  let fontColor: string | undefined = undefined;
+
+  let keyCounter = 0;
+  const pushSegment = (textChunk: string) => {
+    if (!textChunk) return;
+    let node: ReactNode = textChunk;
+    if (fontColor) {
+      node = React.createElement('span', { key: `fc-${keyCounter++}`, style: { color: fontColor } }, node);
+    }
+    if (isUnderline) {
+      node = React.createElement('u', { key: `u-${keyCounter++}` }, node);
+    }
+    if (isBold) {
+      node = React.createElement('b', { key: `b-${keyCounter++}` }, node);
+    }
+    if (isItalic) {
+      node = React.createElement('i', { key: `i-${keyCounter++}` }, node);
+    }
+    nodes.push(node);
+  };
+
+  while ((match = tagRegex.exec(cleaned)) !== null) {
+    const textBefore = cleaned.substring(lastIndex, match.index);
+    if (textBefore) {
+      pushSegment(textBefore);
+    }
+
+    const fullTag = match[0].toLowerCase();
+    if (fullTag.startsWith('</')) {
+      if (fullTag.includes('i')) isItalic = false;
+      else if (fullTag.includes('b')) isBold = false;
+      else if (fullTag.includes('u')) isUnderline = false;
+      else if (fullTag.includes('font')) fontColor = undefined;
+    } else {
+      if (fullTag.startsWith('<i')) isItalic = true;
+      else if (fullTag.startsWith('<b')) isBold = true;
+      else if (fullTag.startsWith('<u')) isUnderline = true;
+      else if (fullTag.startsWith('<font')) {
+        fontColor = match[1] || undefined;
+      }
+    }
+    lastIndex = tagRegex.lastIndex;
+  }
+
+  const textRemaining = cleaned.substring(lastIndex);
+  if (textRemaining) {
+    pushSegment(textRemaining);
+  }
+
+  return nodes.length > 0 ? nodes : [cleaned];
 }
 
 /**
