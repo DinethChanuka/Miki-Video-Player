@@ -22,6 +22,18 @@ interface WebBrowserModalProps {
   onMaximizeWindow?: () => void;
 }
 
+interface WebkitMessageHandlers {
+  browserViewAction?: {
+    postMessage: (msg: unknown) => void;
+  };
+}
+
+interface WindowWithWebkit extends Window {
+  webkit?: {
+    messageHandlers?: WebkitMessageHandlers;
+  };
+}
+
 /**
  * Resolves web URLs to embed-compatible formats to bypass X-Frame-Options blocking
  */
@@ -65,18 +77,63 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
   const [isAdShieldActive, setIsAdShieldActive] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [blockedCount, setBlockedCount] = useState<number>(18);
+  const [detectedMediaUrl, setDetectedMediaUrl] = useState<string | null>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
+  const getWebkitHandlers = () => {
+    if (typeof window === 'undefined') return undefined;
+    return (window as unknown as WindowWithWebkit).webkit?.messageHandlers;
+  };
+
+  const isNativeBrowserSupported = Boolean(getWebkitHandlers()?.browserViewAction);
+
+  // Synchronize with native top-level WKWebView when browser modal is opened
   useEffect(() => {
-    if (initialUrl && isOpen) {
-      const clean = getCleanUrl(initialUrl);
+    if (isOpen) {
+      const clean = getCleanUrl(initialUrl || 'https://cinesubz.co');
       setCurrentUrl(clean);
       setIsLoading(true);
-    }
-  }, [initialUrl, isOpen]);
+      setDetectedMediaUrl(null);
 
-  // Listen for navigation events from native wrapper (e.g. target="_blank" clicks on movie sites)
+      const handlers = getWebkitHandlers();
+      if (handlers?.browserViewAction) {
+        handlers.browserViewAction.postMessage({
+          action: 'open',
+          url: clean,
+        });
+      }
+    }
+  }, [isOpen, initialUrl]);
+
+  // Listen for native browser loading & navigation events
   useEffect(() => {
+    const handleLoadingStart = (e: Event) => {
+      const detail = (e as CustomEvent<{ url?: string }>).detail;
+      setIsLoading(true);
+      if (detail?.url) {
+        setCurrentUrl(detail.url);
+      }
+    };
+
+    const handleLoadingFinish = (e: Event) => {
+      const detail = (e as CustomEvent<{ url?: string; title?: string }>).detail;
+      setIsLoading(false);
+      if (detail?.url) {
+        setCurrentUrl(detail.url);
+      }
+    };
+
+    const handleMediaDetected = (e: Event) => {
+      const detail = (e as CustomEvent<{ url?: string; title?: string }>).detail;
+      if (detail?.url) {
+        setDetectedMediaUrl(detail.url);
+      }
+    };
+
+    const handleAdBlocked = () => {
+      setBlockedCount((c) => c + 1);
+    };
+
     const handleNavigate = (e: Event) => {
       const detail = (e as CustomEvent<{ url?: string }>).detail;
       if (detail?.url) {
@@ -87,28 +144,79 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
         }
         setCurrentUrl(clean);
         setIsLoading(true);
+
+        const handlers = getWebkitHandlers();
+        if (handlers?.browserViewAction) {
+          handlers.browserViewAction.postMessage({
+            action: 'navigate',
+            url: clean,
+          });
+        }
       }
     };
+
+    window.addEventListener('miki:browser-loading-start', handleLoadingStart);
+    window.addEventListener('miki:browser-loading-finish', handleLoadingFinish);
+    window.addEventListener('miki:browser-media-detected', handleMediaDetected);
+    window.addEventListener('miki:browser-ad-blocked', handleAdBlocked);
     window.addEventListener('miki:navigate-web-browser', handleNavigate);
+
     return () => {
+      window.removeEventListener('miki:browser-loading-start', handleLoadingStart);
+      window.removeEventListener('miki:browser-loading-finish', handleLoadingFinish);
+      window.removeEventListener('miki:browser-media-detected', handleMediaDetected);
+      window.removeEventListener('miki:browser-ad-blocked', handleAdBlocked);
       window.removeEventListener('miki:navigate-web-browser', handleNavigate);
     };
   }, [isAdShieldActive]);
 
   if (!isOpen) return null;
 
+  const handleClose = () => {
+    const handlers = getWebkitHandlers();
+    if (handlers?.browserViewAction) {
+      handlers.browserViewAction.postMessage({ action: 'close' });
+    }
+    onClose();
+  };
+
   const handleReload = () => {
     setIsLoading(true);
-    if (iframeRef.current) {
+    const handlers = getWebkitHandlers();
+    if (handlers?.browserViewAction) {
+      handlers.browserViewAction.postMessage({ action: 'reload' });
+    } else if (iframeRef.current) {
       iframeRef.current.src = resolveBrowserFrameUrl(currentUrl);
     }
   };
 
+  const handleToggleShield = () => {
+    const nextState = !isAdShieldActive;
+    setIsAdShieldActive(nextState);
+    if (!nextState) {
+      setBlockedCount((c) => c + 3);
+    }
+    const handlers = getWebkitHandlers();
+    if (handlers?.browserViewAction) {
+      handlers.browserViewAction.postMessage({
+        action: 'toggleShield',
+        enabled: nextState,
+      });
+    }
+  };
+
   const isPlayableInPlayer = () => {
+    if (detectedMediaUrl) return true;
     if (!currentUrl) return false;
     if (parseYouTubeId(currentUrl)) return true;
     if (/\.(mp4|m3u8|webm|mov|mkv)(\?.*)?$/i.test(currentUrl)) return true;
     return false;
+  };
+
+  const handlePlayInPlayer = () => {
+    const target = detectedMediaUrl || currentUrl;
+    handleClose();
+    onPlayInNativePlayer(target);
   };
 
   const resolvedFrameUrl = resolveBrowserFrameUrl(currentUrl);
@@ -120,9 +228,7 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
       style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
     >
       {/* Sleek, Minimal Top Bar - Back, Shield Status, Window Drag & Controls */}
-      <div
-        className="w-full h-11 bg-slate-950/90 backdrop-blur-xl border-b border-white/10 flex items-center justify-between px-3 shrink-0 text-white z-30"
-      >
+      <div className="w-full h-11 bg-slate-950/95 backdrop-blur-xl border-b border-white/10 flex items-center justify-between px-3 shrink-0 text-white z-30 shadow-lg">
         {/* Left Action Controls (no-drag) */}
         <div
           className="flex items-center gap-2.5 shrink-0"
@@ -130,7 +236,7 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
         >
           {/* Back to Player Button */}
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/10 text-xs font-semibold text-white transition-all active:scale-95 shadow-sm"
             title="Return to Miki Player"
           >
@@ -155,10 +261,7 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
 
           {/* Ad Shield Toggle Pill */}
           <button
-            onClick={() => {
-              setIsAdShieldActive(!isAdShieldActive);
-              if (!isAdShieldActive) setBlockedCount((c) => c + 3);
-            }}
+            onClick={handleToggleShield}
             className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-[11px] font-semibold transition-all shadow-sm ${
               isAdShieldActive
                 ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
@@ -206,12 +309,9 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
           {/* Play in Player Button (when media or youtube detected) */}
           {isPlayableInPlayer() && (
             <button
-              onClick={() => {
-                onPlayInNativePlayer(currentUrl);
-                onClose();
-              }}
+              onClick={handlePlayInPlayer}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 hover:brightness-110 active:scale-95 text-white font-bold text-xs transition-all shadow-md animate-pulse"
-              title="Launch in Native Player with 3D Spatial Audio & Video DSP"
+              title="Launch detected stream in Native Player with 3D Spatial Audio & Video DSP"
             >
               <Play className="w-3.5 h-3.5 fill-white" />
               <span>Play in Player</span>
@@ -248,7 +348,7 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
               □
             </button>
             <button
-              onClick={onClose}
+              onClick={handleClose}
               className="w-7 h-7 rounded-xl hover:bg-rose-500/40 text-white/70 hover:text-rose-200 flex items-center justify-center transition-colors text-xs"
               title="Close Browser"
             >
@@ -259,9 +359,9 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
       </div>
 
       {/* Main Full-Window Viewport: Loading Indicator + Edge-to-Edge Website Frame */}
-      <div className="relative flex-1 w-full h-full bg-black overflow-hidden flex flex-col items-center justify-center">
+      <div className="relative flex-1 w-full h-full bg-transparent overflow-hidden flex flex-col items-center justify-center">
         {isLoading && (
-          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/80 backdrop-blur-md">
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/85 backdrop-blur-md">
             <div className="w-12 h-12 rounded-full border-3 border-transparent border-t-cyan-400 border-r-emerald-400 animate-spin shadow-lg shadow-cyan-500/20" />
             <span className="text-sm font-semibold text-white/90 mt-4 flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-cyan-400 animate-pulse" />
@@ -273,17 +373,20 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
           </div>
         )}
 
-        <iframe
-          ref={iframeRef}
-          src={resolvedFrameUrl}
-          title="Miki Protected Web View"
-          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation allow-downloads allow-modals"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
-          allowFullScreen
-          onLoad={() => setIsLoading(false)}
-          onError={() => setIsLoading(false)}
-          className="w-full h-full border-0 bg-slate-950"
-        />
+        {/* Fallback iframe only when native browserView is unavailable */}
+        {!isNativeBrowserSupported && (
+          <iframe
+            ref={iframeRef}
+            src={resolvedFrameUrl}
+            title="Miki Protected Web View"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation allow-downloads allow-modals"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+            allowFullScreen
+            onLoad={() => setIsLoading(false)}
+            onError={() => setIsLoading(false)}
+            className="w-full h-full border-0 bg-slate-950"
+          />
+        )}
       </div>
     </div>
   );

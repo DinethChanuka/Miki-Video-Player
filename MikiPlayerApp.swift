@@ -19,9 +19,11 @@ class BorderlessKeyWindow: NSWindow {
     }
 }
 
-class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMessageHandler, WKUIDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMessageHandler, WKUIDelegate, WKNavigationDelegate {
     var window: BorderlessKeyWindow!
     var webView: WKWebView!
+    var browserWebView: WKWebView?
+    var isAdShieldEnabled: Bool = true
     var isCustomFullScreen = false
     var savedFrame: NSRect = .zero
 
@@ -67,6 +69,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         contentController.add(self, name: "openNativeDirectoryDialog")
         contentController.add(self, name: "saveScreenshot")
         contentController.add(self, name: "requestSystemAccess")
+        contentController.add(self, name: "browserViewAction")
+        contentController.add(self, name: "browserMediaDetected")
         config.userContentController = contentController
 
         webView = WKWebView(frame: window.contentView!.bounds, configuration: config)
@@ -225,6 +229,73 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         }
     }
 
+    func windowDidResize(_ notification: Notification) {
+        updateBrowserViewLayout()
+    }
+
+    func updateBrowserViewLayout() {
+        guard let bView = browserWebView, !bView.isHidden, let content = window?.contentView else { return }
+        bView.frame = NSRect(x: 0, y: 0, width: content.bounds.width, height: max(100, content.bounds.height - 44))
+    }
+
+    func setupBrowserWebView() -> WKWebView {
+        if let existing = browserWebView {
+            return existing
+        }
+
+        let config = WKWebViewConfiguration()
+        config.allowsAirPlayForMediaPlayback = true
+        config.mediaTypesRequiringUserActionForPlayback = []
+        if #available(macOS 12.0, *) {
+            config.preferences.isElementFullscreenEnabled = true
+        }
+
+        let bContentController = WKUserContentController()
+        bContentController.add(self, name: "browserMediaDetected")
+
+        // Injected ad-blocking & video detection script
+        let helperScript = """
+        (function() {
+            window.open = function(url) {
+                if (url) { window.location.href = url; }
+                return null;
+            };
+            function scanMedia() {
+                var videos = document.querySelectorAll('video');
+                for (var i = 0; i < videos.length; i++) {
+                    var v = videos[i];
+                    var src = v.currentSrc || v.src;
+                    if (src && src.indexOf('http') === 0 && src.indexOf('blob:') === -1) {
+                        window.webkit.messageHandlers.browserMediaDetected.postMessage({
+                            url: src,
+                            title: document.title || 'Movie Stream'
+                        });
+                        return;
+                    }
+                }
+            }
+            document.addEventListener('play', scanMedia, true);
+            document.addEventListener('loadeddata', scanMedia, true);
+            setInterval(scanMedia, 4000);
+        })();
+        """
+        let userScript = WKUserScript(source: helperScript, injectionTime: .atDocumentEnd, forMainFrameOnly: false)
+        bContentController.addUserScript(userScript)
+        config.userContentController = bContentController
+
+        let contentBounds = window.contentView?.bounds ?? NSRect(x: 0, y: 0, width: 1280, height: 720)
+        let initialFrame = NSRect(x: 0, y: 0, width: contentBounds.width, height: max(100, contentBounds.height - 44))
+        let bView = WKWebView(frame: initialFrame, configuration: config)
+        bView.autoresizingMask = [.width, .height]
+        bView.uiDelegate = self
+        bView.navigationDelegate = self
+        bView.isHidden = true
+
+        window.contentView?.addSubview(bView)
+        browserWebView = bView
+        return bView
+    }
+
     // WKUIDelegate: Intercept & block intrusive popups while allowing legitimate movie/video page links
     func webView(
         _ webView: WKWebView,
@@ -234,16 +305,70 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
     ) -> WKWebView? {
         if let targetUrl = navigationAction.request.url {
             let urlStr = targetUrl.absoluteString
-            let isAd = urlStr.contains("doubleclick") || urlStr.contains("popads") || urlStr.contains("bet365") || urlStr.contains("onclick") || urlStr.contains("adsterra") || urlStr.contains("adservice")
+            let isAd = urlStr.contains("doubleclick") || urlStr.contains("popads") || urlStr.contains("bet365") || urlStr.contains("onclick") || urlStr.contains("adsterra") || urlStr.contains("adservice") || urlStr.contains("syndication")
             if !isAd {
-                let escaped = urlStr.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "'", with: "\\'")
-                let js = "window.dispatchEvent(new CustomEvent('miki:navigate-web-browser', { detail: { url: '\(escaped)' } }));"
-                webView.evaluateJavaScript(js, completionHandler: nil)
+                if webView == self.browserWebView {
+                    self.browserWebView?.load(navigationAction.request)
+                } else {
+                    let escaped = urlStr.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "'", with: "\\'")
+                    let js = "window.dispatchEvent(new CustomEvent('miki:navigate-web-browser', { detail: { url: '\(escaped)' } }));"
+                    self.webView.evaluateJavaScript(js, completionHandler: nil)
+                }
             } else {
                 NSLog("[Miki Shield] Intercepted and blocked popup window creation for: %@", urlStr)
+                let js = "window.dispatchEvent(new CustomEvent('miki:browser-ad-blocked'));"
+                self.webView.evaluateJavaScript(js, completionHandler: nil)
             }
         }
         return nil
+    }
+
+    // WKNavigationDelegate: tracking page loading & updating top bar
+    func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+        if webView == self.browserWebView, let url = webView.url?.absoluteString {
+            let clean = url.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "'", with: "\\'")
+            let js = "window.dispatchEvent(new CustomEvent('miki:browser-loading-start', { detail: { url: '\(clean)' } }));"
+            self.webView.evaluateJavaScript(js, completionHandler: nil)
+        }
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        if webView == self.browserWebView {
+            let url = webView.url?.absoluteString ?? ""
+            let title = webView.title ?? ""
+            let cleanUrl = url.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "'", with: "\\'")
+            let cleanTitle = title.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "'", with: "\\'")
+            let js = "window.dispatchEvent(new CustomEvent('miki:browser-loading-finish', { detail: { url: '\(cleanUrl)', title: '\(cleanTitle)' } }));"
+            self.webView.evaluateJavaScript(js, completionHandler: nil)
+        }
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        if webView == self.browserWebView {
+            let js = "window.dispatchEvent(new CustomEvent('miki:browser-loading-finish', { detail: { error: '\(error.localizedDescription)' } }));"
+            self.webView.evaluateJavaScript(js, completionHandler: nil)
+        }
+    }
+
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        if webView == self.browserWebView {
+            let js = "window.dispatchEvent(new CustomEvent('miki:browser-loading-finish', { detail: { error: '\(error.localizedDescription)' } }));"
+            self.webView.evaluateJavaScript(js, completionHandler: nil)
+        }
+    }
+
+    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        if webView == self.browserWebView, self.isAdShieldEnabled, let targetUrl = navigationAction.request.url?.absoluteString {
+            let isAd = targetUrl.contains("doubleclick") || targetUrl.contains("popads") || targetUrl.contains("bet365") || targetUrl.contains("onclick") || targetUrl.contains("adsterra") || targetUrl.contains("adservice") || targetUrl.contains("syndication")
+            if isAd {
+                NSLog("[Miki Shield] Blocked ad navigation: %@", targetUrl)
+                let js = "window.dispatchEvent(new CustomEvent('miki:browser-ad-blocked'));"
+                self.webView.evaluateJavaScript(js, completionHandler: nil)
+                decisionHandler(.cancel)
+                return
+            }
+        }
+        decisionHandler(.allow)
     }
 
     // WKUIDelegate: native file picker when <input type="file"> is clicked
@@ -375,6 +500,55 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
                 try? FileManager.default.createDirectory(atPath: screenshotsDir, withIntermediateDirectories: true, attributes: nil)
                 let js = "window.dispatchEvent(new CustomEvent('miki:systemAccessGranted', { detail: { status: 'granted' } }));"
                 self.webView.evaluateJavaScript(js, completionHandler: nil)
+            } else if message.name == "browserViewAction" {
+                if let dict = message.body as? [String: Any], let action = dict["action"] as? String {
+                    switch action {
+                    case "open":
+                        let targetUrl = dict["url"] as? String ?? "https://cinesubz.co"
+                        let bView = self.setupBrowserWebView()
+                        self.updateBrowserViewLayout()
+                        bView.isHidden = false
+                        if let url = URL(string: targetUrl) {
+                            bView.load(URLRequest(url: url))
+                        }
+                        self.window.makeFirstResponder(bView)
+                    case "close":
+                        if let bView = self.browserWebView {
+                            bView.isHidden = true
+                            bView.load(URLRequest(url: URL(string: "about:blank")!))
+                        }
+                        self.window.makeFirstResponder(self.webView)
+                    case "reload":
+                        self.browserWebView?.reload()
+                    case "goBack":
+                        if self.browserWebView?.canGoBack == true {
+                            self.browserWebView?.goBack()
+                        }
+                    case "goForward":
+                        if self.browserWebView?.canGoForward == true {
+                            self.browserWebView?.goForward()
+                        }
+                    case "navigate":
+                        if let targetUrl = dict["url"] as? String, let url = URL(string: targetUrl) {
+                            self.browserWebView?.load(URLRequest(url: url))
+                        }
+                    case "toggleShield":
+                        if let enabled = dict["enabled"] as? Bool {
+                            self.isAdShieldEnabled = enabled
+                        }
+                    default:
+                        break
+                    }
+                }
+            } else if message.name == "browserMediaDetected" {
+                if let dict = message.body as? [String: Any] {
+                    let mediaUrl = dict["url"] as? String ?? ""
+                    let title = dict["title"] as? String ?? ""
+                    let cleanUrl = mediaUrl.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "'", with: "\\'")
+                    let cleanTitle = title.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "'", with: "\\'")
+                    let js = "window.dispatchEvent(new CustomEvent('miki:browser-media-detected', { detail: { url: '\(cleanUrl)', title: '\(cleanTitle)' } }));"
+                    self.webView.evaluateJavaScript(js, completionHandler: nil)
+                }
             }
         }
     }

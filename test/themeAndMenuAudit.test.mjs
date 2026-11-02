@@ -87,3 +87,4 @@ describe('Application Menu, Themes & Background Blur Audit', () => {
     );
   });
 });
+
