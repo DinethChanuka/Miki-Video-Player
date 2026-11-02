@@ -127,12 +127,7 @@ pub async fn player_apply_shader(
     controller: State<'_, Arc<Mutex<MpvController>>>,
 ) -> PlayerResult<()> {
     let guard = controller.lock();
-    // Configure mpv built-in filters corresponding to shader adjustments
-    let contrast_val = (config.contrast * 100.0).round() as i64 - 100; // -100 to 100
-    let saturation_val = (config.saturation * 100.0).round() as i64 - 100;
-    let _ = guard.set_property_string("contrast", &contrast_val.to_string());
-    let _ = guard.set_property_string("saturation", &saturation_val.to_string());
-    Ok(())
+    guard.apply_video_enhancements(&config)
 }
 
 #[tauri::command]
@@ -171,6 +166,16 @@ pub async fn db_save_preferences(
     db: State<'_, DatabaseManager>,
 ) -> PlayerResult<()> {
     db.save_preferences(&prefs)
+}
+
+#[tauri::command]
+pub async fn db_update_eq_preferences(
+    media_id: String,
+    eq_gains_json: String,
+    night_mode_enabled: bool,
+    db: State<'_, DatabaseManager>,
+) -> PlayerResult<()> {
+    db.update_eq_preferences(&media_id, &eq_gains_json, night_mode_enabled)
 }
 
 #[tauri::command]

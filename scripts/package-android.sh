@@ -28,11 +28,11 @@ mkdir -p "Build/Android"
 if command -v npx >/dev/null 2>&1; then
   echo "🚀 Invoking Tauri Android build..."
   if [ -d "src-tauri/gen/android" ]; then
-    npx tauri android build --apk || true
+    npx tauri android build --apk
   else
     echo "⚙️ Initializing Tauri Android project target..."
-    npx tauri android init || true
-    npx tauri android build --apk || true
+    npx tauri android init
+    npx tauri android build --apk
   fi
 
   # Copy generated APKs to Build/Android

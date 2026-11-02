@@ -1,19 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  X,
   Globe,
   ArrowLeft,
-  ArrowRight,
   RotateCw,
   ShieldCheck,
   ShieldAlert,
   Play,
   ExternalLink,
   Sparkles,
-  Lock,
 } from 'lucide-react';
 import { getCleanUrl, isBlockedUrl } from '../../utils/adBlockFilter';
-import { CINEMA_LINKS } from '../../utils/cinemaLinks';
 import { parseYouTubeId } from '../../App';
 
 interface WebBrowserModalProps {
@@ -21,77 +17,90 @@ interface WebBrowserModalProps {
   initialUrl?: string;
   onClose: () => void;
   onPlayInNativePlayer: (url: string) => void;
+  onStartWindowDrag?: (e: React.MouseEvent) => void;
+  onMinimizeWindow?: () => void;
+  onMaximizeWindow?: () => void;
+}
+
+/**
+ * Resolves web URLs to embed-compatible formats to bypass X-Frame-Options blocking
+ */
+export function resolveBrowserFrameUrl(url: string): string {
+  if (!url) return 'https://cinesubz.co';
+  const trimmed = url.trim();
+
+  // Convert YouTube links into embed format to prevent X-Frame-Options: SAMEORIGIN rejection
+  const ytMatch = trimmed.match(
+    /(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i
+  );
+  if (ytMatch && ytMatch[1]) {
+    return `https://www.youtube-nocookie.com/embed/${ytMatch[1]}?autoplay=1&enablejsapi=1`;
+  }
+  if (trimmed.includes('youtube.com') && !trimmed.includes('/embed/')) {
+    return 'https://www.youtube-nocookie.com/embed?listType=search&list=trending';
+  }
+
+  return trimmed;
+}
+
+export function extractHostname(url: string): string {
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname.replace(/^www\./, '');
+  } catch {
+    return url.replace(/^https?:\/\//, '').split('/')[0] || 'Website';
+  }
 }
 
 export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
   isOpen,
-  initialUrl = 'https://www.youtube.com',
+  initialUrl = 'https://cinesubz.co',
   onClose,
   onPlayInNativePlayer,
+  onStartWindowDrag,
+  onMinimizeWindow,
+  onMaximizeWindow,
 }) => {
   const [currentUrl, setCurrentUrl] = useState<string>(initialUrl);
-  const [inputUrl, setInputUrl] = useState<string>(initialUrl);
-  const [history, setHistory] = useState<string[]>([initialUrl]);
-  const [historyIndex, setHistoryIndex] = useState<number>(0);
   const [isAdShieldActive, setIsAdShieldActive] = useState<boolean>(true);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [blockedCount, setBlockedCount] = useState<number>(14);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [blockedCount, setBlockedCount] = useState<number>(18);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
   useEffect(() => {
-    if (initialUrl) {
+    if (initialUrl && isOpen) {
       const clean = getCleanUrl(initialUrl);
       setCurrentUrl(clean);
-      setInputUrl(clean);
-      setHistory([clean]);
-      setHistoryIndex(0);
+      setIsLoading(true);
     }
   }, [initialUrl, isOpen]);
 
+  // Listen for navigation events from native wrapper (e.g. target="_blank" clicks on movie sites)
+  useEffect(() => {
+    const handleNavigate = (e: Event) => {
+      const detail = (e as CustomEvent<{ url?: string }>).detail;
+      if (detail?.url) {
+        const clean = getCleanUrl(detail.url);
+        if (isAdShieldActive && isBlockedUrl(clean)) {
+          setBlockedCount((c) => c + 1);
+          return;
+        }
+        setCurrentUrl(clean);
+        setIsLoading(true);
+      }
+    };
+    window.addEventListener('miki:navigate-web-browser', handleNavigate);
+    return () => {
+      window.removeEventListener('miki:navigate-web-browser', handleNavigate);
+    };
+  }, [isAdShieldActive]);
+
   if (!isOpen) return null;
-
-  const navigateTo = (raw: string) => {
-    const clean = getCleanUrl(raw);
-    if (isAdShieldActive && isBlockedUrl(clean)) {
-      alert(`[Miki Shield] Navigation to known ad/tracker network blocked: ${clean}`);
-      setBlockedCount((c) => c + 1);
-      return;
-    }
-
-    setIsLoading(true);
-    setCurrentUrl(clean);
-    setInputUrl(clean);
-
-    const newHistory = history.slice(0, historyIndex + 1);
-    newHistory.push(clean);
-    setHistory(newHistory);
-    setHistoryIndex(newHistory.length - 1);
-  };
-
-  const handleBack = () => {
-    if (historyIndex > 0) {
-      const prev = history[historyIndex - 1];
-      setHistoryIndex(historyIndex - 1);
-      setCurrentUrl(prev);
-      setInputUrl(prev);
-      setIsLoading(true);
-    }
-  };
-
-  const handleForward = () => {
-    if (historyIndex < history.length - 1) {
-      const next = history[historyIndex + 1];
-      setHistoryIndex(historyIndex + 1);
-      setCurrentUrl(next);
-      setInputUrl(next);
-      setIsLoading(true);
-    }
-  };
 
   const handleReload = () => {
     setIsLoading(true);
     if (iframeRef.current) {
-      iframeRef.current.src = currentUrl;
+      iframeRef.current.src = resolveBrowserFrameUrl(currentUrl);
     }
   };
 
@@ -102,219 +111,179 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
     return false;
   };
 
-  // Safe sandbox string omitting popups when shield is active
-  const sandboxPolicy = isAdShieldActive
-    ? 'allow-scripts allow-same-origin allow-forms allow-presentation allow-downloads'
-    : 'allow-scripts allow-same-origin allow-forms allow-presentation allow-popups allow-downloads';
+  const resolvedFrameUrl = resolveBrowserFrameUrl(currentUrl);
+  const siteHostname = extractHostname(currentUrl);
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-2 sm:p-4 select-none animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 w-full h-full bg-[#06080d] flex flex-col select-none animate-in fade-in duration-150"
       style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
     >
+      {/* Sleek, Minimal Top Bar - Back, Shield Status, Window Drag & Controls */}
       <div
-        className="w-full max-w-6xl h-[92vh] max-h-[900px] rounded-3xl flex flex-col border border-white/20 shadow-2xl overflow-hidden text-white"
-        style={{ backgroundColor: '#0a0d16' }}
+        className="w-full h-11 bg-slate-950/90 backdrop-blur-xl border-b border-white/10 flex items-center justify-between px-3 shrink-0 text-white z-30"
       >
-        {/* Top Control Bar: Title & Window Controls */}
-        <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/10 bg-white/5">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white shadow-md">
-              <Globe className="w-4 h-4" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold tracking-tight text-white">Browse</h3>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/15 border border-cyan-400/30 text-cyan-300 font-bold">
-                  Protected Web View
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-300">
-                Browse YouTube, TikTok, Instagram, Facebook & Cinema Streams
-              </p>
-            </div>
+        {/* Left Action Controls (no-drag) */}
+        <div
+          className="flex items-center gap-2.5 shrink-0"
+          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+        >
+          {/* Back to Player Button */}
+          <button
+            onClick={onClose}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/10 text-xs font-semibold text-white transition-all active:scale-95 shadow-sm"
+            title="Return to Miki Player"
+          >
+            <ArrowLeft className="w-3.5 h-3.5 text-cyan-400" />
+            <span>Player</span>
+          </button>
+
+          {/* Reload Button */}
+          <button
+            onClick={handleReload}
+            className="p-1.5 rounded-xl bg-white/5 hover:bg-white/15 text-white/80 hover:text-white transition-colors"
+            title="Reload website"
+          >
+            <RotateCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-cyan-400' : ''}`} />
+          </button>
+
+          {/* Website Hostname Badge */}
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white/5 border border-white/10 text-xs text-white/90 font-medium">
+            <Globe className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+            <span className="truncate max-w-[180px] font-mono text-[11px]">{siteHostname}</span>
           </div>
 
-          <div className="flex items-center gap-2">
-            {/* Ad Shield Toggle Pill */}
+          {/* Ad Shield Toggle Pill */}
+          <button
+            onClick={() => {
+              setIsAdShieldActive(!isAdShieldActive);
+              if (!isAdShieldActive) setBlockedCount((c) => c + 3);
+            }}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-[11px] font-semibold transition-all shadow-sm ${
+              isAdShieldActive
+                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
+                : 'bg-rose-500/15 text-rose-300 border-rose-500/30 hover:bg-rose-500/25'
+            }`}
+            title={isAdShieldActive ? 'Ad Shield is ON: Intrusive ad popups suppressed' : 'Ad Shield is OFF'}
+          >
+            {isAdShieldActive ? (
+              <>
+                <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                <span>Shield ON ({blockedCount})</span>
+              </>
+            ) : (
+              <>
+                <ShieldAlert className="w-3 h-3 text-rose-400" />
+                <span>Shield OFF</span>
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* Center Draggable Region (Grabs & moves window smoothly) */}
+        <div
+          onMouseDown={onStartWindowDrag}
+          className="flex-1 h-full flex items-center justify-center cursor-grab active:cursor-grabbing px-4"
+          style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+        >
+          <div className="flex items-center gap-2 pointer-events-none opacity-60 hover:opacity-100 transition-opacity">
+            <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+            <span className="text-[11px] font-semibold tracking-wider uppercase text-slate-300">
+              Miki Browser
+            </span>
+            <span className="text-[10px] font-mono text-slate-500">|</span>
+            <span className="text-[10px] text-slate-400 font-mono truncate max-w-xs">
+              {currentUrl}
+            </span>
+          </div>
+        </div>
+
+        {/* Right Tools & Window Controls (no-drag) */}
+        <div
+          className="flex items-center gap-2 shrink-0"
+          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+        >
+          {/* Play in Player Button (when media or youtube detected) */}
+          {isPlayableInPlayer() && (
             <button
               onClick={() => {
-                setIsAdShieldActive(!isAdShieldActive);
-                if (!isAdShieldActive) setBlockedCount((c) => c + 3);
+                onPlayInNativePlayer(currentUrl);
+                onClose();
               }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all shadow-sm ${
-                isAdShieldActive
-                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
-                  : 'bg-rose-500/15 text-rose-300 border-rose-500/30 hover:bg-rose-500/25'
-              }`}
-              title={isAdShieldActive ? 'Ad Shield is ON: Popups & intrusive ads blocked' : 'Ad Shield is OFF'}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 hover:brightness-110 active:scale-95 text-white font-bold text-xs transition-all shadow-md animate-pulse"
+              title="Launch in Native Player with 3D Spatial Audio & Video DSP"
             >
-              {isAdShieldActive ? (
-                <>
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Shield: ON ({blockedCount} Blocked)</span>
-                </>
-              ) : (
-                <>
-                  <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />
-                  <span>Shield: OFF</span>
-                </>
-              )}
+              <Play className="w-3.5 h-3.5 fill-white" />
+              <span>Play in Player</span>
             </button>
-
-            <button
-              onClick={onClose}
-              className="p-2 rounded-xl bg-white/5 hover:bg-white/15 text-white/70 hover:text-white transition-colors"
-              title="Close Browser"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        {/* Address Bar, Navigation Buttons & Quick Launcher */}
-        <div className="flex flex-col gap-2 p-3 bg-black/40 border-b border-white/10">
-          <div className="flex items-center gap-2">
-            {/* History Controls */}
-            <div className="flex items-center gap-1">
-              <button
-                onClick={handleBack}
-                disabled={historyIndex <= 0}
-                className="p-2 rounded-xl bg-white/5 hover:bg-white/15 disabled:opacity-30 disabled:hover:bg-white/5 text-white transition-colors"
-                title="Back"
-              >
-                <ArrowLeft className="w-3.5 h-3.5" />
-              </button>
-              <button
-                onClick={handleForward}
-                disabled={historyIndex >= history.length - 1}
-                className="p-2 rounded-xl bg-white/5 hover:bg-white/15 disabled:opacity-30 disabled:hover:bg-white/5 text-white transition-colors"
-                title="Forward"
-              >
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-              <button
-                onClick={handleReload}
-                className="p-2 rounded-xl bg-white/5 hover:bg-white/15 text-white transition-colors"
-                title="Reload"
-              >
-                <RotateCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-              </button>
-            </div>
-
-            {/* URL / Search Input */}
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                navigateTo(inputUrl);
-              }}
-              className="flex-1 flex items-center relative"
-            >
-              <div className="absolute left-3 text-white/40 pointer-events-none">
-                <Lock className="w-3.5 h-3.5 text-emerald-400" />
-              </div>
-              <input
-                type="text"
-                value={inputUrl}
-                onChange={(e) => setInputUrl(e.target.value)}
-                placeholder="Enter website URL (e.g. cinesubz.co, youtube.com) or search term..."
-                className="w-full pl-9 pr-24 py-2 bg-white/10 hover:bg-white/15 focus:bg-white/15 border border-white/15 focus:border-cyan-400/60 rounded-xl text-xs font-mono text-white placeholder-white/40 focus:outline-none transition-all shadow-inner"
-              />
-              <button
-                type="submit"
-                className="absolute right-1.5 px-3 py-1 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-black font-bold text-xs transition-colors shadow-sm"
-              >
-                Go
-              </button>
-            </form>
-
-            {/* Play In Native Miki Player Button (If YouTube or direct video stream) */}
-            {isPlayableInPlayer() && (
-              <button
-                onClick={() => {
-                  onPlayInNativePlayer(currentUrl);
-                  onClose();
-                }}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 hover:brightness-110 active:scale-95 text-white font-bold text-xs transition-all shadow-lg animate-pulse"
-                title="Launch in Miki Native Video Player with 3D Spatial Audio & DSP"
-              >
-                <Play className="w-3.5 h-3.5 fill-white" />
-                <span>Play in Player</span>
-              </button>
-            )}
-
-            {/* External Browser Fallback */}
-            <a
-              href={currentUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="p-2 rounded-xl bg-white/5 hover:bg-white/15 text-white/70 hover:text-white transition-colors"
-              title="Open in System Browser"
-            >
-              <ExternalLink className="w-3.5 h-3.5" />
-            </a>
-          </div>
-
-          {/* Quick-Launch Stream Portals Row */}
-          <div className="flex items-center gap-2 overflow-x-auto pt-1 text-xs">
-            <span className="text-[10px] uppercase font-mono tracking-wider text-slate-400 font-bold shrink-0">
-              Fast Links:
-            </span>
-            {CINEMA_LINKS.slice(0, 7).map((item) => {
-              const isActive = currentUrl.includes(item.id) || currentUrl === item.url;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => navigateTo(item.url)}
-                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition-all shrink-0 ${
-                    isActive
-                      ? 'bg-white/20 text-white border-white/40 shadow-sm'
-                      : 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10 hover:text-white'
-                  }`}
-                >
-                  <span className={`w-1.5 h-1.5 rounded-full bg-gradient-to-r ${item.accentColor}`} />
-                  <span>{item.name.split(' ')[0]}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Browser Frame Viewport */}
-        <div className="relative flex-1 w-full h-full bg-black overflow-hidden flex flex-col items-center justify-center">
-          {isLoading && (
-            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm">
-              <div className="w-10 h-10 rounded-full border-3 border-transparent border-t-cyan-400 border-r-emerald-400 animate-spin" />
-              <span className="text-xs font-semibold text-white/90 mt-3 flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
-                Connecting securely with Ad Shield...
-              </span>
-            </div>
           )}
 
-          <iframe
-            ref={iframeRef}
-            src={currentUrl}
-            title="Miki Protected Web View"
-            sandbox={sandboxPolicy}
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-            allowFullScreen
-            onLoad={() => setIsLoading(false)}
-            onError={() => setIsLoading(false)}
-            className="w-full h-full border-0 bg-slate-950"
-          />
-        </div>
+          {/* Open in Default System Browser */}
+          <a
+            href={currentUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="p-1.5 rounded-xl bg-white/5 hover:bg-white/15 text-white/70 hover:text-white transition-colors"
+            title="Open in System Web Browser"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
 
-        {/* Bottom Safety & Ad Shield Status Bar */}
-        <div className="px-4 py-2 border-t border-white/10 bg-white/[0.02] flex items-center justify-between text-[11px] text-slate-400">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399]" />
-            <span>Miki Shield Active • Popup suppression enabled • Zero tracker redirects</span>
+          <div className="w-[1px] h-4 bg-white/15 mx-1" />
+
+          {/* Window Control Buttons */}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={onMinimizeWindow}
+              className="w-7 h-7 rounded-xl hover:bg-white/10 text-white/70 hover:text-white flex items-center justify-center transition-colors text-xs font-bold"
+              title="Minimize"
+            >
+              ─
+            </button>
+            <button
+              onClick={onMaximizeWindow}
+              className="w-7 h-7 rounded-xl hover:bg-white/10 text-white/70 hover:text-white flex items-center justify-center transition-colors text-xs"
+              title="Maximize"
+            >
+              □
+            </button>
+            <button
+              onClick={onClose}
+              className="w-7 h-7 rounded-xl hover:bg-rose-500/40 text-white/70 hover:text-rose-200 flex items-center justify-center transition-colors text-xs"
+              title="Close Browser"
+            >
+              ✕
+            </button>
           </div>
-          <span className="font-mono text-cyan-400 text-[10px]">
-            {currentUrl}
-          </span>
         </div>
+      </div>
+
+      {/* Main Full-Window Viewport: Loading Indicator + Edge-to-Edge Website Frame */}
+      <div className="relative flex-1 w-full h-full bg-black overflow-hidden flex flex-col items-center justify-center">
+        {isLoading && (
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/80 backdrop-blur-md">
+            <div className="w-12 h-12 rounded-full border-3 border-transparent border-t-cyan-400 border-r-emerald-400 animate-spin shadow-lg shadow-cyan-500/20" />
+            <span className="text-sm font-semibold text-white/90 mt-4 flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-cyan-400 animate-pulse" />
+              Loading {siteHostname}...
+            </span>
+            <span className="text-xs text-slate-400 mt-1 font-mono max-w-md truncate px-4 text-center">
+              {currentUrl}
+            </span>
+          </div>
+        )}
+
+        <iframe
+          ref={iframeRef}
+          src={resolvedFrameUrl}
+          title="Miki Protected Web View"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation allow-downloads allow-modals"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+          allowFullScreen
+          onLoad={() => setIsLoading(false)}
+          onError={() => setIsLoading(false)}
+          className="w-full h-full border-0 bg-slate-950"
+        />
       </div>
     </div>
   );

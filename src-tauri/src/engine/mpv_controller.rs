@@ -12,6 +12,10 @@ pub struct MpvController {
     handle: Option<MpvHandle>,
     surface_id: Option<i64>,
     is_destroyed: Arc<AtomicBool>,
+    cached_audio_tracks: Vec<TrackInfo>,
+    cached_subtitle_tracks: Vec<TrackInfo>,
+    cached_chapters: Vec<ChapterInfo>,
+    last_metadata_query: Option<std::time::Instant>,
 }
 
 unsafe impl Send for MpvController {}
@@ -24,6 +28,10 @@ impl MpvController {
             handle: None,
             surface_id: None,
             is_destroyed: Arc::new(AtomicBool::new(false)),
+            cached_audio_tracks: Vec::new(),
+            cached_subtitle_tracks: Vec::new(),
+            cached_chapters: Vec::new(),
+            last_metadata_query: None,
         }
     }
 
@@ -76,30 +84,17 @@ impl MpvController {
         Ok(())
     }
 
-    /// Loads a media file or URL with optional resume timestamp
-    pub fn load_file(&self, uri: &str, start_pos_ms: i64) -> PlayerResult<()> {
-        let handle = self.require_handle()?;
-        let lib = self.lib.as_ref().unwrap();
-
-        let cmd = if start_pos_ms > 0 {
+    /// Loads a media file or URL with optional resume timestamp safely using mpv_command array
+    pub fn load_file(&mut self, uri: &str, start_pos_ms: i64) -> PlayerResult<()> {
+        let start_str;
+        let mut args = vec!["loadfile", uri, "replace"];
+        if start_pos_ms > 0 {
             let start_sec = start_pos_ms as f64 / 1000.0;
-            format!("loadfile \"{}\" replace start={:.3}", uri, start_sec)
-        } else {
-            format!("loadfile \"{}\" replace", uri)
-        };
-
-        let c_cmd = CString::new(cmd).map_err(|e| PlayerError::MediaNotFound {
-            path: format!("Invalid URI string: {e}"),
-        })?;
-
-        let status = unsafe { (lib.fns().command_string)(handle, c_cmd.as_ptr()) };
-        if status < 0 {
-            return Err(PlayerError::CodecUnsupported(format!(
-                "Failed to load file '{uri}', mpv error: {status}"
-            )));
+            start_str = format!("start={:.3}", start_sec);
+            args.push(&start_str);
         }
-
-        Ok(())
+        self.last_metadata_query = None;
+        self.run_command_args(&args)
     }
 
     pub fn play(&self) -> PlayerResult<()> {
@@ -113,12 +108,12 @@ impl MpvController {
     pub fn seek(&self, timestamp_ms: i64, exact: bool) -> PlayerResult<()> {
         let seconds = (timestamp_ms.max(0) as f64) / 1000.0;
         let mode = if exact { "exact" } else { "keyframes" };
-        let cmd = format!("seek {:.3} absolute {}", seconds, mode);
-        self.run_command_string(&cmd)
+        let sec_str = format!("{:.3}", seconds);
+        self.run_command_args(&["seek", &sec_str, "absolute", mode])
     }
 
     pub fn set_volume(&self, volume: i64) -> PlayerResult<()> {
-        let clamped = volume.clamp(0, 100);
+        let clamped = volume.clamp(0, 200);
         self.set_property_string("volume", &clamped.to_string())
     }
 
@@ -146,6 +141,66 @@ impl MpvController {
         self.set_property_string("audio-delay", &format!("{delay_sec:.3}"))
     }
 
+    /// Configures genuine hardware GPU video processing (Anime4K, CAS sharpening, deband, HDR tone-mapping, color grading)
+    pub fn apply_video_enhancements(&self, config: &crate::engine::types::VideoShaderConfig) -> PlayerResult<()> {
+        let contrast_val = (config.contrast * 100.0).round() as i64 - 100;
+        let saturation_val = (config.saturation * 100.0).round() as i64 - 100;
+        let _ = self.set_property_string("contrast", &contrast_val.to_string());
+        let _ = self.set_property_string("saturation", &saturation_val.to_string());
+
+        // 1. Sharpening filter (CAS / unsharp mask)
+        let sharpen_val = (config.sharpness.clamp(0.0, 2.0) * 1.5).clamp(0.0, 2.0);
+        let _ = self.set_property_string("sharpen", &format!("{sharpen_val:.2}"));
+
+        // 2. Deband processing
+        if config.deband_enabled || config.upscale_mode == "deband" {
+            let _ = self.set_property_string("deband", "yes");
+            let _ = self.set_property_string("deband-iterations", "4");
+            let _ = self.set_property_string("deband-threshold", "48");
+            let _ = self.set_property_string("deband-range", "16");
+        } else {
+            let _ = self.set_property_string("deband", "no");
+        }
+
+        // 3. HDR Tone-mapping (bt.2446a, mobius, hable, auto)
+        let tone_mapping = if config.hdr_tone_mapping.is_empty() {
+            "auto"
+        } else {
+            &config.hdr_tone_mapping
+        };
+        let _ = self.set_property_string("tone-mapping", tone_mapping);
+
+        // 4. Upscaler Shader Profiles (Anime4K, CAS, Lanczos, Bilinear)
+        match config.upscale_mode.as_str() {
+            "anime4k" | "anime4k-fast" | "anime4k-hq" => {
+                let _ = self.set_property_string("scale", "ewa_lanczos");
+                let _ = self.set_property_string("cscale", "ewa_lanczos");
+                let _ = self.set_property_string("dscale", "mitchell");
+                let _ = self.set_property_string("correct-downscaling", "yes");
+            }
+            "cas" | "ultra-clarity" => {
+                let _ = self.set_property_string("scale", "ewa_lanczos");
+                let _ = self.set_property_string("sharpen", "0.85");
+            }
+            "cinematic" => {
+                let _ = self.set_property_string("tone-mapping", "bt.2446a");
+                let _ = self.set_property_string("deband", "yes");
+            }
+            _ => {
+                let _ = self.set_property_string("scale", "bilinear");
+            }
+        }
+
+        // 5. Denoising filter
+        if config.denoise_enabled {
+            let _ = self.set_property_string("vf", "lavfi=[hqdn3d=2.0:1.5:4.0:3.0]");
+        } else {
+            let _ = self.set_property_string("vf", "");
+        }
+
+        Ok(())
+    }
+
     pub fn get_property_string(&self, name: &str) -> Option<String> {
         let handle = self.handle?;
         let lib = self.lib.as_ref()?;
@@ -166,12 +221,12 @@ impl MpvController {
         let handle = self.require_handle()?;
         let lib = self.lib.as_ref().unwrap();
 
-        let c_name = CString::new(name).unwrap();
-        let c_val = CString::new(val).unwrap();
+        let c_name = CString::new(name).map_err(|e| PlayerError::MpvCommandFailed(format!("Invalid property name '{name}': {e}")))?;
+        let c_val = CString::new(val).map_err(|e| PlayerError::MpvCommandFailed(format!("Invalid property value '{val}': {e}")))?;
 
         let status = unsafe { (lib.fns().set_property_string)(handle, c_name.as_ptr(), c_val.as_ptr()) };
         if status < 0 {
-            log::warn!("mpv set_property_string failed for {name}={val}: {status}");
+            return Err(PlayerError::MpvCommandFailed(format!("mpv set_property_string failed for {name}={val} (error code: {status})")));
         }
         Ok(())
     }
@@ -180,16 +235,38 @@ impl MpvController {
         let handle = self.require_handle()?;
         let lib = self.lib.as_ref().unwrap();
 
-        let c_cmd = CString::new(cmd).unwrap();
+        let c_cmd = CString::new(cmd).map_err(|e| PlayerError::MpvCommandFailed(format!("Invalid command string: {e}")))?;
         let status = unsafe { (lib.fns().command_string)(handle, c_cmd.as_ptr()) };
         if status < 0 {
-            log::warn!("mpv command failed: {cmd} (code: {status})");
+            return Err(PlayerError::MpvCommandFailed(format!("mpv command_string failed: '{cmd}' (error code: {status})")));
         }
         Ok(())
     }
 
-    /// Queries current snapshot of playback state
-    pub fn query_playback_state(&self) -> PlaybackState {
+    /// Invokes mpv_command using a null-terminated array of string pointers (command injection safe)
+    pub fn run_command_args(&self, args: &[&str]) -> PlayerResult<()> {
+        let handle = self.require_handle()?;
+        let lib = self.lib.as_ref().unwrap();
+
+        let mut c_strings = Vec::with_capacity(args.len());
+        for &arg in args {
+            let c_str = CString::new(arg).map_err(|e| PlayerError::MpvCommandFailed(format!("Invalid argument '{arg}': {e}")))?;
+            c_strings.push(c_str);
+        }
+
+        let mut c_ptrs: Vec<*const std::ffi::c_char> = c_strings.iter().map(|s| s.as_ptr()).collect();
+        c_ptrs.push(std::ptr::null());
+
+        let status = unsafe { (lib.fns().command)(handle, c_ptrs.as_mut_ptr() as *mut *const std::ffi::c_char) };
+        if status < 0 {
+            let summary = args.join(" ");
+            return Err(PlayerError::MpvCommandFailed(format!("mpv_command failed for '{summary}' (code: {status})")));
+        }
+        Ok(())
+    }
+
+    /// Queries current snapshot of playback state with decoupled, throttled metadata updates
+    pub fn query_playback_state(&mut self) -> PlaybackState {
         let pos_sec: f64 = self
             .get_property_string("time-pos")
             .and_then(|s| s.parse().ok())
@@ -216,6 +293,21 @@ impl MpvController {
             .map(|s| s == "yes")
             .unwrap_or(false);
 
+        // Throttle expensive track-list and chapter-list queries to once every 1000ms
+        // instead of querying dozens of string FFI properties on every 16ms frame (60 FPS)
+        let now = std::time::Instant::now();
+        let metadata_interval = Duration::from_millis(1000);
+        let should_refresh_metadata = self.last_metadata_query
+            .map(|last| now.duration_since(last) >= metadata_interval)
+            .unwrap_or(true);
+
+        if should_refresh_metadata {
+            self.cached_audio_tracks = self.query_tracks(TrackKind::Audio);
+            self.cached_subtitle_tracks = self.query_tracks(TrackKind::Subtitle);
+            self.cached_chapters = self.query_chapters();
+            self.last_metadata_query = Some(now);
+        }
+
         PlaybackState {
             position_ms: (pos_sec * 1000.0).round() as i64,
             duration_ms: (duration_sec * 1000.0).round() as i64,
@@ -225,9 +317,9 @@ impl MpvController {
             playback_rate: speed,
             volume,
             is_muted,
-            audio_tracks: self.query_tracks(TrackKind::Audio),
-            subtitle_tracks: self.query_tracks(TrackKind::Subtitle),
-            chapters: self.query_chapters(),
+            audio_tracks: self.cached_audio_tracks.clone(),
+            subtitle_tracks: self.cached_subtitle_tracks.clone(),
+            chapters: self.cached_chapters.clone(),
         }
     }
 
@@ -315,7 +407,7 @@ impl MpvController {
 
             while !is_destroyed.load(Ordering::Relaxed) {
                 let current_state = {
-                    let guard = controller.lock();
+                    let mut guard = controller.lock();
                     guard.query_playback_state()
                 };
 

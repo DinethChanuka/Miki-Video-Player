@@ -380,9 +380,7 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
   ];
 
   return (
-    <div className={`fixed inset-0 z-50 flex items-center justify-center animate-in fade-in duration-200 select-none p-4 ${
-      customBgImage ? 'bg-black/45' : 'bg-black/80 backdrop-blur-md'
-    }`}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center animate-in fade-in duration-200 select-none p-4 bg-black/65 backdrop-blur-xl">
       <div className="glass-panel w-full max-w-3xl h-[680px] max-h-[90vh] min-h-[540px] p-6 rounded-3xl flex flex-col gap-4 border border-white/20 shadow-2xl overflow-hidden bg-slate-950/98">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-white/10 pb-3">

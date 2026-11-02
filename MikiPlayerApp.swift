@@ -9,6 +9,14 @@ class BorderlessKeyWindow: NSWindow {
     override var canBecomeMain: Bool {
         return true
     }
+    var lastMouseDownEvent: NSEvent?
+
+    override func sendEvent(_ event: NSEvent) {
+        if event.type == .leftMouseDown {
+            lastMouseDownEvent = event
+        }
+        super.sendEvent(event)
+    }
 }
 
 class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMessageHandler, WKUIDelegate {
@@ -81,11 +89,29 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         mainMenu.addItem(appMenuItem)
         let appMenu = NSMenu()
         appMenuItem.submenu = appMenu
-        let prefItem = NSMenuItem(title: "Google / Gmail Account...", action: #selector(openGmailSignIn), keyEquivalent: ",")
+        let prefItem = NSMenuItem(title: "Google / Gmail Account...", action: #selector(openGmailSignIn), keyEquivalent: "g")
         prefItem.target = self
         appMenu.addItem(prefItem)
+        let themesItem = NSMenuItem(title: "Themes & Video Filters...", action: #selector(openThemesAndSettings), keyEquivalent: "t")
+        themesItem.target = self
+        appMenu.addItem(themesItem)
+        let eqItem = NSMenuItem(title: "3D Spatial Sound & EQ...", action: #selector(openEqualizer), keyEquivalent: "e")
+        eqItem.target = self
+        appMenu.addItem(eqItem)
         appMenu.addItem(NSMenuItem.separator())
         appMenu.addItem(withTitle: "Quit Miki Player", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+
+        // File Menu
+        let fileMenuItem = NSMenuItem()
+        mainMenu.addItem(fileMenuItem)
+        let fileMenu = NSMenu(title: "File")
+        fileMenuItem.submenu = fileMenu
+        let openFileItem = NSMenuItem(title: "Open Local File...", action: #selector(openLocalFile), keyEquivalent: "o")
+        openFileItem.target = self
+        fileMenu.addItem(openFileItem)
+        let libItem = NSMenuItem(title: "Media Explorer & Library...", action: #selector(openLibrary), keyEquivalent: "l")
+        libItem.target = self
+        fileMenu.addItem(libItem)
 
         // Edit menu to allow Cmd+C, Cmd+V, Cmd+A, Cmd+Z in text inputs
         let editMenuItem = NSMenuItem()
@@ -144,6 +170,26 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         webView.evaluateJavaScript(js, completionHandler: nil)
     }
 
+    @objc func openLocalFile() {
+        let js = "document.getElementById('miki-main-file-input')?.click();"
+        webView.evaluateJavaScript(js, completionHandler: nil)
+    }
+
+    @objc func openLibrary() {
+        let js = "window.dispatchEvent(new CustomEvent('miki:open-library'));"
+        webView.evaluateJavaScript(js, completionHandler: nil)
+    }
+
+    @objc func openThemesAndSettings() {
+        let js = "window.dispatchEvent(new CustomEvent('miki:open-settings'));"
+        webView.evaluateJavaScript(js, completionHandler: nil)
+    }
+
+    @objc func openEqualizer() {
+        let js = "window.dispatchEvent(new CustomEvent('miki:open-eq'));"
+        webView.evaluateJavaScript(js, completionHandler: nil)
+    }
+
     @objc func openGmailSignIn() {
         let js = "window.dispatchEvent(new CustomEvent('miki:open-gmail-signin'));"
         webView.evaluateJavaScript(js, completionHandler: nil)
@@ -179,15 +225,23 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         }
     }
 
-    // WKUIDelegate: Intercept & block intrusive popups and unauthorized new window spawns
+    // WKUIDelegate: Intercept & block intrusive popups while allowing legitimate movie/video page links
     func webView(
         _ webView: WKWebView,
         createWebViewWith configuration: WKWebViewConfiguration,
         for navigationAction: WKNavigationAction,
         windowFeatures: WKWindowFeatures
     ) -> WKWebView? {
-        if let targetUrl = navigationAction.request.url?.absoluteString {
-            NSLog("[Miki Shield] Intercepted and blocked popup window creation for: %@", targetUrl)
+        if let targetUrl = navigationAction.request.url {
+            let urlStr = targetUrl.absoluteString
+            let isAd = urlStr.contains("doubleclick") || urlStr.contains("popads") || urlStr.contains("bet365") || urlStr.contains("onclick") || urlStr.contains("adsterra") || urlStr.contains("adservice")
+            if !isAd {
+                let escaped = urlStr.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "'", with: "\\'")
+                let js = "window.dispatchEvent(new CustomEvent('miki:navigate-web-browser', { detail: { url: '\(escaped)' } }));"
+                webView.evaluateJavaScript(js, completionHandler: nil)
+            } else {
+                NSLog("[Miki Shield] Intercepted and blocked popup window creation for: %@", urlStr)
+            }
         }
         return nil
     }
@@ -206,7 +260,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         openPanel.canChooseDirectories = false
         openPanel.allowsMultipleSelection = parameters.allowsMultipleSelection
         if #available(macOS 11.0, *) {
-            openPanel.allowedContentTypes = [.movie, .video, .audio, .mpeg4Movie, .quickTimeMovie]
+            openPanel.allowedContentTypes = [.movie, .video, .audio, .mpeg4Movie, .quickTimeMovie, .image, .png, .jpeg, .webP]
         }
         openPanel.begin { response in
             if response == .OK {
@@ -228,8 +282,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
                         self.window.level = .normal
                         self.isCustomFullScreen = false
                     }
-                    if let currentEvent = NSApp.currentEvent {
-                        self.window.performDrag(with: currentEvent)
+                    let dragEvent = (self.window.lastMouseDownEvent?.type == .leftMouseDown) ? self.window.lastMouseDownEvent : NSApp.currentEvent
+                    if let event = dragEvent {
+                        self.window.performDrag(with: event)
                     }
                 case "close":
                     NSApp.terminate(nil)

@@ -204,7 +204,6 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({
   const removeYouTubeHistory = usePlayerStore((s) => s.removeYouTubeHistory);
   const activeSubtitleTrack = usePlayerStore((s) => s.activeSubtitleTrack);
   const loadSubtitleFromFile = usePlayerStore((s) => s.loadSubtitleFromFile);
-  const customBgImage = usePlayerStore((s) => s.customBgImage);
 
   const [activeTab, setActiveTab] = useState<'youtube' | 'tiktok' | 'instagram' | 'demos' | 'recent' | 'bookmarks' | 'cinema'>('youtube');
   const [selectedCategory, setSelectedCategory] = useState<DemoCategory>('All');
@@ -333,7 +332,7 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className={`fixed inset-0 z-50 flex items-center justify-center animate-in fade-in duration-200 p-4 ${customBgImage ? 'bg-black/45' : 'bg-black/80 backdrop-blur-md'}`}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center animate-in fade-in duration-200 p-4 bg-black/65 backdrop-blur-xl">
       <div className="glass-panel w-full max-w-4xl h-[650px] p-6 rounded-3xl flex flex-col gap-4 border border-white/20 shadow-2xl overflow-hidden bg-slate-950/95">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-white/10 pb-3">

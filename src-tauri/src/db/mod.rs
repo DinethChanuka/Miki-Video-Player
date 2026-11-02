@@ -306,6 +306,30 @@ impl DatabaseManager {
         Ok(())
     }
 
+    /// Atomically updates equalizer and night mode preferences without clobbering audio/subtitle tracks
+    pub fn update_eq_preferences(
+        &self,
+        media_id: &str,
+        eq_gains_json: &str,
+        night_mode_enabled: bool,
+    ) -> PlayerResult<()> {
+        let conn = self.conn.lock();
+        conn.execute(
+            "INSERT INTO media_preferences (
+                media_id, eq_gains_json, night_mode_enabled
+             ) VALUES (?1, ?2, ?3)
+             ON CONFLICT(media_id) DO UPDATE SET
+                eq_gains_json = excluded.eq_gains_json,
+                night_mode_enabled = excluded.night_mode_enabled",
+            params![
+                media_id,
+                eq_gains_json,
+                i64::from(night_mode_enabled),
+            ],
+        )?;
+        Ok(())
+    }
+
     pub fn save_preferences(&self, prefs: &MediaPreferences) -> PlayerResult<()> {
         let conn = self.conn.lock();
         conn.execute(

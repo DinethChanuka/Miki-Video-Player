@@ -14,11 +14,11 @@ mkdir -p "Build/ios"
 if command -v npx >/dev/null 2>&1; then
   echo "🚀 Invoking Tauri iOS build..."
   if [ -d "src-tauri/gen/apple" ]; then
-    npx tauri ios build --no-signing || true
+    npx tauri ios build --no-signing
   else
     echo "⚙️ Initializing Tauri iOS project target..."
-    npx tauri ios init || true
-    npx tauri ios build --no-signing || true
+    npx tauri ios init
+    npx tauri ios build --no-signing
   fi
 
   # Copy generated iOS artifacts to Build/ios

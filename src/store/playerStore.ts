@@ -93,6 +93,7 @@ export interface PlayerStoreState {
   // Engine & Media Identity
   engine: IPlayerEngine | null;
   activeEngineType: EngineType;
+  currentSessionId: string;
   currentMediaId: string | null;
   currentUri: string | null;
   currentTitle: string;
@@ -385,10 +386,13 @@ const loadStoredBgTint = (): 'obsidian' | 'navy' | 'aurora' | 'amethyst' | 'clea
 };
 
 let lastSqliteSyncMs = 0;
+let activeRetryTimer: ReturnType<typeof setTimeout> | null = null;
+let sessionCounter = 0;
 
 export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
   engine: null,
   activeEngineType: isTauriRuntime() ? 'tauri-mpv' : 'web-media',
+  currentSessionId: 'session_initial',
   currentMediaId: null,
   currentUri: null,
   currentTitle: '',
@@ -791,17 +795,25 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
         }).catch(() => {});
       }
 
-      // Live progress persistence for recently played card displays
+      // Live progress persistence for recently played card displays (immutable update)
       const curUri = get().currentUri;
       if (curUri && telemetry.durationMs > 0 && !telemetry.isPaused) {
         const pct = Math.min(100, Math.round((telemetry.positionMs / telemetry.durationMs) * 100));
         const recents = get().recentMedia;
         const target = recents.find((r) => r.uri === curUri);
         if (target && target.progressPercent !== pct) {
-          target.progressPercent = pct;
-          target.lastPositionMs = telemetry.positionMs;
-          target.durationMs = telemetry.durationMs;
-          saveStoredRecentMedia(recents);
+          const updatedRecents = recents.map((item) =>
+            item.uri === curUri
+              ? {
+                  ...item,
+                  progressPercent: pct,
+                  lastPositionMs: telemetry.positionMs,
+                  durationMs: telemetry.durationMs,
+                }
+              : item
+          );
+          saveStoredRecentMedia(updatedRecents);
+          set({ recentMedia: updatedRecents });
         }
       }
     });
@@ -824,7 +836,18 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
         const nextRetry = get().retryCount + 1;
         set({ retryCount: nextRetry });
         const delayMs = Math.pow(2, nextRetry) * 500;
-        setTimeout(() => {
+        const capturedSessionId = get().currentSessionId;
+
+        if (activeRetryTimer) {
+          clearTimeout(activeRetryTimer);
+        }
+
+        activeRetryTimer = setTimeout(() => {
+          activeRetryTimer = null;
+          if (get().currentSessionId !== capturedSessionId) {
+            // Media was switched or session was closed during the backoff delay
+            return;
+          }
           const uri = get().currentUri;
           if (uri && !/(?:youtube\.com|youtu\.be)/.test(uri)) {
             get().engine?.load(uri, get().positionMs);
@@ -852,6 +875,14 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
   },
 
   openMedia: async (uri, title, autoResume = true, startPositionMs?: number) => {
+    // Invalidate prior sessions and cancel any pending retry timeouts
+    if (activeRetryTimer) {
+      clearTimeout(activeRetryTimer);
+      activeRetryTimer = null;
+    }
+    const newSessionId = `session_${Date.now()}_${++sessionCounter}`;
+    set({ currentSessionId: newSessionId, retryCount: 0 });
+
     const resolvedTitle = title ?? extractCleanFileName(uri);
     let startPos = startPositionMs ?? 0;
 
@@ -1062,9 +1093,25 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
   },
 
   closeMedia: async () => {
+    if (activeRetryTimer) {
+      clearTimeout(activeRetryTimer);
+      activeRetryTimer = null;
+    }
+    const closedSessionId = `session_closed_${Date.now()}_${++sessionCounter}`;
+    set({ currentSessionId: closedSessionId, retryCount: 0 });
+
     const engine = get().engine;
     if (engine) {
       await engine.pause();
+    }
+    // Cleanly purge HTML5 video viewport DOM element so stale video frames do not bleed into the UI
+    if (typeof document !== 'undefined') {
+      const videoEl = document.getElementById('aether-video-viewport') as HTMLVideoElement | null;
+      if (videoEl) {
+        videoEl.pause();
+        videoEl.removeAttribute('src');
+        videoEl.load();
+      }
     }
     set({
       currentUri: null,
@@ -1160,22 +1207,41 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     set({ eqGainsDb: gainsDb, nightModeEnabled: nightMode });
     await get().engine?.setEqualizer(gainsDb, nightMode);
 
-    const { currentMediaId, playbackRate } = get();
+    const {
+      currentMediaId,
+      playbackRate,
+      audioTracks,
+      subtitleTracks,
+      shaderConfig,
+    } = get();
+
+    const activeAudioTrackId = audioTracks.find((t) => t.selected)?.id || null;
+    const activeSubtitleTrackId = subtitleTracks.find((t) => t.selected)?.id || null;
+
     if (isTauriRuntime() && currentMediaId) {
-      await invoke('db_save_preferences', {
-        prefs: {
+      try {
+        await invoke('db_update_eq_preferences', {
           mediaId: currentMediaId,
-          audioTrackId: null,
-          subtitleTrackId: null,
-          audioDelayMs: 0,
-          subtitleDelayMs: 0,
-          playbackRate,
-          aspectRatio: 'auto',
-          shaderPreset: 'ambient_default',
           eqGainsJson: JSON.stringify(gainsDb),
           nightModeEnabled: nightMode,
-        },
-      }).catch(() => {});
+        });
+      } catch {
+        // Fallback preserving active tracks and playback settings
+        await invoke('db_save_preferences', {
+          prefs: {
+            mediaId: currentMediaId,
+            audioTrackId: activeAudioTrackId,
+            subtitleTrackId: activeSubtitleTrackId,
+            audioDelayMs: 0,
+            subtitleDelayMs: 0,
+            playbackRate: playbackRate || 1.0,
+            aspectRatio: 'auto',
+            shaderPreset: shaderConfig.superResolution || 'ambient_default',
+            eqGainsJson: JSON.stringify(gainsDb),
+            nightModeEnabled: nightMode,
+          },
+        }).catch(() => {});
+      }
     }
   },
 

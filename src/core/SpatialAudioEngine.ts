@@ -30,8 +30,11 @@ export type SpatialProfileId =
   | 'vocal_isolation'
   | 'custom';
 
+export type SpatialOutputMode = 'binaural' | 'discrete_51';
+
 export interface SpatialAudioState {
   enabled: boolean;
+  outputMode: SpatialOutputMode;
   profile: SpatialProfileId;
   coordinates: SpatialCoordinates;
   speakers: SpeakerLevels;
@@ -43,6 +46,7 @@ export interface SpatialAudioState {
 
 export const DEFAULT_SPATIAL_STATE: SpatialAudioState = {
   enabled: true,
+  outputMode: 'binaural',
   profile: 'imax_3d',
   coordinates: { x: 0, y: 0, z: 0.5 },
   speakers: {
@@ -71,14 +75,17 @@ export class SpatialAudioEngine {
   private srGain: GainNode | null = null;
   private lfeGain: GainNode | null = null;
   private lfeFilter: BiquadFilterNode | null = null;
+  private channelMergerNode: ChannelMergerNode | null = null;
   private masterGain: GainNode | null = null;
   private dynamicsCompressor: DynamicsCompressorNode | null = null;
   private masterVolume: number = 1.0; // 0.0 to 2.0 (supports 200% overdrive)
 
+  private cachedDestinationNode: AudioNode | null = null;
   private state: SpatialAudioState = { ...DEFAULT_SPATIAL_STATE };
 
   public init(audioCtx: AudioContext, sourceNode: AudioNode, destinationNode: AudioNode): void {
     this.audioCtx = audioCtx;
+    this.cachedDestinationNode = destinationNode;
 
     try {
       // 1. Real-time Analyser for visualizer
@@ -113,7 +120,12 @@ export class SpatialAudioEngine {
       this.lfeFilter.type = 'lowpass';
       this.lfeFilter.frequency.setValueAtTime(this.state.lfeCrossoverHz, audioCtx.currentTime);
 
-      // 6. Master Preamp Gain & Limiter Compressor (prevents clipping distortion)
+      // 6. 6-Channel Merger Node for Discrete 5.1 Surround Output
+      if (typeof audioCtx.createChannelMerger === 'function') {
+        this.channelMergerNode = audioCtx.createChannelMerger(6);
+      }
+
+      // 7. Master Preamp Gain & Limiter Compressor (prevents clipping distortion at up to 200% overdrive)
       this.masterGain = audioCtx.createGain();
       this.masterGain.gain.setValueAtTime(this.state.preampGain, audioCtx.currentTime);
 
@@ -128,7 +140,7 @@ export class SpatialAudioEngine {
       sourceNode.connect(this.analyserNode);
       sourceNode.connect(this.pannerNode);
 
-      // Connect panner to speakers
+      // Connect panner to speaker gain nodes
       this.pannerNode.connect(this.flGain);
       this.pannerNode.connect(this.cGain);
       this.pannerNode.connect(this.frGain);
@@ -139,27 +151,91 @@ export class SpatialAudioEngine {
       this.pannerNode.connect(this.lfeFilter);
       this.lfeFilter.connect(this.lfeGain);
 
-      // Connect speaker gains to balance or master
-      const intermediateNode = this.stereoPanNode || this.masterGain;
-
-      this.flGain.connect(intermediateNode);
-      this.cGain.connect(intermediateNode);
-      this.frGain.connect(intermediateNode);
-      this.slGain.connect(intermediateNode);
-      this.srGain.connect(intermediateNode);
-      this.lfeGain.connect(intermediateNode);
-
-      if (this.stereoPanNode) {
-        this.stereoPanNode.connect(this.masterGain);
-      }
-
-      this.masterGain.connect(this.dynamicsCompressor);
-      this.dynamicsCompressor.connect(destinationNode);
-
+      this.routeGraph();
       this.applyState(this.state);
     } catch (e) {
       console.warn('[SpatialAudioEngine] WebAudio spatial nodes init fallback:', e);
     }
+  }
+
+  private routeGraph(): void {
+    if (!this.audioCtx || !this.cachedDestinationNode || !this.masterGain || !this.dynamicsCompressor) return;
+
+    // Disconnect speakers before re-routing
+    try {
+      this.flGain?.disconnect();
+      this.cGain?.disconnect();
+      this.frGain?.disconnect();
+      this.slGain?.disconnect();
+      this.srGain?.disconnect();
+      this.lfeGain?.disconnect();
+      this.stereoPanNode?.disconnect();
+      this.channelMergerNode?.disconnect();
+      this.masterGain.disconnect();
+      this.dynamicsCompressor.disconnect();
+    } catch {
+      // Ignore disconnect errors on initial routing
+    }
+
+    const supports51 = (this.audioCtx.destination.maxChannelCount || 2) >= 6;
+    if (this.state.outputMode === 'discrete_51' && supports51 && this.channelMergerNode) {
+      // 5.1 Discrete Speaker Routing:
+      // W3C Standard 5.1 Channel Ordering:
+      // Ch 0: Front Left
+      // Ch 1: Front Right
+      // Ch 2: Center
+      // Ch 3: Low Frequency Effects (LFE / Subwoofer)
+      // Ch 4: Surround Left
+      // Ch 5: Surround Right
+      try {
+        this.audioCtx.destination.channelCount = 6;
+        this.audioCtx.destination.channelCountMode = 'explicit';
+      } catch {
+        // Fallback for browsers with locked destination channelCount
+      }
+
+      this.flGain?.connect(this.channelMergerNode, 0, 0);
+      this.frGain?.connect(this.channelMergerNode, 0, 1);
+      this.cGain?.connect(this.channelMergerNode, 0, 2);
+      this.lfeGain?.connect(this.channelMergerNode, 0, 3);
+      this.slGain?.connect(this.channelMergerNode, 0, 4);
+      this.srGain?.connect(this.channelMergerNode, 0, 5);
+
+      this.channelMergerNode.connect(this.masterGain);
+    } else {
+      // Binaural Stereo / Headphone Routing:
+      // Feeds into stereo panning balance and master gain
+      const intermediateNode = this.stereoPanNode || this.masterGain;
+
+      this.flGain?.connect(intermediateNode);
+      this.cGain?.connect(intermediateNode);
+      this.frGain?.connect(intermediateNode);
+      this.slGain?.connect(intermediateNode);
+      this.srGain?.connect(intermediateNode);
+      this.lfeGain?.connect(intermediateNode);
+
+      if (this.stereoPanNode) {
+        this.stereoPanNode.connect(this.masterGain);
+      }
+    }
+
+    // Safety peak limiter before final destination
+    this.masterGain.connect(this.dynamicsCompressor);
+    this.dynamicsCompressor.connect(this.cachedDestinationNode);
+  }
+
+  public setOutputMode(mode: SpatialOutputMode): void {
+    this.state.outputMode = mode;
+    this.routeGraph();
+    this.applyState(this.state);
+  }
+
+  public isDiscrete51(): boolean {
+    return this.state.outputMode === 'discrete_51';
+  }
+
+  public getMasterVolume(): number {
+    return this.masterVolume;
   }
 
   public setCoordinates(x: number, y: number, z: number): void {

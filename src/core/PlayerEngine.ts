@@ -474,9 +474,18 @@ export class WebMediaEngine implements IPlayerEngine {
 
     this.setupWebAudioGraph();
 
+    const hasWebAudio = Boolean(this.gainNode || this.spatialAudio || this.mediaSourceNode);
+
     if (this.videoEl) {
-      // HTML5 video element standard volume only supports 0 to 1 (0% to 100%)
-      this.videoEl.volume = Math.min(1, clamped / 100);
+      if (hasWebAudio) {
+        // Authoritative Volume Control:
+        // When WebAudio is handling the DSP chain, keep HTMLVideoElement unattenuated at 1.0 (unity gain)
+        // to prevent double volume multiplication (videoEl.volume * gainNode.gain).
+        this.videoEl.volume = 1.0;
+      } else {
+        // Fallback for CORS or bypassed audio context
+        this.videoEl.volume = Math.min(1, clamped / 100);
+      }
     }
 
     if (this.gainNode && this.audioCtx) {
@@ -489,8 +498,12 @@ export class WebMediaEngine implements IPlayerEngine {
   }
 
   async setMuted(muted: boolean): Promise<void> {
+    const hasWebAudio = Boolean(this.gainNode || this.spatialAudio || this.mediaSourceNode);
     if (this.videoEl) {
       this.videoEl.muted = muted;
+      if (!muted && hasWebAudio) {
+        this.videoEl.volume = 1.0;
+      }
     }
     const targetVolume = muted ? 0 : this.currentVolumePercent / 100;
     if (this.spatialAudio) {

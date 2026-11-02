@@ -81,16 +81,25 @@ export const ApplicationMenu: React.FC<ApplicationMenuProps> = ({
         <ChevronDown className="w-3 h-3 text-white/50 group-hover:text-white transition-colors" />
       </button>
 
-      {/* Solid High-Contrast Dropdown Panel (Bypasses WebKit nested backdrop-blur bug) */}
+      {/* Solid High-Contrast Dropdown Panel with Dimming Backdrop Scrim */}
       {isOpen && (
-        <div
-          className="absolute left-0 mt-2.5 w-72 sm:w-80 rounded-3xl border border-white/20 p-3.5 z-50 flex flex-col gap-2.5 shadow-2xl animate-in fade-in zoom-in-95 duration-150"
-          style={{
-            backgroundColor: '#0a0d16',
-            boxShadow: '0 25px 60px rgba(0, 0, 0, 0.98), 0 0 25px rgba(255, 255, 255, 0.08)',
-            WebkitAppRegion: 'no-drag',
-          } as React.CSSProperties}
-        >
+        <>
+          {/* Backdrop Scrim - Dims background cards and captures outside clicks to prevent text overlap */}
+          <div
+            className="fixed inset-0 z-40 bg-black/60 backdrop-blur-[2px] transition-opacity animate-in fade-in duration-150"
+            onClick={() => setIsOpen(false)}
+            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+          />
+
+          {/* Solid High-Contrast Dropdown Panel */}
+          <div
+            className="absolute left-0 mt-2.5 w-72 sm:w-80 rounded-3xl border border-slate-700/80 p-3.5 z-50 flex flex-col gap-2.5 shadow-2xl animate-in fade-in zoom-in-95 duration-150 select-none"
+            style={{
+              backgroundColor: '#0a0e1a',
+              boxShadow: '0 25px 60px rgba(0, 0, 0, 0.98), 0 0 25px rgba(255, 255, 255, 0.08)',
+              WebkitAppRegion: 'no-drag',
+            } as React.CSSProperties}
+          >
           {/* Section 1: Google / Gmail Account Status */}
           <div
             onClick={() => {
@@ -270,6 +279,7 @@ export const ApplicationMenu: React.FC<ApplicationMenuProps> = ({
             </button>
           </div>
         </div>
+        </>
       )}
     </div>
   );
