@@ -43,6 +43,13 @@ jobs:
           test -f dist/index.html || { echo "❌ dist/index.html missing"; exit 1; }
           echo "✅ Web production bundle verified successfully!"
 
+      - name: Upload Web Production Bundle Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Miki-Player-Web-Production
+          path: dist/
+          if-no-files-found: error
+
   # =========================================================================
   # 2. SECURITY AUDIT & INTEGRITY CHECKUP
   # =========================================================================
@@ -166,9 +173,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Miki-Player-Windows-x64
-          path: |
-            Build/windows/*.exe
-            Build/windows/*.msi
+          path: Build/windows/
+          if-no-files-found: warn
 
   build-linux-appimage:
     name: Build Linux Binary (.AppImage, .deb & .iso)
@@ -223,10 +229,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Miki-Player-Linux-x86_64
-          path: |
-            Build/Linux/*.AppImage
-            Build/Linux/*.deb
-            Build/Linux/*.iso
+          path: Build/Linux/
+          if-no-files-found: warn
 
   build-android-apk:
     name: Build Android APK (Release & Debug)
@@ -281,9 +285,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Miki-Player-Android-APK
-          path: |
-            Build/Android/*.apk
-            src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+          path: Build/Android/
+          if-no-files-found: warn
 
   build-ios-app:
     name: Build iOS Application (.ipa / .app)
@@ -321,6 +324,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Miki-Player-iOS-Bundle
-          path: |
-            Build/ios/*.ipa
-            Build/ios/*.app
+          path: Build/ios/
+          if-no-files-found: warn
