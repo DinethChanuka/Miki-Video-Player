@@ -20,12 +20,12 @@ export const SubtitleOverlay: React.FC<SubtitleOverlayProps> = ({
 
   const adjustedTime = currentPositionSec - syncOffsetSec;
 
-  // Find active cue matching current time
-  const activeCue = cues.find(
+  // Find all active cues matching current time (handles overlapping dialogue)
+  const activeCues = cues.filter(
     (cue) => adjustedTime >= cue.startTime && adjustedTime <= cue.endTime
   );
 
-  if (!activeCue) return null;
+  if (activeCues.length === 0) return null;
 
   const config = { ...DEFAULT_SUBTITLE_STYLE, ...styleConfig };
 
@@ -44,7 +44,7 @@ export const SubtitleOverlay: React.FC<SubtitleOverlayProps> = ({
       }}
     >
       <div
-        className={`max-w-4xl text-center px-4 py-2 rounded-xl backdrop-blur-sm select-none shadow-2xl transition-opacity duration-150 ${fontSizeClass}`}
+        className={`max-w-4xl text-center px-4 py-2 rounded-xl backdrop-blur-sm select-none shadow-2xl transition-opacity duration-150 space-y-1 ${fontSizeClass}`}
         style={{
           color: config.textColor,
           backgroundColor: `rgba(0, 0, 0, ${config.backgroundOpacity})`,
@@ -53,7 +53,12 @@ export const SubtitleOverlay: React.FC<SubtitleOverlayProps> = ({
           lineHeight: '1.4',
         }}
       >
-        {activeCue.text}
+        {activeCues.map((cue, idx) => (
+          <div
+            key={cue.id || idx}
+            dangerouslySetInnerHTML={{ __html: cue.text }}
+          />
+        ))}
       </div>
     </div>
   );

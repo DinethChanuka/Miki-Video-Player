@@ -39,7 +39,7 @@ and immersive 3D Spatial Audio.
       assert.ok(cues[1].text.includes('crystal-clear 4K HDR'));
     });
 
-    it('parses WebVTT (.vtt) cues and strips header tags', () => {
+    it('parses WebVTT (.vtt) cues and preserves formatting tags', () => {
       const vttSample = `WEBVTT - Demonstration Track
 
 00:00.500 --> 00:03.000
@@ -50,8 +50,8 @@ and immersive 3D Spatial Audio.
 `;
       const cues = parseSubtitleText(vttSample);
       assert.equal(cues.length, 2);
-      assert.equal(cues[0].text, 'Hello World!');
-      assert.equal(cues[1].text, 'This is an italicized caption');
+      assert.equal(cues[0].text, '<b>Hello World!</b>');
+      assert.equal(cues[1].text, '<i>This is an italicized caption</i>');
       assert.equal(cues[0].startTime, 0.5);
       assert.equal(cues[0].endTime, 3.0);
     });
