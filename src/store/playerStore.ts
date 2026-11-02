@@ -791,17 +791,25 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
         }).catch(() => {});
       }
 
-      // Live progress persistence for recently played card displays
+      // Live progress persistence for recently played card displays (immutable update)
       const curUri = get().currentUri;
       if (curUri && telemetry.durationMs > 0 && !telemetry.isPaused) {
         const pct = Math.min(100, Math.round((telemetry.positionMs / telemetry.durationMs) * 100));
         const recents = get().recentMedia;
         const target = recents.find((r) => r.uri === curUri);
         if (target && target.progressPercent !== pct) {
-          target.progressPercent = pct;
-          target.lastPositionMs = telemetry.positionMs;
-          target.durationMs = telemetry.durationMs;
-          saveStoredRecentMedia(recents);
+          const updatedRecents = recents.map((item) =>
+            item.uri === curUri
+              ? {
+                  ...item,
+                  progressPercent: pct,
+                  lastPositionMs: telemetry.positionMs,
+                  durationMs: telemetry.durationMs,
+                }
+              : item
+          );
+          saveStoredRecentMedia(updatedRecents);
+          set({ recentMedia: updatedRecents });
         }
       }
     });
@@ -1160,22 +1168,41 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     set({ eqGainsDb: gainsDb, nightModeEnabled: nightMode });
     await get().engine?.setEqualizer(gainsDb, nightMode);
 
-    const { currentMediaId, playbackRate } = get();
+    const {
+      currentMediaId,
+      playbackRate,
+      audioTracks,
+      subtitleTracks,
+      shaderConfig,
+    } = get();
+
+    const activeAudioTrackId = audioTracks.find((t) => t.selected)?.id || null;
+    const activeSubtitleTrackId = subtitleTracks.find((t) => t.selected)?.id || null;
+
     if (isTauriRuntime() && currentMediaId) {
-      await invoke('db_save_preferences', {
-        prefs: {
+      try {
+        await invoke('db_update_eq_preferences', {
           mediaId: currentMediaId,
-          audioTrackId: null,
-          subtitleTrackId: null,
-          audioDelayMs: 0,
-          subtitleDelayMs: 0,
-          playbackRate,
-          aspectRatio: 'auto',
-          shaderPreset: 'ambient_default',
           eqGainsJson: JSON.stringify(gainsDb),
           nightModeEnabled: nightMode,
-        },
-      }).catch(() => {});
+        });
+      } catch {
+        // Fallback preserving active tracks and playback settings
+        await invoke('db_save_preferences', {
+          prefs: {
+            mediaId: currentMediaId,
+            audioTrackId: activeAudioTrackId,
+            subtitleTrackId: activeSubtitleTrackId,
+            audioDelayMs: 0,
+            subtitleDelayMs: 0,
+            playbackRate: playbackRate || 1.0,
+            aspectRatio: 'auto',
+            shaderPreset: shaderConfig.superResolution || 'ambient_default',
+            eqGainsJson: JSON.stringify(gainsDb),
+            nightModeEnabled: nightMode,
+          },
+        }).catch(() => {});
+      }
     }
   },
 

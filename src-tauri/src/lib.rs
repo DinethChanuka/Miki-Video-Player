@@ -76,6 +76,7 @@ pub fn run() {
             commands::db_load_or_init_session,
             commands::db_update_progress,
             commands::db_save_preferences,
+            commands::db_update_eq_preferences,
             commands::db_get_recent_media,
             commands::db_add_bookmark,
             commands::db_remove_recent

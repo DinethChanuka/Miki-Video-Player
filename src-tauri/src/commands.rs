@@ -169,6 +169,16 @@ pub async fn db_save_preferences(
 }
 
 #[tauri::command]
+pub async fn db_update_eq_preferences(
+    media_id: String,
+    eq_gains_json: String,
+    night_mode_enabled: bool,
+    db: State<'_, DatabaseManager>,
+) -> PlayerResult<()> {
+    db.update_eq_preferences(&media_id, &eq_gains_json, night_mode_enabled)
+}
+
+#[tauri::command]
 pub async fn db_get_recent_media(
     limit: usize,
     db: State<'_, DatabaseManager>,
