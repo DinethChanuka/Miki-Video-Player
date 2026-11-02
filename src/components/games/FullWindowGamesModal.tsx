@@ -8,12 +8,10 @@ import {
   Sparkles,
   Gamepad2,
   Search,
-  Grid,
   X,
   Play,
   MousePointer,
-  Keyboard,
-  ExternalLink,
+  Sliders,
 } from 'lucide-react';
 
 interface FullWindowGamesModalProps {
@@ -213,7 +211,7 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
 
         {/* Center: Live Keyboard / Mouse HUD */}
         <div className="hidden lg:flex items-center gap-1.5 px-3 py-1 rounded-xl bg-black/60 border border-white/10 text-[10px] font-mono">
-          <Keyboard className="w-3.5 h-3.5 text-white/40 mr-1" />
+          <Sliders className="w-3.5 h-3.5 text-white/40 mr-1" />
           <span
             className={`px-1.5 py-0.5 rounded transition-colors ${
               activeKeys['KeyW'] || activeKeys['ArrowUp']
@@ -277,7 +275,7 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
                 : 'bg-white/5 border-white/10 text-white/80 hover:bg-white/10 hover:text-white'
             }`}
           >
-            <Grid className="w-3.5 h-3.5 text-cyan-400" />
+            <Sliders className="w-3.5 h-3.5 text-cyan-400" />
             <span>Games ({GAMES_CATALOG.length})</span>
           </button>
 

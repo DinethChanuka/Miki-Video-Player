@@ -10,7 +10,6 @@ import {
   Share2,
   CheckCircle2,
   Plus,
-  Globe,
   Film,
   Tv,
 } from 'lucide-react';
@@ -24,7 +23,7 @@ interface ApplicationMenuProps {
   onOpenEq: () => void;
   onOpenLocalFile: () => void;
   onOpenSystemAccess: () => void;
-  onOpenGames?: () => void;
+  onOpenGames?: (gameId?: string) => void;
   onOpenMusic?: () => void;
   onOpenChannels?: () => void;
 }
@@ -32,7 +31,7 @@ interface ApplicationMenuProps {
 export const ApplicationMenu: React.FC<ApplicationMenuProps> = ({
   onOpenGmailSignIn,
   onOpenLibrary,
-  onOpenWebBrowser,
+  onOpenWebBrowser: _onOpenWebBrowser,
   onOpenSettings,
   onOpenEq,
   onOpenLocalFile,

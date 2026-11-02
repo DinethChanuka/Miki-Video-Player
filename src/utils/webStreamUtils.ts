@@ -101,3 +101,23 @@ export function isSocialWebStream(url: string): boolean {
   return parseWebStream(url) !== null;
 }
 
+export function isDirectMediaUrl(uri: string): boolean {
+  if (!uri) return false;
+  const clean = uri.split('?')[0].toLowerCase();
+  return (
+    clean.endsWith('.mp4') ||
+    clean.endsWith('.mkv') ||
+    clean.endsWith('.webm') ||
+    clean.endsWith('.avi') ||
+    clean.endsWith('.mov') ||
+    clean.endsWith('.m3u8') ||
+    clean.endsWith('.m3u') ||
+    clean.endsWith('.mp3') ||
+    clean.endsWith('.wav') ||
+    clean.endsWith('.flac') ||
+    clean.endsWith('.aac') ||
+    clean.endsWith('.ogg') ||
+    clean.endsWith('.ts')
+  );
+}
+

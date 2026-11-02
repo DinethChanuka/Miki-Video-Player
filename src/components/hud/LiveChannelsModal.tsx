@@ -12,12 +12,9 @@ import {
   Search,
   X,
   Play,
-  Upload,
-  Sparkles,
   Globe,
-  Plus,
-  Flame,
   CheckCircle2,
+  FolderOpen,
 } from 'lucide-react';
 
 interface LiveChannelsModalProps {
@@ -177,7 +174,7 @@ export const LiveChannelsModal: React.FC<LiveChannelsModalProps> = ({
             </button>
 
             <label className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 text-white text-xs font-semibold cursor-pointer transition-all whitespace-nowrap">
-              <Upload className="w-3.5 h-3.5 text-cyan-400" />
+              <FolderOpen className="w-3.5 h-3.5 text-cyan-400" />
               <span>Import M3U</span>
               <input
                 ref={fileInputRef}

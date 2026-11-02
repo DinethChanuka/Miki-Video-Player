@@ -1129,7 +1129,6 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     } else if (!isTauriRuntime()) {
       startPos = autoResume ? savedPos : 0;
     }
-    const isHttp = uri.startsWith('http://') || uri.startsWith('https://');
     const domain = isHttp ? extractDomain(uri) : undefined;
     const defaultThumb = isHttp ? getWebsiteFaviconUrl(uri, 128) : undefined;
     const mediaId = uri;

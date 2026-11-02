@@ -627,7 +627,7 @@ export const App: React.FC = () => {
             onOpenEq={() => setIsEqOpen(true)}
             onOpenLocalFile={handleOpenLocalFileDialog}
             onOpenSystemAccess={() => setIsSystemAccessOpen(true)}
-            onOpenGames={(gameId) => {
+            onOpenGames={(gameId?: string) => {
               if (gameId) setSelectedGameId(gameId);
               setIsGamesOpen(true);
             }}
