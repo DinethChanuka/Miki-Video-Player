@@ -222,11 +222,36 @@ export function resolveMediaStreamUrl(uri: string): string {
     uri.startsWith('data:') ||
     uri.startsWith('http://') ||
     uri.startsWith('https://') ||
-    uri.startsWith('/@media-stream')
+    uri.startsWith('asset:') ||
+    uri.startsWith('media-stream:') ||
+    uri.startsWith('tauri:')
   ) {
     return uri;
   }
-  // Local filesystem path e.g. /Users/... or file:///... or C:\...
+
+  // 1. In native macOS WebKit application bundle (loads via custom WKURLSchemeHandler)
+  if (
+    typeof window !== 'undefined' &&
+    (window as unknown as { webkit?: { messageHandlers?: Record<string, unknown> } }).webkit?.messageHandlers
+  ) {
+    const cleanPath = uri.replace(/^file:\/\//, '');
+    return `media-stream://localhost?path=${encodeURIComponent(cleanPath)}`;
+  }
+
+  // 2. In Tauri desktop runtime: use Tauri asset protocol
+  if (
+    typeof window !== 'undefined' &&
+    ('__TAURI_INTERNALS__' in window || (window as unknown as { __TAURI__?: unknown }).__TAURI__)
+  ) {
+    try {
+      const cleanPath = uri.replace(/^file:\/\//, '');
+      return `http://asset.localhost/${encodeURI(cleanPath.replace(/^[a-zA-Z]:[/\\]/, '').replace(/^\//, ''))}`;
+    } catch {
+      // Fallback
+    }
+  }
+
+  // 3. In Vite development environment
   return `http://localhost:1420/@media-stream?path=${encodeURIComponent(uri)}`;
 }
 

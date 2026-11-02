@@ -19,6 +19,129 @@ class BorderlessKeyWindow: NSWindow {
     }
 }
 
+class MediaStreamSchemeHandler: NSObject, WKURLSchemeHandler {
+    func webView(_ webView: WKWebView, start urlSchemeTask: WKURLSchemeTask) {
+        guard let url = urlSchemeTask.request.url else {
+            urlSchemeTask.didFailWithError(NSError(domain: "MediaStream", code: 400, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"]))
+            return
+        }
+
+        var filePath = ""
+        if let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+           let pathItem = components.queryItems?.first(where: { $0.name == "path" })?.value {
+            filePath = pathItem
+        } else {
+            filePath = url.path
+        }
+
+        filePath = (filePath as NSString).standardizingPath
+        if filePath.hasPrefix("file://") {
+            filePath = String(filePath.dropFirst(7))
+        }
+
+        guard FileManager.default.fileExists(atPath: filePath) else {
+            urlSchemeTask.didFailWithError(NSError(domain: "MediaStream", code: 404, userInfo: [NSLocalizedDescriptionKey: "File not found"]))
+            return
+        }
+
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: filePath),
+              let fileSize = attributes[.size] as? Int64 else {
+            urlSchemeTask.didFailWithError(NSError(domain: "MediaStream", code: 500, userInfo: [NSLocalizedDescriptionKey: "Cannot read attributes"]))
+            return
+        }
+
+        let ext = (filePath as NSString).pathExtension.lowercased()
+        let mimeMap: [String: String] = [
+            "mp4": "video/mp4",
+            "m4v": "video/mp4",
+            "webm": "video/webm",
+            "mkv": "video/x-matroska",
+            "mov": "video/quicktime",
+            "avi": "video/x-msvideo",
+            "mp3": "audio/mpeg",
+            "wav": "audio/wav",
+            "flac": "audio/flac",
+            "m4a": "audio/mp4",
+            "aac": "audio/aac",
+            "ogg": "audio/ogg",
+            "ts": "video/mp2t",
+            "m3u8": "application/vnd.apple.mpegurl",
+            "m3u": "audio/x-mpegurl"
+        ]
+        let mimeType = mimeMap[ext] ?? "video/mp4"
+
+        guard let fileHandle = FileHandle(forReadingAtPath: filePath) else {
+            urlSchemeTask.didFailWithError(NSError(domain: "MediaStream", code: 500, userInfo: [NSLocalizedDescriptionKey: "Cannot open file handle"]))
+            return
+        }
+
+        let rangeHeader = urlSchemeTask.request.value(forHTTPHeaderField: "Range")
+        if let range = rangeHeader, range.starts(with: "bytes=") {
+            let cleanRange = String(range.dropFirst(6))
+            let parts = cleanRange.components(separatedBy: "-")
+            var start: Int64 = 0
+            var end: Int64 = fileSize - 1
+
+            if let p0 = Int64(parts[0]) {
+                start = p0
+            }
+            if parts.count > 1, let p1 = Int64(parts[1]) {
+                end = p1
+            }
+
+            if start >= fileSize || start > end {
+                let headers: [String: String] = [
+                    "Content-Range": "bytes */\(fileSize)",
+                    "Accept-Ranges": "bytes"
+                ]
+                let response = HTTPURLResponse(url: url, statusCode: 416, httpVersion: "HTTP/1.1", headerFields: headers)!
+                urlSchemeTask.didReceive(response)
+                urlSchemeTask.didFinish()
+                try? fileHandle.close()
+                return
+            }
+
+            let length = end - start + 1
+            let headers: [String: String] = [
+                "Content-Type": mimeType,
+                "Content-Range": "bytes \(start)-\(end)/\(fileSize)",
+                "Content-Length": "\(length)",
+                "Accept-Ranges": "bytes",
+                "Access-Control-Allow-Origin": "*"
+            ]
+
+            let response = HTTPURLResponse(url: url, statusCode: 206, httpVersion: "HTTP/1.1", headerFields: headers)!
+            urlSchemeTask.didReceive(response)
+
+            fileHandle.seek(toFileOffset: UInt64(start))
+            let data = fileHandle.readData(ofLength: Int(length))
+            urlSchemeTask.didReceive(data)
+            urlSchemeTask.didFinish()
+            try? fileHandle.close()
+        } else {
+            let headers: [String: String] = [
+                "Content-Type": mimeType,
+                "Content-Length": "\(fileSize)",
+                "Accept-Ranges": "bytes",
+                "Access-Control-Allow-Origin": "*"
+            ]
+            let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: headers)!
+            urlSchemeTask.didReceive(response)
+
+            let chunkSize = 1024 * 1024
+            while true {
+                let chunk = fileHandle.readData(ofLength: chunkSize)
+                if chunk.isEmpty { break }
+                urlSchemeTask.didReceive(chunk)
+            }
+            urlSchemeTask.didFinish()
+            try? fileHandle.close()
+        }
+    }
+
+    func webView(_ webView: WKWebView, stop urlSchemeTask: WKURLSchemeTask) {}
+}
+
 class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMessageHandler, WKUIDelegate, WKNavigationDelegate {
     var window: BorderlessKeyWindow!
     var webView: WKWebView!
@@ -92,6 +215,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
             config.preferences.isElementFullscreenEnabled = true
         }
 
+        // Register custom scheme handler for local media streaming (HTTP 206 partial content)
+        config.setURLSchemeHandler(MediaStreamSchemeHandler(), forURLScheme: "media-stream")
+
         // Window controls & Native dialogs IPC script handler
         let contentController = WKUserContentController()
         contentController.add(self, name: "windowAction")
@@ -113,8 +239,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         window.makeFirstResponder(webView)
         NSApp.activate(ignoringOtherApps: true)
 
-        let appUrl = URL(string: "http://localhost:1420/")!
-        webView.load(URLRequest(url: appUrl))
+        // Production: Load bundled dist/index.html via loadFileURL with allowingReadAccessTo
+        if let bundleDist = Bundle.main.url(forResource: "index", withExtension: "html", subdirectory: "dist") {
+            webView.loadFileURL(bundleDist, allowingReadAccessTo: URL(fileURLWithPath: "/"))
+        } else if let resourceUrl = Bundle.main.resourceURL?.appendingPathComponent("dist/index.html"),
+                  FileManager.default.fileExists(atPath: resourceUrl.path) {
+            webView.loadFileURL(resourceUrl, allowingReadAccessTo: URL(fileURLWithPath: "/"))
+        } else {
+            let appUrl = URL(string: "http://localhost:1420/")!
+            webView.load(URLRequest(url: appUrl))
+        }
     }
 
     private func setupMainMenu() {
