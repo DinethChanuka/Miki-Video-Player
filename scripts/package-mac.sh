@@ -59,6 +59,20 @@ cat << 'EOF' > "Miki Player.app/Contents/Info.plist"
         <key>NSAllowsLocalNetworking</key>
         <true/>
     </dict>
+    <key>NSDocumentsFolderUsageDescription</key>
+    <string>Miki Player requires access to your Documents folder to load and play video files.</string>
+    <key>NSDownloadsFolderUsageDescription</key>
+    <string>Miki Player requires access to your Downloads folder to play downloaded videos and stream files.</string>
+    <key>NSMoviesFolderUsageDescription</key>
+    <string>Miki Player requires access to your Movies library to play media.</string>
+    <key>NSPicturesFolderUsageDescription</key>
+    <string>Miki Player requires access to your Pictures folder to save high-resolution screenshots.</string>
+    <key>NSDesktopFolderUsageDescription</key>
+    <string>Miki Player requires access to your Desktop to open media files.</string>
+    <key>NSNetworkVolumesUsageDescription</key>
+    <string>Miki Player requires access to network shares to stream video.</string>
+    <key>NSRemovableVolumesUsageDescription</key>
+    <string>Miki Player requires access to external USB storage to play videos.</string>
 </dict>
 </plist>
 EOF

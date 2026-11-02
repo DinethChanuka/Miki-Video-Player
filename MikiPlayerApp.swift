@@ -58,6 +58,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         contentController.add(self, name: "openNativeFileDialog")
         contentController.add(self, name: "openNativeDirectoryDialog")
         contentController.add(self, name: "saveScreenshot")
+        contentController.add(self, name: "requestSystemAccess")
         config.userContentController = contentController
 
         webView = WKWebView(frame: window.contentView!.bounds, configuration: config)
@@ -80,6 +81,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         mainMenu.addItem(appMenuItem)
         let appMenu = NSMenu()
         appMenuItem.submenu = appMenu
+        let prefItem = NSMenuItem(title: "Google / Gmail Account...", action: #selector(openGmailSignIn), keyEquivalent: ",")
+        prefItem.target = self
+        appMenu.addItem(prefItem)
+        appMenu.addItem(NSMenuItem.separator())
         appMenu.addItem(withTitle: "Quit Miki Player", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
 
         // Edit menu to allow Cmd+C, Cmd+V, Cmd+A, Cmd+Z in text inputs
@@ -95,7 +100,96 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         editMenu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
         editMenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
 
+        // Account & Services Menu
+        let accountMenuItem = NSMenuItem()
+        mainMenu.addItem(accountMenuItem)
+        let accountMenu = NSMenu(title: "Account")
+        accountMenuItem.submenu = accountMenu
+        let signInItem = NSMenuItem(title: "Sign in with Google / Gmail...", action: #selector(openGmailSignIn), keyEquivalent: "g")
+        signInItem.target = self
+        accountMenu.addItem(signInItem)
+
+        // Web Streams Menu (YouTube, TikTok, Instagram, Cinema, Web Browser)
+        let streamMenuItem = NSMenuItem()
+        mainMenu.addItem(streamMenuItem)
+        let streamMenu = NSMenu(title: "Streams")
+        streamMenuItem.submenu = streamMenu
+        let browseItem = NSMenuItem(title: "Browse Protected Web...", action: #selector(openWebBrowser), keyEquivalent: "b")
+        browseItem.target = self
+        streamMenu.addItem(browseItem)
+        let cinemaItem = NSMenuItem(title: "Cinema & CineSubz Streams...", action: #selector(openCinemaPortal), keyEquivalent: "m")
+        cinemaItem.target = self
+        streamMenu.addItem(cinemaItem)
+        streamMenu.addItem(NSMenuItem.separator())
+        let ytItem = NSMenuItem(title: "YouTube Web Stream...", action: #selector(openYouTubeStream), keyEquivalent: "y")
+        ytItem.target = self
+        streamMenu.addItem(ytItem)
+        let ttItem = NSMenuItem(title: "TikTok Web Stream...", action: #selector(openTikTokStream), keyEquivalent: "t")
+        ttItem.target = self
+        streamMenu.addItem(ttItem)
+        let igItem = NSMenuItem(title: "Instagram Web Stream...", action: #selector(openInstagramStream), keyEquivalent: "i")
+        igItem.target = self
+        streamMenu.addItem(igItem)
+
         NSApp.mainMenu = mainMenu
+    }
+
+    @objc func openWebBrowser() {
+        let js = "window.dispatchEvent(new CustomEvent('miki:open-web-browser', { detail: { url: 'https://www.youtube.com' } }));"
+        webView.evaluateJavaScript(js, completionHandler: nil)
+    }
+
+    @objc func openCinemaPortal() {
+        let js = "window.dispatchEvent(new CustomEvent('miki:open-web-browser', { detail: { url: 'https://cinesubz.co' } }));"
+        webView.evaluateJavaScript(js, completionHandler: nil)
+    }
+
+    @objc func openGmailSignIn() {
+        let js = "window.dispatchEvent(new CustomEvent('miki:open-gmail-signin'));"
+        webView.evaluateJavaScript(js, completionHandler: nil)
+    }
+
+    @objc func openYouTubeStream() {
+        let js = "window.dispatchEvent(new CustomEvent('miki:open-web-stream', { detail: { tab: 'youtube' } }));"
+        webView.evaluateJavaScript(js, completionHandler: nil)
+    }
+
+    @objc func openTikTokStream() {
+        let js = "window.dispatchEvent(new CustomEvent('miki:open-web-stream', { detail: { tab: 'tiktok' } }));"
+        webView.evaluateJavaScript(js, completionHandler: nil)
+    }
+
+    @objc func openInstagramStream() {
+        let js = "window.dispatchEvent(new CustomEvent('miki:open-web-stream', { detail: { tab: 'instagram' } }));"
+        webView.evaluateJavaScript(js, completionHandler: nil)
+    }
+
+    final class SafeCompletionWrapper {
+        private var handler: (([URL]?) -> Void)?
+        init(_ handler: @escaping ([URL]?) -> Void) {
+            self.handler = handler
+        }
+        func complete(with urls: [URL]?) {
+            let h = handler
+            handler = nil
+            h?(urls)
+        }
+        deinit {
+            handler?(nil)
+        }
+    }
+
+    // WKUIDelegate: Intercept & block intrusive popups and unauthorized new window spawns
+    func webView(
+        _ webView: WKWebView,
+        createWebViewWith configuration: WKWebViewConfiguration,
+        for navigationAction: WKNavigationAction,
+        windowFeatures: WKWindowFeatures
+    ) -> WKWebView? {
+        if let targetUrl = navigationAction.request.url?.absoluteString {
+            NSLog("[Miki Shield] Intercepted and blocked popup window creation for: %@", targetUrl)
+        }
+        return nil
     }
 
     // WKUIDelegate: native file picker when <input type="file"> is clicked
@@ -105,7 +199,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         initiatedByFrame frame: WKFrameInfo,
         completionHandler: @escaping ([URL]?) -> Void
     ) {
+        let wrapper = SafeCompletionWrapper(completionHandler)
         let openPanel = NSOpenPanel()
+        openPanel.title = "Select Media File - Miki Player"
         openPanel.canChooseFiles = true
         openPanel.canChooseDirectories = false
         openPanel.allowsMultipleSelection = parameters.allowsMultipleSelection
@@ -114,9 +210,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         }
         openPanel.begin { response in
             if response == .OK {
-                completionHandler(openPanel.urls)
+                wrapper.complete(with: openPanel.urls)
             } else {
-                completionHandler(nil)
+                wrapper.complete(with: nil)
             }
         }
     }
@@ -217,6 +313,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
                         print("[Miki] Screenshot write failed: \(error)")
                     }
                 }
+            } else if message.name == "requestSystemAccess" {
+                // Ensure screenshot and user directories exist and trigger system access validation
+                let home = FileManager.default.homeDirectoryForCurrentUser.path
+                let screenshotsDir = "\(home)/Pictures/Miki Player/Screenshots"
+                try? FileManager.default.createDirectory(atPath: screenshotsDir, withIntermediateDirectories: true, attributes: nil)
+                let js = "window.dispatchEvent(new CustomEvent('miki:systemAccessGranted', { detail: { status: 'granted' } }));"
+                self.webView.evaluateJavaScript(js, completionHandler: nil)
             }
         }
     }

@@ -16,8 +16,8 @@ if ! curl -s http://localhost:1420/ >/dev/null 2>&1; then
   done
 fi
 
-# 2. Compile native borderless launcher if not yet compiled
-if [ ! -f "./MikiPlayer" ]; then
+# 2. Compile native borderless launcher if not yet compiled or source modified
+if [ ! -f "./MikiPlayer" ] || [ "MikiPlayerApp.swift" -nt "./MikiPlayer" ]; then
   echo "[Miki Player] Compiling native borderless Cocoa app..."
   swiftc -O -o MikiPlayer MikiPlayerApp.swift -framework Cocoa -framework WebKit
 fi

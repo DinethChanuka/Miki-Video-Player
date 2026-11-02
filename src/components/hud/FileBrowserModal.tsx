@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { usePlayerStore } from '../../store/playerStore';
 import {
   FolderOpen,
@@ -15,14 +15,81 @@ import {
   Subtitles,
   CheckCircle2,
   Filter,
+  Share2,
+  Globe,
+  ShieldCheck,
+  ExternalLink,
 } from 'lucide-react';
 import { parseYouTubeId } from '../../App';
 import { formatPathForOS } from '../../utils/pathUtils';
+import { CINEMA_LINKS, filterCinemaLinks, CinemaCategory } from '../../utils/cinemaLinks';
 
 interface FileBrowserModalProps {
   isOpen: boolean;
   onClose: () => void;
+  initialTab?: 'youtube' | 'tiktok' | 'instagram' | 'demos' | 'recent' | 'bookmarks' | 'cinema';
 }
+
+export interface SocialStreamItem {
+  id: string;
+  title: string;
+  url: string;
+  platform: 'tiktok' | 'instagram';
+  author: string;
+  badge: string;
+  thumbnail: string;
+}
+
+const TIKTOK_SAMPLES: SocialStreamItem[] = [
+  {
+    id: 'tt-1',
+    title: 'Zach King Magic Broomstick Illusion',
+    url: 'https://www.tiktok.com/@zachking/video/6768504823336881414',
+    platform: 'tiktok',
+    author: '@zachking',
+    badge: 'Trending Magic',
+    thumbnail: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=400&q=80',
+  },
+  {
+    id: 'tt-2',
+    title: 'Golden Retriever Pool Splash Video',
+    url: 'https://www.tiktok.com/@scout2015/video/6718335390845095173',
+    platform: 'tiktok',
+    author: '@scout2015',
+    badge: 'Nature & Pets',
+    thumbnail: 'https://images.unsplash.com/photo-1543466835-00a7907e9de1?auto=format&fit=crop&w=400&q=80',
+  },
+  {
+    id: 'tt-3',
+    title: 'Bella Poarch M to the B Viral Clip',
+    url: 'https://www.tiktok.com/@bellapoarch/video/6862153058223197445',
+    platform: 'tiktok',
+    author: '@bellapoarch',
+    badge: 'Top Viral',
+    thumbnail: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=400&q=80',
+  },
+];
+
+const INSTAGRAM_SAMPLES: SocialStreamItem[] = [
+  {
+    id: 'ig-1',
+    title: 'Cinematic Mountain Drone Hyperlapse Reel',
+    url: 'https://www.instagram.com/reel/C21AbCdEfGh/',
+    platform: 'instagram',
+    author: '@earthpix',
+    badge: '4K Drone Reel',
+    thumbnail: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=80',
+  },
+  {
+    id: 'ig-2',
+    title: 'Cyberpunk Tokyo Night Walk in 60fps',
+    url: 'https://www.instagram.com/reel/C3bA8ZtP1mQ/',
+    platform: 'instagram',
+    author: '@tokyo_nights',
+    badge: 'Urban Cinema',
+    thumbnail: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=400&q=80',
+  },
+];
 
 export type DemoCategory =
   | 'All'
@@ -121,7 +188,11 @@ const DEMO_STREAMS: DemoStreamItem[] = [
 type SortCriteria = 'recent' | 'title' | 'duration' | 'progress';
 type SortDirection = 'asc' | 'desc';
 
-export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({ isOpen, onClose }) => {
+export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({
+  isOpen,
+  onClose,
+  initialTab = 'youtube',
+}) => {
   const openMedia = usePlayerStore((s) => s.openMedia);
   const recentMedia = usePlayerStore((s) => s.recentMedia);
   const removeRecentMedia = usePlayerStore((s) => s.removeRecentMedia);
@@ -135,12 +206,23 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({ isOpen, onCl
   const loadSubtitleFromFile = usePlayerStore((s) => s.loadSubtitleFromFile);
   const customBgImage = usePlayerStore((s) => s.customBgImage);
 
-  const [activeTab, setActiveTab] = useState<'demos' | 'recent' | 'bookmarks' | 'url'>('url');
+  const [activeTab, setActiveTab] = useState<'youtube' | 'tiktok' | 'instagram' | 'demos' | 'recent' | 'bookmarks' | 'cinema'>('youtube');
   const [selectedCategory, setSelectedCategory] = useState<DemoCategory>('All');
+  const [cinemaCategory, setCinemaCategory] = useState<CinemaCategory>('All');
   const [customUrl, setCustomUrl] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<SortCriteria>('recent');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+
+  const filteredCinemaLinks = useMemo(() => {
+    return filterCinemaLinks(CINEMA_LINKS, searchTerm, cinemaCategory);
+  }, [searchTerm, cinemaCategory]);
+
+  useEffect(() => {
+    if (isOpen && initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [isOpen, initialTab]);
 
   const handleOpenLocalFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -331,53 +413,89 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({ isOpen, onCl
         )}
 
         {/* Navigation Tabs - Minimal One-Word Names */}
-        <div className="flex items-center gap-2 border-b border-white/10 pb-2">
+        <div className="flex items-center gap-1.5 border-b border-white/10 pb-2 overflow-x-auto">
           <button
-            onClick={() => setActiveTab('url')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-semibold transition-all ${
-              activeTab === 'url'
+            onClick={() => setActiveTab('youtube')}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-2xl text-xs font-semibold transition-all whitespace-nowrap ${
+              activeTab === 'youtube'
                 ? 'bg-rose-500/20 text-rose-300 border border-rose-400/30 shadow-sm'
                 : 'text-white/70 hover:text-white hover:bg-white/5'
             }`}
           >
             <Youtube className="w-3.5 h-3.5 text-rose-400" />
-            Streams ({youtubeHistory.length})
+            <span>YouTube ({youtubeHistory.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('cinema')}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-2xl text-xs font-semibold transition-all whitespace-nowrap ${
+              activeTab === 'cinema'
+                ? 'bg-amber-500/20 text-amber-300 border border-amber-400/30 shadow-sm'
+                : 'text-white/70 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <Film className="w-3.5 h-3.5 text-amber-400" />
+            <span>Cinema ({CINEMA_LINKS.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('tiktok')}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-2xl text-xs font-semibold transition-all whitespace-nowrap ${
+              activeTab === 'tiktok'
+                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 shadow-sm'
+                : 'text-white/70 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <Share2 className="w-3.5 h-3.5 text-cyan-400" />
+            <span>TikTok</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('instagram')}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-2xl text-xs font-semibold transition-all whitespace-nowrap ${
+              activeTab === 'instagram'
+                ? 'bg-pink-500/20 text-pink-300 border border-pink-400/30 shadow-sm'
+                : 'text-white/70 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5 text-pink-400" />
+            <span>Instagram</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('demos')}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-2xl text-xs font-semibold transition-all whitespace-nowrap ${
+              activeTab === 'demos'
+                ? 'bg-purple-500/20 text-purple-300 border border-purple-400/30 shadow-sm'
+                : 'text-white/70 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <Film className="w-3.5 h-3.5 text-purple-400" />
+            <span>Demos ({DEMO_STREAMS.length})</span>
           </button>
 
           <button
             onClick={() => setActiveTab('recent')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-semibold transition-all ${
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-2xl text-xs font-semibold transition-all whitespace-nowrap ${
               activeTab === 'recent'
                 ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 shadow-sm'
                 : 'text-white/70 hover:text-white hover:bg-white/5'
             }`}
           >
             <Clock className="w-3.5 h-3.5" />
-            Recent ({recentMedia.length})
+            <span>Recent ({recentMedia.length})</span>
           </button>
 
           <button
             onClick={() => setActiveTab('bookmarks')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-semibold transition-all ${
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-2xl text-xs font-semibold transition-all whitespace-nowrap ${
               activeTab === 'bookmarks'
                 ? 'bg-amber-500/20 text-amber-300 border border-amber-400/30 shadow-sm'
                 : 'text-white/70 hover:text-white hover:bg-white/5'
             }`}
           >
             <Bookmark className="w-3.5 h-3.5 text-amber-400" />
-            Saved ({bookmarks.length})
-          </button>
-
-          <button
-            onClick={() => setActiveTab('demos')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-semibold transition-all ${
-              activeTab === 'demos'
-                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 shadow-sm'
-                : 'text-white/70 hover:text-white hover:bg-white/5'
-            }`}
-          >
-            <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-            Demos ({DEMO_STREAMS.length})
+            <span>Saved ({bookmarks.length})</span>
           </button>
         </div>
 
@@ -387,7 +505,7 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({ isOpen, onCl
             <Search className="w-4 h-4 text-white/40 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder={`Search ${activeTab === 'demos' ? 'demo streams' : activeTab === 'url' ? 'YouTube history' : 'library'}...`}
+              placeholder={`Search ${activeTab === 'demos' ? 'demo streams' : activeTab === 'youtube' ? 'YouTube history' : activeTab === 'tiktok' ? 'TikTok' : activeTab === 'instagram' ? 'Instagram' : 'library'}...`}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-9 pr-4 py-2 bg-white/5 rounded-2xl border border-white/10 text-xs text-white placeholder-white/40 focus:outline-none focus:border-cyan-400/50 transition-colors"
@@ -489,17 +607,17 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({ isOpen, onCl
             </div>
           )}
 
-          {activeTab === 'url' && (
+          {activeTab === 'youtube' && (
             <div className="flex flex-col gap-4 py-1">
-              {/* Form to load URL */}
+              {/* Form to load YouTube URL */}
               <form onSubmit={handlePlayUrl} className="flex flex-col gap-3">
                 <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 flex flex-col gap-1">
                   <div className="flex items-center gap-2 text-rose-400 font-semibold text-xs">
                     <Youtube className="w-4 h-4" />
-                    YouTube & Network Stream Fast-Loader
+                    YouTube Stream Fast-Loader
                   </div>
-                  <p className="text-xs text-white/60 leading-relaxed">
-                    Paste any <strong>YouTube URL</strong> or direct <strong>HLS / MP4</strong> stream link. Playback stopped point is saved automatically.
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    Paste any <strong>YouTube URL</strong> or shorts link. Playback stopped point is saved automatically.
                   </p>
                 </div>
 
@@ -507,17 +625,33 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({ isOpen, onCl
                   <input
                     type="text"
                     required
-                    placeholder="Paste YouTube or video URL (https://youtube.com/watch?v=...)"
+                    placeholder="Paste YouTube URL (https://youtube.com/watch?v=...)"
                     value={customUrl}
                     onChange={(e) => setCustomUrl(e.target.value)}
-                    className="flex-1 px-4 py-2.5 bg-white/5 rounded-2xl border border-white/15 text-xs text-white placeholder-white/30 focus:outline-none focus:border-cyan-400"
+                    className="flex-1 px-4 py-2.5 bg-white/5 rounded-2xl border border-white/15 text-xs text-white placeholder-white/30 focus:outline-none focus:border-rose-400"
                   />
                   <button
                     type="submit"
                     className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-rose-500 to-red-600 hover:brightness-110 text-white font-bold text-xs shadow-lg shadow-rose-500/20 transition-all shrink-0 active:scale-95 flex items-center gap-1.5"
                   >
                     <Play className="w-3.5 h-3.5 fill-white" />
-                    <span>Play Stream</span>
+                    <span>Play</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      window.dispatchEvent(
+                        new CustomEvent('miki:open-web-browser', {
+                          detail: { url: customUrl || 'https://www.youtube.com' },
+                        })
+                      );
+                      onClose();
+                    }}
+                    className="px-4 py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/15 text-white font-semibold text-xs transition-all shrink-0 active:scale-95 flex items-center gap-1.5"
+                    title="Browse YouTube in the protected, ad-blocked in-app web browser"
+                  >
+                    <Globe className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Browse Site</span>
                   </button>
                 </div>
               </form>
@@ -624,6 +758,158 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({ isOpen, onCl
             </div>
           )}
 
+          {activeTab === 'tiktok' && (
+            <div className="flex flex-col gap-4 py-1">
+              {/* Form to load TikTok URL */}
+              <form onSubmit={handlePlayUrl} className="flex flex-col gap-3">
+                <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 flex flex-col gap-1">
+                  <div className="flex items-center gap-2 text-cyan-400 font-semibold text-xs">
+                    <Share2 className="w-4 h-4" />
+                    TikTok Web Player & Stream Fast-Loader
+                  </div>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    Paste any <strong>TikTok video URL</strong> (e.g. <code>https://www.tiktok.com/@user/video/...</code>).
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    required
+                    placeholder="Paste TikTok video URL (https://www.tiktok.com/@.../video/...)"
+                    value={customUrl}
+                    onChange={(e) => setCustomUrl(e.target.value)}
+                    className="flex-1 px-4 py-2.5 bg-white/5 rounded-2xl border border-white/15 text-xs text-white placeholder-white/30 focus:outline-none focus:border-cyan-400"
+                  />
+                  <button
+                    type="submit"
+                    className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:brightness-110 text-white font-bold text-xs shadow-lg shadow-cyan-500/20 transition-all shrink-0 active:scale-95 flex items-center gap-1.5"
+                  >
+                    <Play className="w-3.5 h-3.5 fill-white" />
+                    <span>Play TikTok</span>
+                  </button>
+                </div>
+              </form>
+
+              {/* Curated Trending TikTok Videos */}
+              <div className="flex flex-col gap-3 pt-2 border-t border-white/10">
+                <span className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                  <Share2 className="w-3.5 h-3.5 text-cyan-400" />
+                  Trending TikTok Streams (1-Click Play)
+                </span>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {TIKTOK_SAMPLES.map((item) => (
+                    <div
+                      key={item.id}
+                      onClick={() => {
+                        openMedia(item.url, item.title);
+                        onClose();
+                      }}
+                      className="group rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-cyan-400/40 p-3 flex items-center gap-3 cursor-pointer transition-all shadow-md"
+                    >
+                      <div className="relative w-20 h-16 rounded-xl overflow-hidden bg-black/60 shrink-0 border border-white/10">
+                        <img
+                          src={item.thumbnail}
+                          alt={item.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        />
+                        <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Play className="w-5 h-5 text-white fill-white" />
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-1 min-w-0 flex-1">
+                        <span className="text-xs font-bold text-white group-hover:text-cyan-300 transition-colors truncate">
+                          {item.title}
+                        </span>
+                        <span className="text-[10px] text-white/50 font-mono truncate">{item.author}</span>
+                        <span className="text-[9px] font-mono px-2 py-0.5 rounded-md bg-white/10 text-cyan-300 border border-white/10 w-fit">
+                          {item.badge}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'instagram' && (
+            <div className="flex flex-col gap-4 py-1">
+              {/* Form to load Instagram URL */}
+              <form onSubmit={handlePlayUrl} className="flex flex-col gap-3">
+                <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 flex flex-col gap-1">
+                  <div className="flex items-center gap-2 text-pink-400 font-semibold text-xs">
+                    <Sparkles className="w-4 h-4" />
+                    Instagram Reels & Stream Fast-Loader
+                  </div>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    Paste any <strong>Instagram Reel or Post URL</strong> (e.g. <code>https://www.instagram.com/reel/...</code>).
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    required
+                    placeholder="Paste Instagram Reel URL (https://www.instagram.com/reel/...)"
+                    value={customUrl}
+                    onChange={(e) => setCustomUrl(e.target.value)}
+                    className="flex-1 px-4 py-2.5 bg-white/5 rounded-2xl border border-white/15 text-xs text-white placeholder-white/30 focus:outline-none focus:border-pink-400"
+                  />
+                  <button
+                    type="submit"
+                    className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-purple-500 via-pink-500 to-amber-500 hover:brightness-110 text-white font-bold text-xs shadow-lg shadow-pink-500/20 transition-all shrink-0 active:scale-95 flex items-center gap-1.5"
+                  >
+                    <Play className="w-3.5 h-3.5 fill-white" />
+                    <span>Play Reel</span>
+                  </button>
+                </div>
+              </form>
+
+              {/* Curated Instagram Reels */}
+              <div className="flex flex-col gap-3 pt-2 border-t border-white/10">
+                <span className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                  <Sparkles className="w-3.5 h-3.5 text-pink-400" />
+                  Verified Instagram Reels (1-Click Play)
+                </span>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {INSTAGRAM_SAMPLES.map((item) => (
+                    <div
+                      key={item.id}
+                      onClick={() => {
+                        openMedia(item.url, item.title);
+                        onClose();
+                      }}
+                      className="group rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-pink-400/40 p-3 flex items-center gap-3 cursor-pointer transition-all shadow-md"
+                    >
+                      <div className="relative w-20 h-16 rounded-xl overflow-hidden bg-black/60 shrink-0 border border-white/10">
+                        <img
+                          src={item.thumbnail}
+                          alt={item.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        />
+                        <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Play className="w-5 h-5 text-white fill-white" />
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-1 min-w-0 flex-1">
+                        <span className="text-xs font-bold text-white group-hover:text-pink-300 transition-colors truncate">
+                          {item.title}
+                        </span>
+                        <span className="text-[10px] text-white/50 font-mono truncate">{item.author}</span>
+                        <span className="text-[9px] font-mono px-2 py-0.5 rounded-md bg-white/10 text-pink-300 border border-white/10 w-fit">
+                          {item.badge}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
           {activeTab === 'recent' && (
             <div className="flex flex-col gap-2">
               {filteredAndSortedRecents.length === 0 ? (
@@ -714,6 +1000,115 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({ isOpen, onCl
                   </div>
                 ))
               )}
+            </div>
+          )}
+
+          {/* TAB 7: CINEMA & FAST STREAMING PORTALS */}
+          {activeTab === 'cinema' && (
+            <div className="flex flex-col gap-4 py-1">
+              {/* Category Filter Pills & Ad Shield Active Banner */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-white/5 border border-white/10">
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-2 text-amber-400 font-semibold text-xs">
+                    <Film className="w-4 h-4" />
+                    <span>Cinema & Fast Links Directory</span>
+                  </div>
+                  <p className="text-xs text-slate-300">
+                    Free movie streaming platforms, CineSubz subtitles & social media with auto ad-blocking.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-400/30 text-emerald-300 text-xs font-semibold shrink-0">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Ad & Popup Shield Active</span>
+                </div>
+              </div>
+
+              {/* Category Filter Buttons */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+                {(['All', 'Subtitles', 'Cinema', 'Social', 'Anime', 'Documentary'] as CinemaCategory[]).map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setCinemaCategory(cat)}
+                    className={`px-3 py-1.5 rounded-xl font-semibold transition-all shrink-0 border ${
+                      cinemaCategory === cat
+                        ? 'bg-amber-500/25 text-amber-300 border-amber-400/50 shadow-sm'
+                        : 'bg-white/5 text-slate-400 border-white/10 hover:bg-white/10 hover:text-white'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+
+              {/* Grid of Cinema & Fast Link Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                {filteredCinemaLinks.map((item) => (
+                  <div
+                    key={item.id}
+                    className="p-4 rounded-2xl bg-white/5 border border-white/10 hover:border-white/20 transition-all flex flex-col justify-between gap-3 group shadow-md"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className={`w-8 h-8 rounded-xl bg-gradient-to-tr ${item.accentColor} flex items-center justify-center text-white shadow-sm shrink-0`}>
+                          <Film className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-bold text-white group-hover:text-amber-300 transition-colors">
+                            {item.name}
+                          </h4>
+                          <span className="text-[10px] font-mono text-cyan-400">
+                            {item.url.replace(/^https?:\/\//, '')}
+                          </span>
+                        </div>
+                      </div>
+
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-lg bg-black/60 border border-white/10 text-white/80 shrink-0">
+                        {item.badge}
+                      </span>
+                    </div>
+
+                    <p className="text-[11px] text-slate-300 leading-relaxed line-clamp-2">
+                      {item.description}
+                    </p>
+
+                    <div className="flex items-center justify-between pt-2 border-t border-white/10 gap-2">
+                      <span className="text-[10px] text-emerald-400 font-mono flex items-center gap-1">
+                        <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                        Popups Suppressed
+                      </span>
+
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => {
+                            window.dispatchEvent(
+                              new CustomEvent('miki:open-web-browser', {
+                                detail: { url: item.url },
+                              })
+                            );
+                            onClose();
+                          }}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-rose-500 hover:brightness-110 active:scale-95 text-white font-bold text-xs shadow-md transition-all"
+                          title="Open in protected ad-blocked web browser"
+                        >
+                          <Globe className="w-3.5 h-3.5" />
+                          <span>Browse Site</span>
+                        </button>
+
+                        <a
+                          href={item.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="p-1.5 rounded-xl bg-white/5 hover:bg-white/15 text-white/60 hover:text-white transition-colors"
+                          title="Open in default browser"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { usePlayerStore, MediaHistoryItem } from './store/playerStore';
 import { PLAYER_THEMES } from './types/theme';
 import { AmbientCanvas } from './components/ambient/AmbientCanvas';
@@ -6,13 +6,19 @@ import { ControlsOverlay } from './components/hud/ControlsOverlay';
 import { EqualizerModal } from './components/hud/EqualizerModal';
 import { VideoSettingsModal } from './components/hud/VideoSettingsModal';
 import { FileBrowserModal } from './components/hud/FileBrowserModal';
+import { WebBrowserModal } from './components/hud/WebBrowserModal';
 import { ResumeChoiceModal } from './components/hud/ResumeChoiceModal';
+import { SystemAccessModal } from './components/hud/SystemAccessModal';
 import { ErrorToast } from './components/hud/ErrorToast';
 import { SplashScreen } from './components/splash/SplashScreen';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { usePlayerGestures } from './hooks/usePlayerGestures';
 import { YouTubePlayer } from './components/player/YouTubePlayer';
+import { WebEmbedPlayer } from './components/player/WebEmbedPlayer';
 import { SubtitleOverlay } from './components/player/SubtitleOverlay';
+import { ApplicationMenu } from './components/hud/ApplicationMenu';
+import { GmailSignInModal } from './components/hud/GmailSignInModal';
+import { parseWebStream } from './utils/webStreamUtils';
 import {
   FolderOpen,
   Sparkles,
@@ -105,6 +111,11 @@ export const App: React.FC = () => {
   const [isEqOpen, setIsEqOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isFileBrowserOpen, setIsFileBrowserOpen] = useState(false);
+  const [fileBrowserInitialTab, setFileBrowserInitialTab] = useState<'youtube' | 'tiktok' | 'instagram' | 'demos' | 'recent' | 'bookmarks' | 'cinema'>('youtube');
+  const [isWebBrowserOpen, setIsWebBrowserOpen] = useState(false);
+  const [webBrowserUrl, setWebBrowserUrl] = useState('https://www.youtube.com');
+  const [isSystemAccessOpen, setIsSystemAccessOpen] = useState(false);
+  const [isGmailSignInOpen, setIsGmailSignInOpen] = useState(false);
   const [pendingResumeItem, setPendingResumeItem] = useState<MediaHistoryItem | null>(null);
   const [isResumeChoiceOpen, setIsResumeChoiceOpen] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
@@ -218,7 +229,31 @@ export const App: React.FC = () => {
 
   const { handleTouchStart, handleTouchEnd } = usePlayerGestures(containerRef);
 
-  const youtubeId = parseYouTubeId(currentUri);
+  const webStream = useMemo(() => (currentUri ? parseWebStream(currentUri) : null), [currentUri]);
+  const youtubeId = webStream?.platform === 'youtube' ? webStream.id : null;
+
+  // Listen for native / global triggers for Gmail signin, web streams & browser
+  useEffect(() => {
+    const handleOpenGmail = () => setIsGmailSignInOpen(true);
+    const handleOpenStream = (e: Event) => {
+      const detail = (e as CustomEvent<{ tab?: 'youtube' | 'tiktok' | 'instagram' | 'cinema' }>).detail;
+      if (detail?.tab) setFileBrowserInitialTab(detail.tab);
+      setIsFileBrowserOpen(true);
+    };
+    const handleOpenBrowser = (e: Event) => {
+      const detail = (e as CustomEvent<{ url?: string }>).detail;
+      if (detail?.url) setWebBrowserUrl(detail.url);
+      setIsWebBrowserOpen(true);
+    };
+    window.addEventListener('miki:open-gmail-signin', handleOpenGmail);
+    window.addEventListener('miki:open-web-stream', handleOpenStream);
+    window.addEventListener('miki:open-web-browser', handleOpenBrowser);
+    return () => {
+      window.removeEventListener('miki:open-gmail-signin', handleOpenGmail);
+      window.removeEventListener('miki:open-web-stream', handleOpenStream);
+      window.removeEventListener('miki:open-web-browser', handleOpenBrowser);
+    };
+  }, []);
 
   // Initialize playback engine on mount
   useEffect(() => {
@@ -262,6 +297,24 @@ export const App: React.FC = () => {
     window.addEventListener('miki:nativeFileSelected', handleNativePicked);
     return () => window.removeEventListener('miki:nativeFileSelected', handleNativePicked);
   }, [openMedia]);
+
+  // Check initial OS System Permissions Access confirmation on first launch
+  useEffect(() => {
+    const hasAccepted = localStorage.getItem('miki_os_permissions_accepted');
+    if (!hasAccepted) {
+      const timer = setTimeout(() => {
+        setIsSystemAccessOpen(true);
+      }, 700);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  // Allow reopening OS System Access dialog from settings or anywhere
+  useEffect(() => {
+    const handleOpenAccess = () => setIsSystemAccessOpen(true);
+    window.addEventListener('miki:open-system-access', handleOpenAccess);
+    return () => window.removeEventListener('miki:open-system-access', handleOpenAccess);
+  }, []);
 
   // Listen to Cocoa native directory picker and screenshot saved events
   useEffect(() => {
@@ -359,14 +412,17 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [seek, resetControlsTimer, playNextMedia, playPreviousMedia]);
 
-  const handleOpenLocalFileDialog = () => {
+  const handleOpenLocalFileDialog = useCallback(() => {
     if (
       typeof window !== 'undefined' &&
       (window as unknown as { webkit?: { messageHandlers?: { openNativeFileDialog?: { postMessage: (msg: string) => void } } } }).webkit?.messageHandlers?.openNativeFileDialog
     ) {
       (window as unknown as { webkit: { messageHandlers: { openNativeFileDialog: { postMessage: (msg: string) => void } } } }).webkit.messageHandlers.openNativeFileDialog.postMessage('open');
+    } else {
+      const input = document.getElementById('miki-main-file-input') as HTMLInputElement | null;
+      input?.click();
     }
-  };
+  }, []);
 
   const handleFileDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -421,26 +477,31 @@ export const App: React.FC = () => {
       {/* Custom Background Image Layer (Below all Glassmorphic Layers with Extended Spread) */}
       {customBgImage && (
         <div className="absolute -inset-10 z-0 pointer-events-none overflow-hidden">
-          <div
-            className="w-full h-full bg-cover bg-center transition-all duration-300 ease-out transform scale-105"
+          <img
+            src={customBgImage}
+            alt="Custom background wallpaper"
+            className="w-full h-full object-cover transition-all duration-200 ease-out"
             style={{
-              backgroundImage: `url(${customBgImage})`,
               opacity: customBgOpacity,
+              WebkitFilter: `blur(${customBgBlur}px) brightness(${customBgBrightness ?? 1.0})`,
               filter: `blur(${customBgBlur}px) brightness(${customBgBrightness ?? 1.0})`,
+              transform: 'scale(1.10) translateZ(0)',
+              WebkitTransform: 'scale(1.10) translateZ(0)',
+              willChange: 'filter, transform, opacity',
             }}
           />
           {/* Dynamic Tint Overlay Layer */}
           <div
             className={`absolute inset-0 pointer-events-none transition-colors duration-300 ${
               customBgTint === 'navy'
-                ? 'bg-blue-950/40'
+                ? 'bg-blue-950/45'
                 : customBgTint === 'aurora'
-                  ? 'bg-emerald-950/30'
+                  ? 'bg-emerald-950/35'
                   : customBgTint === 'amethyst'
-                    ? 'bg-purple-950/30'
+                    ? 'bg-purple-950/35'
                     : customBgTint === 'clear'
                       ? 'bg-transparent'
-                      : 'bg-black/40'
+                      : 'bg-black/45'
             }`}
             style={{
               opacity: customBgTint === 'clear' ? 0 : Math.min(1, (customBgOpacity ?? 1) * 0.9),
@@ -448,6 +509,16 @@ export const App: React.FC = () => {
           />
         </div>
       )}
+
+      {/* Global Theme Ambient Atmosphere Layer */}
+      <div
+        className="absolute inset-0 pointer-events-none z-0 transition-all duration-700 overflow-hidden"
+        style={{
+          background: `radial-gradient(ellipse 95% 70% at 50% -10%, ${theme.haloGlow}, transparent 70%), radial-gradient(circle 800px at 0% 100%, ${theme.previewColors[0]}33, transparent 65%), radial-gradient(circle 800px at 100% 100%, ${theme.previewColors[1]}33, transparent 65%)`,
+          mixBlendMode: customBgImage ? 'screen' : 'normal',
+          opacity: customBgImage ? 0.75 : 1,
+        }}
+      />
 
       {/* Sleek, Clean Frameless Titlebar - Drag & Always Visible Menubar */}
       <div
@@ -488,6 +559,23 @@ export const App: React.FC = () => {
               </span>
             </div>
           )}
+
+          {/* Application Menu: Google/Gmail Sign-in, Web Streams, Quick Tools */}
+          <ApplicationMenu
+            onOpenGmailSignIn={() => setIsGmailSignInOpen(true)}
+            onOpenLibrary={(tab) => {
+              if (tab) setFileBrowserInitialTab(tab);
+              setIsFileBrowserOpen(true);
+            }}
+            onOpenWebBrowser={(url) => {
+              if (url) setWebBrowserUrl(url);
+              setIsWebBrowserOpen(true);
+            }}
+            onOpenSettings={() => setIsSettingsOpen(true)}
+            onOpenEq={() => setIsEqOpen(true)}
+            onOpenLocalFile={handleOpenLocalFileDialog}
+            onOpenSystemAccess={() => setIsSystemAccessOpen(true)}
+          />
 
           {currentUri && (
             <div className="flex items-center gap-2">
@@ -554,13 +642,20 @@ export const App: React.FC = () => {
       {/* Main Viewport Area */}
       <div className="relative flex-1 w-full h-full overflow-hidden flex items-center justify-center">
         {/* Ambient Lighting Canvas Layer */}
-        {!youtubeId && <AmbientCanvas videoRef={videoRef} />}
+        {!youtubeId && !webStream && <AmbientCanvas videoRef={videoRef} />}
 
-        {/* YouTube Video Stream or Standard Video */}
+        {/* Web Stream (YouTube, TikTok, Instagram) or Standard Video */}
         {youtubeId ? (
           <YouTubePlayer
             youtubeId={youtubeId}
-            initialPositionMs={positionMs}
+            initialPositionMs={usePlayerStore.getState().positionMs}
+          />
+        ) : webStream ? (
+          <WebEmbedPlayer
+            platform={webStream.platform}
+            embedUrl={webStream.embedUrl}
+            originalUrl={webStream.originalUrl}
+            title={currentTitle}
           />
         ) : activeEngineType === 'web-media' ? (
           <div ref={viewportRef} className="relative w-full h-full flex items-center justify-center overflow-hidden">
@@ -750,7 +845,7 @@ export const App: React.FC = () => {
         {!currentUri && (
           <div
             className={`absolute inset-0 z-30 flex flex-col items-center justify-start pt-6 sm:pt-8 pb-12 px-6 sm:px-10 pointer-events-auto animate-in fade-in duration-300 overflow-y-auto ${
-              customBgImage ? 'bg-black/25' : 'bg-black/75 backdrop-blur-md'
+              customBgImage ? 'bg-black/30' : 'bg-black/20'
             }`}
           >
             {recentMedia.length > 0 ? (
@@ -777,11 +872,7 @@ export const App: React.FC = () => {
 
                   <div className="flex items-center gap-2.5">
                     <button
-                      onClick={() => {
-                        handleOpenLocalFileDialog();
-                        const input = document.getElementById('miki-main-file-input') as HTMLInputElement | null;
-                        input?.click();
-                      }}
+                      onClick={handleOpenLocalFileDialog}
                       className={`px-4 py-2.5 rounded-2xl bg-gradient-to-r ${theme.accentGradient} text-white font-bold text-xs cursor-pointer transition-all shadow-lg active:scale-95 flex items-center gap-1.5`}
                       style={{ boxShadow: `0 4px 15px ${theme.haloGlow}` }}
                     >
@@ -1029,7 +1120,7 @@ export const App: React.FC = () => {
         )}
 
         {/* Glassmorphic Controls Overlay (for native/local/HLS video) */}
-        {currentUri && !youtubeId && (
+        {currentUri && !youtubeId && !webStream && (
           <ControlsOverlay
             onOpenEq={() => setIsEqOpen(true)}
             onOpenSettings={() => setIsSettingsOpen(true)}
@@ -1041,8 +1132,30 @@ export const App: React.FC = () => {
       </div>
 
       {/* Modals wrapped in ErrorBoundary to guarantee uninterrupted UI */}
+      <ErrorBoundary onReset={() => setIsWebBrowserOpen(false)}>
+        <WebBrowserModal
+          isOpen={isWebBrowserOpen}
+          initialUrl={webBrowserUrl}
+          onClose={() => setIsWebBrowserOpen(false)}
+          onPlayInNativePlayer={(url) => {
+            openMedia(url);
+          }}
+        />
+      </ErrorBoundary>
+
       <ErrorBoundary onReset={() => setIsFileBrowserOpen(false)}>
-        <FileBrowserModal isOpen={isFileBrowserOpen} onClose={() => setIsFileBrowserOpen(false)} />
+        <FileBrowserModal
+          isOpen={isFileBrowserOpen}
+          onClose={() => setIsFileBrowserOpen(false)}
+          initialTab={fileBrowserInitialTab}
+        />
+      </ErrorBoundary>
+
+      <ErrorBoundary onReset={() => setIsGmailSignInOpen(false)}>
+        <GmailSignInModal
+          isOpen={isGmailSignInOpen}
+          onClose={() => setIsGmailSignInOpen(false)}
+        />
       </ErrorBoundary>
 
       <ErrorBoundary onReset={() => setIsSettingsOpen(false)}>
@@ -1067,6 +1180,13 @@ export const App: React.FC = () => {
           }}
           onResume={handleConfirmResume}
           onRestart={handleConfirmRestart}
+        />
+      </ErrorBoundary>
+
+      <ErrorBoundary onReset={() => setIsSystemAccessOpen(false)}>
+        <SystemAccessModal
+          isOpen={isSystemAccessOpen}
+          onClose={() => setIsSystemAccessOpen(false)}
         />
       </ErrorBoundary>
 
