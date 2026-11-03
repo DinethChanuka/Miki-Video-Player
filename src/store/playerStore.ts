@@ -912,7 +912,7 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
         return;
       }
 
-      set({ lastError: error });
+      set({ lastError: error, isBuffering: false });
 
       // Automated Self-Healing Recovery Execution
       if (error.recovery === 'fallback_to_web_engine' && get().activeEngineType !== 'web-media') {

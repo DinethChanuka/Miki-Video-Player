@@ -827,7 +827,7 @@ export const App: React.FC = () => {
             />
 
             {/* High-Performance Loading / Buffering HUD Animation Indicator */}
-            {isBuffering && currentUri && (
+            {isBuffering && !lastError && currentUri && (
               <div className="absolute inset-0 pointer-events-none z-20 flex flex-col items-center justify-center bg-black/45 backdrop-blur-sm animate-in fade-in duration-200">
                 <div className="relative flex items-center justify-center">
                   {/* Outer Pulsing Aura */}

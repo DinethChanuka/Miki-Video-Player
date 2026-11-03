@@ -328,6 +328,11 @@ export class WebMediaEngine implements IPlayerEngine {
         return;
       }
 
+      if (typeof window !== 'undefined') {
+        import('../store/playerStore')
+          .then(({ usePlayerStore }) => usePlayerStore.setState({ isBuffering: false }))
+          .catch(() => {});
+      }
       const err = this.videoEl?.error;
       this.emitError({
         code: 'CODEC_UNSUPPORTED',
@@ -456,6 +461,11 @@ export class WebMediaEngine implements IPlayerEngine {
       });
       this.hls.on(Hls.Events.ERROR, (_event, data) => {
         if (data.fatal) {
+          if (typeof window !== 'undefined') {
+            import('../store/playerStore')
+              .then(({ usePlayerStore }) => usePlayerStore.setState({ isBuffering: false }))
+              .catch(() => {});
+          }
           this.emitError({
             code: data.type === Hls.ErrorTypes.NETWORK_ERROR ? 'STREAM_TIMEOUT' : 'CODEC_UNSUPPORTED',
             message: `HLS stream error: ${data.details}`,
