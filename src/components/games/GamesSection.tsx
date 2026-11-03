@@ -229,7 +229,7 @@ export const GamesSection: React.FC<GamesSectionProps> = ({ onClose: _onClose, o
             sandbox={
               selectedGame.srcDoc
                 ? 'allow-scripts allow-pointer-lock allow-forms'
-                : 'allow-scripts allow-forms allow-pointer-lock allow-popups'
+                : 'allow-scripts allow-same-origin allow-forms allow-pointer-lock allow-popups'
             }
             tabIndex={0}
           />

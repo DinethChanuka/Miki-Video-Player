@@ -12,6 +12,8 @@ import {
   Play,
   MousePointer,
   Sliders,
+  AlertCircle,
+  ExternalLink,
 } from 'lucide-react';
 
 interface FullWindowGamesModalProps {
@@ -60,10 +62,26 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
   const [activeKeys, setActiveKeys] = useState<{ [key: string]: boolean }>({});
   const [mouseActive, setMouseActive] = useState<boolean>(false);
   const [gameKey, setGameKey] = useState<number>(0);
+  const [iframeError, setIframeError] = useState<boolean>(false);
+  const [isLoadingIframe, setIsLoadingIframe] = useState<boolean>(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const mouseTimeoutRef = useRef<any>(null);
+
+  // Monitor loading timeout for external non-srcDoc games
+  useEffect(() => {
+    setIframeError(false);
+    if (!selectedGame.srcDoc) {
+      setIsLoadingIframe(true);
+      const timer = setTimeout(() => {
+        setIsLoadingIframe(false);
+      }, 4000);
+      return () => clearTimeout(timer);
+    } else {
+      setIsLoadingIframe(false);
+    }
+  }, [selectedGame.id, gameKey]);
 
   // Update initial game if prop changes
   useEffect(() => {
@@ -353,7 +371,7 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
       {/* MAIN VIEWPORT BODY */}
       <div className="relative flex-1 w-full h-full bg-[#03060a] overflow-hidden">
         {/* GAME IFRAME VIEWPORT */}
-        <div className="w-full h-full flex items-center justify-center bg-black">
+        <div className="w-full h-full flex items-center justify-center bg-black relative">
           <iframe
             key={`${selectedGame.id}-${gameKey}`}
             ref={iframeRef}
@@ -363,11 +381,87 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
             sandbox={
               selectedGame.srcDoc
                 ? 'allow-scripts allow-pointer-lock allow-forms'
-                : 'allow-scripts allow-forms allow-pointer-lock allow-popups'
+                : 'allow-scripts allow-same-origin allow-forms allow-pointer-lock allow-popups'
             }
-            allow="fullscreen; autoplay"
+            allow="fullscreen; autoplay; gamepad; focus-without-user-activation *"
             className="w-full h-full border-0 bg-black"
+            onLoad={() => setIsLoadingIframe(false)}
+            onError={() => {
+              setIsLoadingIframe(false);
+              setIframeError(true);
+            }}
           />
+
+          {/* Loading Indicator for Remote Games */}
+          {isLoadingIframe && !selectedGame.srcDoc && (
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/75 backdrop-blur-sm gap-3 pointer-events-none">
+              <div className="w-8 h-8 rounded-full border-2 border-purple-500 border-t-transparent animate-spin" />
+              <span className="text-xs text-white/70 font-mono">Loading {selectedGame.title}...</span>
+            </div>
+          )}
+
+          {/* Graceful Fallback Card when embedding is restricted or fails */}
+          {iframeError && !selectedGame.srcDoc && (
+            <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/90 backdrop-blur-md p-6">
+              <div className="max-w-md w-full p-6 rounded-3xl bg-slate-900 border border-purple-500/30 flex flex-col items-center text-center gap-4 shadow-2xl">
+                <div className="p-3 rounded-2xl bg-purple-500/20 text-purple-400">
+                  <AlertCircle className="w-8 h-8" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">
+                    {selectedGame.title} Embedding Restricted
+                  </h3>
+                  <p className="text-xs text-white/60 mt-1.5 leading-relaxed">
+                    This game server restricts third-party iframe embedding or is temporarily unreachable. You can launch it directly in the ad-shielded browser or enjoy an instant offline inbuilt title.
+                  </p>
+                </div>
+                <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full mt-2">
+                  <button
+                    onClick={() => {
+                      const fallback = GAMES_CATALOG.find((g) => g.isInbuilt && g.id === 'pacman') || GAMES_CATALOG[0];
+                      setSelectedGame(fallback);
+                      setPreviewGame(fallback);
+                      setIframeError(false);
+                      setGameKey((k) => k + 1);
+                    }}
+                    className="flex-1 w-full py-2.5 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs transition-all shadow-lg shadow-purple-600/30 flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    <span>Play Inbuilt Alternative</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (
+                        typeof window !== 'undefined' &&
+                        (window as unknown as { webkit?: { messageHandlers?: { browserViewAction?: { postMessage: (msg: unknown) => void } } } }).webkit?.messageHandlers?.browserViewAction
+                      ) {
+                        (window as unknown as { webkit: { messageHandlers: { browserViewAction: { postMessage: (msg: unknown) => void } } } }).webkit.messageHandlers.browserViewAction.postMessage({
+                          action: 'open',
+                          url: selectedGame.url,
+                        });
+                        onClose();
+                      } else {
+                        window.open(selectedGame.url, '_blank');
+                      }
+                    }}
+                    className="flex-1 w-full py-2.5 px-4 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs border border-white/10 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <ExternalLink className="w-4 h-4 text-cyan-400" />
+                    <span>Launch in Web Browser</span>
+                  </button>
+                </div>
+                <button
+                  onClick={() => {
+                    setIframeError(false);
+                    setGameKey((k) => k + 1);
+                  }}
+                  className="text-[11px] text-white/40 hover:text-white transition-colors cursor-pointer mt-1"
+                >
+                  Retry Loading
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* 50+ GAMES DRAWER / SELECTOR OVERLAY */}
