@@ -13,11 +13,12 @@ import {
 
 interface GamesSectionProps {
   onClose?: () => void;
+  onOpenGames?: (gameId?: string) => void;
 }
 
 const CATEGORIES = ['All', 'Arcade', 'Retro', 'Classic', 'Puzzle', 'Action', 'Sports'];
 
-export const GamesSection: React.FC<GamesSectionProps> = ({ onClose: _onClose }) => {
+export const GamesSection: React.FC<GamesSectionProps> = ({ onClose: _onClose, onOpenGames }) => {
   const [selectedGame, setSelectedGame] = useState<GameItem>(GAMES_CATALOG[0]);
   const [activeCategory, setActiveCategory] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -220,10 +221,16 @@ export const GamesSection: React.FC<GamesSectionProps> = ({ onClose: _onClose })
         <div className="relative flex-1 w-full min-h-[460px] rounded-2xl overflow-hidden border border-white/10 bg-black shadow-2xl">
           <iframe
             ref={iframeRef}
-            src={selectedGame.url}
+            srcDoc={selectedGame.srcDoc}
+            src={!selectedGame.srcDoc ? selectedGame.url : undefined}
             title={selectedGame.title}
             className="w-full h-full min-h-[460px] border-0"
             allow="autoplay; fullscreen; gamepad; focus-without-user-activation *"
+            sandbox={
+              selectedGame.srcDoc
+                ? 'allow-scripts allow-pointer-lock allow-forms'
+                : 'allow-scripts allow-forms allow-pointer-lock allow-popups'
+            }
             tabIndex={0}
           />
           <button
@@ -275,8 +282,13 @@ export const GamesSection: React.FC<GamesSectionProps> = ({ onClose: _onClose })
               <div
                 key={game.id}
                 onClick={() => {
-                  setSelectedGame(game);
-                  setIsPlaying(true);
+                  if (onOpenGames) {
+                    if (_onClose) _onClose();
+                    onOpenGames(game.id);
+                  } else {
+                    setSelectedGame(game);
+                    setIsPlaying(true);
+                  }
                 }}
                 className="p-3.5 rounded-2xl bg-white/5 border border-white/10 hover:border-purple-400/50 hover:bg-white/10 cursor-pointer transition-all flex flex-col justify-between gap-3 group shadow-md"
               >
