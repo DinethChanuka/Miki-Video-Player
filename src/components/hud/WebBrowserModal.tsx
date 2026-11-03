@@ -314,7 +314,9 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 w-full h-full bg-[#06080d] flex flex-col select-none animate-in fade-in duration-150"
+      className={`fixed inset-0 z-50 w-full h-full ${
+        isNativeBrowserSupported ? 'bg-transparent' : 'bg-[#06080d]'
+      } flex flex-col select-none animate-in fade-in duration-150`}
       style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
     >
       {/* Sleek, Minimal Top Bar - Back, Shield Status, Window Drag & Controls */}
@@ -551,9 +553,13 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
       )}
 
       {/* Main Full-Window Viewport: Loading Indicator + Edge-to-Edge Website Frame */}
-      <div className="relative flex-1 w-full h-full bg-transparent overflow-hidden flex flex-col items-center justify-center">
+      <div
+        className={`relative flex-1 w-full h-full bg-transparent overflow-hidden flex flex-col items-center justify-center ${
+          isNativeBrowserSupported ? 'pointer-events-none' : ''
+        }`}
+      >
         {isLoading && (
-          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/85 backdrop-blur-md">
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/85 backdrop-blur-md pointer-events-auto">
             <div className="w-12 h-12 rounded-full border-3 border-transparent border-t-cyan-400 border-r-emerald-400 animate-spin shadow-lg shadow-cyan-500/20" />
             <span className="text-sm font-semibold text-white/90 mt-4 flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-cyan-400 animate-pulse" />
@@ -576,7 +582,7 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
             allowFullScreen
             onLoad={() => setIsLoading(false)}
             onError={() => setIsLoading(false)}
-            className="w-full h-full border-0 bg-slate-950"
+            className="w-full h-full border-0 bg-slate-950 pointer-events-auto"
           />
         )}
       </div>
