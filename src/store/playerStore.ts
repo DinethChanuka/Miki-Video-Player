@@ -34,6 +34,7 @@ import {
   extractCleanFileName,
 } from '../utils/pathUtils';
 import { parseWebStream, isDirectMediaUrl, WebPlatform } from '../utils/webStreamUtils';
+import { getChannelByUri, getChannelBackupUrl, getChannelByName } from '../utils/channelCatalog';
 
 export interface MediaHistoryItem {
   mediaId: string;
@@ -915,10 +916,10 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
       // Automated Channel Self-Healing: If a live channel fails, immediately attempt backup mirror URLs
       if (curUri && (error.code === 'STREAM_TIMEOUT' || error.code === 'STREAM_ERROR' || error.code === 'CODEC_UNSUPPORTED')) {
         try {
-          const { getChannelByUri, getChannelBackupUrl } = await import('../utils/channelCatalog.ts');
-          const channel = getChannelByUri(curUri);
+          const curTitle = get().currentTitle;
+          const channel = (curTitle ? getChannelByName(curTitle) : undefined) || getChannelByUri(curUri);
           if (channel && channel.backupUrls && channel.backupUrls.length > 0) {
-            const nextBackup = getChannelBackupUrl(channel.streamUrl, curUri);
+            const nextBackup = getChannelBackupUrl(channel.name, curUri) || getChannelBackupUrl(channel.streamUrl, curUri);
             if (nextBackup && nextBackup !== curUri) {
               console.log(`[playerStore] Live channel ${channel.name} encountered ${error.message}. Auto-healing via backup mirror: ${nextBackup}`);
               set({ isBuffering: true, lastError: null, retryCount: 0 });
