@@ -40,3 +40,4 @@ describe('StreamDiagnostics Engine Audit', () => {
     assert.equal(diag.reason, 'NETWORK_OFFLINE');
   });
 });
+

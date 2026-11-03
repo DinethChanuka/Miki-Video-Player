@@ -228,6 +228,12 @@ export interface PlayerStoreState {
   // YouTube stopped place persistence
   saveYouTubeProgress: (youtubeId: string, positionMs: number, durationMs: number) => void;
 
+  // Stream Quality Levels (HLS ABR & Manual Level Switching)
+  streamQualityLevels: Array<{ id: number; name: string; height: number; width: number; bitrate: number }>;
+  currentQualityLevel: number;
+  setStreamQuality: (levelId: number) => void;
+  updateStreamQualityLevels: (levels: Array<{ id: number; name: string; height: number; width: number; bitrate: number }>) => void;
+
   addBookmark: (label?: string) => Promise<void>;
   removeRecentMedia: (uri: string) => void;
   addYouTubeHistory: (url: string, title?: string) => void;
@@ -655,6 +661,17 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
   },
 
   // Sound System Advanced Controls
+  streamQualityLevels: [],
+  currentQualityLevel: -1,
+  updateStreamQualityLevels: (levels) => set({ streamQualityLevels: levels }),
+  setStreamQuality: (levelId) => {
+    set({ currentQualityLevel: levelId });
+    const engine = get().engine;
+    if (engine && engine.setQualityLevel) {
+      engine.setQualityLevel(levelId);
+    }
+  },
+
   preampGain: 1.0,
   stereoPan: 0.0,
   setPreampGain: (gain) => {
@@ -948,14 +965,20 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
               primaryUrl: channel.streamUrl,
               backupUrls: channel.backupUrls,
               channelName: channel.name,
-              maxRetriesPerSource: 1,
+              maxRetriesPerSource: 0,
             });
           }
           const failover = activeFailoverManager.recordFailure(error.message);
-          const nextBackup = failover.action === 'switch_source' ? failover.url : (getChannelBackupUrl(channel.name, curUri) || getChannelBackupUrl(channel.streamUrl, curUri));
+          const nextBackup =
+            failover.action === 'switch_source'
+              ? failover.url
+              : getChannelBackupUrl(channel.name, curUri) ||
+                getChannelBackupUrl(channel.streamUrl, curUri);
 
-          if (failover.action === 'switch_source' && nextBackup && nextBackup !== curUri) {
-            console.log(`[playerStore] Live channel ${channel.name} encountered ${error.message}. Auto-healing via backup mirror: ${nextBackup}`);
+          if (nextBackup && nextBackup !== curUri) {
+            console.log(
+              `[playerStore] Live channel ${channel.name} encountered ${error.message}. Auto-healing via backup mirror: ${nextBackup}`
+            );
             set({ isBuffering: true, lastError: null, retryCount: 0 });
             await get().openMedia(nextBackup, channel.name, false);
             return;

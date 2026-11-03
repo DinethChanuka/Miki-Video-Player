@@ -33,3 +33,4 @@ describe('Game Catalog Validator Audit', () => {
     assert.ok(report.errors.some((e) => e.includes('missing non-empty srcDoc')));
   });
 });
+

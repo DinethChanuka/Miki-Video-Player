@@ -14,7 +14,6 @@ import {
   ArrowUpDown,
   Subtitles,
   CheckCircle2,
-  Filter,
   Share2,
   Globe,
   ShieldCheck,
@@ -35,7 +34,7 @@ import { MusicPlayerView } from '../music/MusicPlayerView';
 interface FileBrowserModalProps {
   isOpen: boolean;
   onClose: () => void;
-  initialTab?: 'youtube' | 'tiktok' | 'instagram' | 'demos' | 'recent' | 'bookmarks' | 'cinema' | 'social' | 'games' | 'music' | 'history' | 'saved' | 'channels';
+  initialTab?: 'youtube' | 'tiktok' | 'instagram' | 'recent' | 'bookmarks' | 'cinema' | 'social' | 'games' | 'music' | 'history' | 'saved' | 'channels';
   onOpenGames?: (gameId?: string) => void;
 }
 
@@ -100,100 +99,6 @@ const INSTAGRAM_SAMPLES: SocialStreamItem[] = [
   },
 ];
 
-export type DemoCategory =
-  | 'All'
-  | 'Animation & Movies'
-  | 'Adaptive HLS'
-  | 'Sci-Fi & VFX'
-  | '4K & Nature'
-  | 'Hi-Fi Audio';
-
-export interface DemoStreamItem {
-  id: string;
-  title: string;
-  uri: string;
-  category: DemoCategory;
-  badge: string;
-  duration: string;
-  thumbnail: string;
-}
-
-// 100% Verified, CORS-enabled, High-Speed Public Streams
-const DEMO_STREAMS: DemoStreamItem[] = [
-  {
-    id: 'demo-bbb',
-    title: 'Big Buck Bunny (1080p Surround Cinema)',
-    uri: 'https://archive.org/download/BigBuckBunny_124/Content/big_buck_bunny_720p_surround.mp4',
-    category: 'Animation & Movies',
-    badge: '1080p Surround',
-    duration: '9:56',
-    thumbnail: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=400&q=80',
-  },
-  {
-    id: 'demo-sintel',
-    title: 'Sintel Animated Film (2K Master)',
-    uri: 'https://archive.org/download/Sintel/sintel-2048-surround.mp4',
-    category: 'Animation & Movies',
-    badge: 'Blender CGI',
-    duration: '14:48',
-    thumbnail: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=400&q=80',
-  },
-  {
-    id: 'demo-tears',
-    title: 'Tears of Steel (1080p Sci-Fi VFX Master)',
-    uri: 'https://archive.org/download/Tears-of-Steel/tears_of_steel_720p.mp4',
-    category: 'Sci-Fi & VFX',
-    badge: 'Sci-Fi VFX',
-    duration: '12:14',
-    thumbnail: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=400&q=80',
-  },
-  {
-    id: 'demo-elephants',
-    title: 'Elephants Dream (Classic Open Movie)',
-    uri: 'https://archive.org/download/ElephantsDream/ed_1024_512kb.mp4',
-    category: 'Animation & Movies',
-    badge: 'Stereo Hi-Fi',
-    duration: '10:53',
-    thumbnail: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=400&q=80',
-  },
-  {
-    id: 'demo-cosmos',
-    title: 'France 24 English HD Live Stream',
-    uri: 'https://live.france24.com/hls/live/2037218/F24_EN_HI_HLS/master_2300.m3u8',
-    category: 'Adaptive HLS',
-    badge: 'Live 1080p',
-    duration: '24/7 Live',
-    thumbnail: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=400&q=80',
-  },
-  {
-    id: 'demo-mux',
-    title: 'Mux Adaptive Multi-Bitrate HLS',
-    uri: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
-    category: 'Adaptive HLS',
-    badge: 'Auto 1080p',
-    duration: 'Live Buffer',
-    thumbnail: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=400&q=80',
-  },
-  {
-    id: 'demo-apple',
-    title: 'Apple Advanced 16×9 Stream',
-    uri: 'https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_16x9/bipbop_16x9_variant.m3u8',
-    category: 'Adaptive HLS',
-    badge: 'Multi-Audio',
-    duration: 'Live Test',
-    thumbnail: 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=400&q=80',
-  },
-  {
-    id: 'demo-akamai',
-    title: 'Akamai Ultra-Resilient HLS Live',
-    uri: 'https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8',
-    category: 'Adaptive HLS',
-    badge: 'Low-Latency',
-    duration: '24/7 Live',
-    thumbnail: 'https://images.unsplash.com/photo-1531366936337-7c912a4589a7?auto=format&fit=crop&w=400&q=80',
-  },
-];
-
 type SortCriteria = 'recent' | 'title' | 'duration' | 'progress';
 type SortDirection = 'asc' | 'desc';
 
@@ -225,7 +130,6 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({
     | 'social'
     | 'music'
     | 'games'
-    | 'demos'
     | 'history'
     | 'saved'
     | 'youtube'
@@ -235,7 +139,6 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({
     | 'bookmarks';
 
   const [activeTab, setActiveTab] = useState<TabType>('channels');
-  const [selectedCategory, setSelectedCategory] = useState<DemoCategory>('All');
   const [cinemaCategory, setCinemaCategory] = useState<CinemaCategory>('All');
   const [channelCategory, setChannelCategory] = useState<string>('All');
   const [customUrl, setCustomUrl] = useState('');
@@ -313,25 +216,6 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({
     }
   };
 
-  // Filtered and Sorted Demo Streams
-  const filteredAndSortedDemos = useMemo(() => {
-    const term = (searchTerm || '').toLowerCase();
-    let list = DEMO_STREAMS.filter((d) => {
-      const matchesCategory = selectedCategory === 'All' || d.category === selectedCategory;
-      const matchesSearch =
-        (d.title || '').toLowerCase().includes(term) ||
-        (d.category || '').toLowerCase().includes(term) ||
-        (d.badge || '').toLowerCase().includes(term);
-      return matchesCategory && matchesSearch;
-    });
-
-    list.sort((a, b) => {
-      let cmp = (a.title || '').localeCompare(b.title || '');
-      return sortDirection === 'asc' ? cmp : -cmp;
-    });
-
-    return list;
-  }, [selectedCategory, searchTerm, sortDirection]);
 
   // Filtered and Sorted YouTube History
   const filteredAndSortedYouTube = useMemo(() => {
@@ -384,14 +268,6 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({
 
     return list;
   }, [recentMedia, searchTerm, sortBy, sortDirection]);
-
-  const categories: DemoCategory[] = [
-    'All',
-    'Animation & Movies',
-    'Adaptive HLS',
-    'Sci-Fi & VFX',
-    '4K & Nature',
-  ];
 
   if (!isOpen) return null;
 
@@ -537,17 +413,6 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({
             <span>Games</span>
           </button>
 
-          <button
-            onClick={() => setActiveTab('demos')}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-2xl text-xs font-semibold transition-all whitespace-nowrap ${
-              activeTab === 'demos'
-                ? 'bg-purple-500/20 text-purple-300 border border-purple-400/30 shadow-sm'
-                : 'text-white/70 hover:text-white hover:bg-white/5'
-            }`}
-          >
-            <Film className="w-3.5 h-3.5 text-purple-400" />
-            <span>Demos ({DEMO_STREAMS.length})</span>
-          </button>
 
           <button
             onClick={() => setActiveTab('history')}
@@ -580,7 +445,7 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({
             <Search className="w-4 h-4 text-white/40 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder={`Search ${activeTab === 'demos' ? 'demo streams' : activeTab === 'youtube' ? 'YouTube history' : activeTab === 'tiktok' ? 'TikTok' : activeTab === 'instagram' ? 'Instagram' : 'library'}...`}
+              placeholder={`Search ${activeTab === 'youtube' ? 'YouTube history' : activeTab === 'tiktok' ? 'TikTok' : activeTab === 'instagram' ? 'Instagram' : 'library'}...`}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-9 pr-4 py-2 bg-white/5 rounded-2xl border border-white/10 text-xs text-white placeholder-white/40 focus:outline-none focus:border-cyan-400/50 transition-colors"
@@ -682,73 +547,6 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({
                       <span className="text-rose-400 font-bold group-hover:translate-x-0.5 transition-transform flex items-center gap-1">
                         Stream Now →
                       </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'demos' && (
-            <div className="flex flex-col gap-3">
-              {/* Category Filter Pills */}
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-                <span className="text-[11px] text-white/40 font-semibold mr-1 flex items-center gap-1 shrink-0">
-                  <Filter className="w-3 h-3 text-cyan-400" /> Category:
-                </span>
-                {categories.map((cat) => (
-                  <button
-                    key={cat}
-                    onClick={() => setSelectedCategory(cat)}
-                    className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all whitespace-nowrap shrink-0 ${
-                      selectedCategory === cat
-                        ? 'bg-cyan-500 text-slate-950 font-bold shadow-md shadow-cyan-500/20'
-                        : 'bg-white/5 text-white/60 hover:text-white hover:bg-white/10 border border-white/5'
-                    }`}
-                  >
-                    {cat}
-                  </button>
-                ))}
-              </div>
-
-              {/* Grid of Categorized Demo Streams */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-1">
-                {filteredAndSortedDemos.map((demo) => (
-                  <div
-                    key={demo.id}
-                    onClick={() => {
-                      openMedia(demo.uri, demo.title);
-                      onClose();
-                    }}
-                    className="flex items-center gap-3 p-3 rounded-2xl bg-white/5 border border-white/10 hover:border-cyan-400/40 hover:bg-white/10 cursor-pointer group transition-all"
-                  >
-                    <div className="relative w-20 h-14 rounded-xl overflow-hidden bg-black/60 shrink-0 border border-white/10">
-                      <img
-                        src={demo.thumbnail}
-                        alt={demo.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                        onError={(e) => {
-                          (e.target as HTMLElement).style.display = 'none';
-                        }}
-                      />
-                      <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Play className="w-5 h-5 text-white fill-white" />
-                      </div>
-                      <span className="absolute bottom-1 right-1 bg-black/80 px-1 py-0.5 rounded text-[9px] font-mono text-white/80">
-                        {demo.duration}
-                      </span>
-                    </div>
-
-                    <div className="flex flex-col gap-0.5 min-w-0 flex-1">
-                      <span className="text-xs font-bold text-white group-hover:text-cyan-300 transition-colors truncate">
-                        {demo.title}
-                      </span>
-                      <span className="text-[11px] text-white/50 truncate">{demo.category}</span>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-[9px] font-mono px-2 py-0.5 rounded-md bg-white/10 text-cyan-300 border border-white/10">
-                          {demo.badge}
-                        </span>
-                      </div>
                     </div>
                   </div>
                 ))}

@@ -57,3 +57,4 @@ describe('StreamFailoverManager Controller Audit', () => {
     assert.equal(manager.isSessionActive(sessionId), false);
   });
 });
+

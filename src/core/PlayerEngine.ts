@@ -98,6 +98,8 @@ export interface IPlayerEngine {
   setEqualizer(gainsDb: number[], nightMode: boolean): Promise<void>;
   applyVideoFilter(config: VideoShaderConfig): Promise<void>;
   captureSnapshot?(): string | null;
+  getQualityLevels?(): any[];
+  setQualityLevel?(level: number): void;
   onTelemetry(callback: (telemetry: PlaybackTelemetry) => void): () => void;
   onError(callback: (error: PlayerErrorEnvelope) => void): () => void;
   destroy(): Promise<void>;
@@ -208,6 +210,12 @@ export class TauriMpvEngine implements IPlayerEngine {
   private emitError(err: PlayerErrorEnvelope) {
     this.errorListeners.forEach((cb) => cb(err));
   }
+
+  getQualityLevels(): any[] {
+    return [];
+  }
+
+  setQualityLevel(_level: number): void {}
 
   async destroy(): Promise<void> {
     this.telemetryListeners.clear();
@@ -694,6 +702,14 @@ export class WebMediaEngine implements IPlayerEngine {
 
   private emitError(err: PlayerErrorEnvelope) {
     this.errorListeners.forEach((cb) => cb(err));
+  }
+
+  getQualityLevels(): any[] {
+    return this.hlsController?.getQualityLevels() || [];
+  }
+
+  setQualityLevel(level: number): void {
+    this.hlsController?.setQualityLevel(level);
   }
 
   async destroy(): Promise<void> {

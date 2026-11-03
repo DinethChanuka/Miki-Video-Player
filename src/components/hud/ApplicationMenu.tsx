@@ -17,7 +17,7 @@ import { StoredGmailAccount, getStoredGmailAccount } from './GmailSignInModal';
 
 interface ApplicationMenuProps {
   onOpenGmailSignIn: () => void;
-  onOpenLibrary: (initialTab?: 'youtube' | 'tiktok' | 'instagram' | 'demos' | 'recent' | 'bookmarks' | 'cinema' | 'social' | 'games' | 'music') => void;
+  onOpenLibrary: (initialTab?: 'youtube' | 'tiktok' | 'instagram' | 'recent' | 'bookmarks' | 'cinema' | 'social' | 'games' | 'music') => void;
   onOpenWebBrowser?: (url?: string) => void;
   onOpenSettings: () => void;
   onOpenEq: () => void;

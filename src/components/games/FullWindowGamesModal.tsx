@@ -39,6 +39,7 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
   onClose,
   initialGameId,
 }) => {
+  const [isPlayingGame, setIsPlayingGame] = useState<boolean>(() => Boolean(initialGameId));
   const [selectedGame, setSelectedGame] = useState<GameItem>(() => {
     if (initialGameId) {
       const match = GAMES_CATALOG.find((g) => g.id === initialGameId);
@@ -57,7 +58,7 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
 
   const [activeCategory, setActiveCategory] = useState<'All' | GameCategory>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [isCatalogDrawerOpen, setIsCatalogDrawerOpen] = useState<boolean>(() => !initialGameId);
+  const [isCatalogDrawerOpen, setIsCatalogDrawerOpen] = useState<boolean>(true);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [activeKeys, setActiveKeys] = useState<{ [key: string]: boolean }>({});
   const [mouseActive, setMouseActive] = useState<boolean>(false);
@@ -72,7 +73,7 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
   // Monitor loading timeout for external non-srcDoc games
   useEffect(() => {
     setIframeError(false);
-    if (!selectedGame.srcDoc) {
+    if (isPlayingGame && !selectedGame.srcDoc) {
       setIsLoadingIframe(true);
       const timer = setTimeout(() => {
         setIsLoadingIframe(false);
@@ -82,7 +83,7 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
     } else {
       setIsLoadingIframe(false);
     }
-  }, [selectedGame.id, gameKey, selectedGame.srcDoc]);
+  }, [isPlayingGame, selectedGame.id, gameKey, selectedGame.srcDoc]);
 
   // Update initial game if prop changes
   useEffect(() => {
@@ -91,9 +92,11 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
       if (match) {
         setSelectedGame(match);
         setPreviewGame(match);
+        setIsPlayingGame(true);
         setIsCatalogDrawerOpen(false);
       }
     } else {
+      setIsPlayingGame(false);
       setIsCatalogDrawerOpen(true);
     }
   }, [initialGameId]);
@@ -101,7 +104,7 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
   // Live Keyboard & Mouse HUD and key isolation from media player
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      if (!isOpen) return;
+      if (!isOpen || !isPlayingGame) return;
       const key = e.code;
       const trackedKeys = [
         'ArrowUp',
@@ -137,7 +140,7 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
 
   const handleKeyUp = useCallback(
     (e: KeyboardEvent) => {
-      if (!isOpen) return;
+      if (!isOpen || !isPlayingGame) return;
       const key = e.code;
       setActiveKeys((prev) => ({ ...prev, [key]: false }));
       iframeRef.current?.contentWindow?.postMessage(
@@ -240,12 +243,14 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
         {/* Left: Back button & Active Game Title */}
         <div className="flex items-center gap-3">
           <button
-            onClick={onClose}
+            onClick={isPlayingGame ? () => setIsPlayingGame(false) : onClose}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/15 border border-white/10 text-white/80 hover:text-white transition-all text-xs font-semibold"
-            title="Return to Video Player"
+            title={isPlayingGame ? 'Back to Games Gallery' : 'Return to Video Player'}
           >
             <ArrowLeft className="w-4 h-4 text-cyan-400" />
-            <span className="hidden sm:inline">Player</span>
+            <span className="hidden sm:inline">
+              {isPlayingGame ? 'All Games' : 'Player'}
+            </span>
           </button>
 
           <div className="h-5 w-px bg-white/10" />
@@ -257,83 +262,100 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-xs font-bold text-white tracking-wide truncate max-w-[180px] sm:max-w-xs">
-                  {selectedGame.title}
+                  {isPlayingGame ? selectedGame.title : 'Miki Game Arcade'}
                 </h1>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-purple-500/20 border border-purple-400/30 text-purple-300 hidden md:inline">
-                  {selectedGame.badge}
+                  {isPlayingGame ? selectedGame.badge : `${GAMES_CATALOG.length} Titles`}
                 </span>
-                {selectedGame.isInbuilt && (
+                {isPlayingGame && selectedGame.isInbuilt && (
                   <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hidden lg:inline">
                     Offline Ready
                   </span>
                 )}
               </div>
               <p className="text-[10px] text-white/50 truncate max-w-[200px] sm:max-w-sm hidden sm:block">
-                {selectedGame.controlsHint}
+                {isPlayingGame
+                  ? selectedGame.controlsHint
+                  : 'High-performance zero-latency HTML5 canvas and retro games'}
               </p>
             </div>
           </div>
         </div>
 
-        {/* Center: Live Keyboard / Mouse HUD */}
-        <div className="hidden lg:flex items-center gap-1.5 px-3 py-1 rounded-xl bg-black/60 border border-white/10 text-[10px] font-mono">
-          <Sliders className="w-3.5 h-3.5 text-white/40 mr-1" />
-          <span
-            className={`px-1.5 py-0.5 rounded transition-colors ${
-              activeKeys['KeyW'] || activeKeys['ArrowUp']
-                ? 'bg-emerald-500 text-black font-bold shadow-sm shadow-emerald-500/50'
-                : 'text-white/40'
-            }`}
-          >
-            W/↑
-          </span>
-          <span
-            className={`px-1.5 py-0.5 rounded transition-colors ${
-              activeKeys['KeyA'] || activeKeys['ArrowLeft']
-                ? 'bg-emerald-500 text-black font-bold shadow-sm shadow-emerald-500/50'
-                : 'text-white/40'
-            }`}
-          >
-            A/←
-          </span>
-          <span
-            className={`px-1.5 py-0.5 rounded transition-colors ${
-              activeKeys['KeyS'] || activeKeys['ArrowDown']
-                ? 'bg-emerald-500 text-black font-bold shadow-sm shadow-emerald-500/50'
-                : 'text-white/40'
-            }`}
-          >
-            S/↓
-          </span>
-          <span
-            className={`px-1.5 py-0.5 rounded transition-colors ${
-              activeKeys['KeyD'] || activeKeys['ArrowRight']
-                ? 'bg-emerald-500 text-black font-bold shadow-sm shadow-emerald-500/50'
-                : 'text-white/40'
-            }`}
-          >
-            D/→
-          </span>
-          <span
-            className={`px-2 py-0.5 rounded transition-colors ${
-              activeKeys['Space']
-                ? 'bg-emerald-500 text-black font-bold shadow-sm shadow-emerald-500/50'
-                : 'text-white/40'
-            }`}
-          >
-            SPACE
-          </span>
-          <div className="h-3 w-px bg-white/20 mx-1" />
-          <MousePointer
-            className={`w-3.5 h-3.5 transition-colors ${
-              mouseActive ? 'text-cyan-400 animate-pulse' : 'text-white/30'
-            }`}
-          />
-        </div>
+        {/* Center: Live Keyboard / Mouse HUD when playing, or quick search hint */}
+        {isPlayingGame ? (
+          <div className="hidden lg:flex items-center gap-1.5 px-3 py-1 rounded-xl bg-black/60 border border-white/10 text-[10px] font-mono">
+            <Sliders className="w-3.5 h-3.5 text-white/40 mr-1" />
+            <span
+              className={`px-1.5 py-0.5 rounded transition-colors ${
+                activeKeys['KeyW'] || activeKeys['ArrowUp']
+                  ? 'bg-emerald-500 text-black font-bold shadow-sm shadow-emerald-500/50'
+                  : 'text-white/40'
+              }`}
+            >
+              W/↑
+            </span>
+            <span
+              className={`px-1.5 py-0.5 rounded transition-colors ${
+                activeKeys['KeyA'] || activeKeys['ArrowLeft']
+                  ? 'bg-emerald-500 text-black font-bold shadow-sm shadow-emerald-500/50'
+                  : 'text-white/40'
+              }`}
+            >
+              A/←
+            </span>
+            <span
+              className={`px-1.5 py-0.5 rounded transition-colors ${
+                activeKeys['KeyS'] || activeKeys['ArrowDown']
+                  ? 'bg-emerald-500 text-black font-bold shadow-sm shadow-emerald-500/50'
+                  : 'text-white/40'
+              }`}
+            >
+              S/↓
+            </span>
+            <span
+              className={`px-1.5 py-0.5 rounded transition-colors ${
+                activeKeys['KeyD'] || activeKeys['ArrowRight']
+                  ? 'bg-emerald-500 text-black font-bold shadow-sm shadow-emerald-500/50'
+                  : 'text-white/40'
+              }`}
+            >
+              D/→
+            </span>
+            <span
+              className={`px-2 py-0.5 rounded transition-colors ${
+                activeKeys['Space']
+                  ? 'bg-emerald-500 text-black font-bold shadow-sm shadow-emerald-500/50'
+                  : 'text-white/40'
+              }`}
+            >
+              SPACE
+            </span>
+            <div className="h-3 w-px bg-white/20 mx-1" />
+            <MousePointer
+              className={`w-3.5 h-3.5 transition-colors ${
+                mouseActive ? 'text-cyan-400 animate-pulse' : 'text-white/30'
+              }`}
+            />
+          </div>
+        ) : (
+          <div className="flex-1 max-w-md hidden md:block">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/40" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search games by title or category..."
+                className="w-full pl-9 pr-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder-white/30 focus:outline-none focus:border-cyan-400 transition-all"
+              />
+            </div>
+          </div>
+        )}
 
-        {/* Right Actions: Catalog Drawer Toggle, External Open, Reload, Fullscreen, Close */}
+        {/* Right Actions: Catalog Toggle, External Open, Reload, Fullscreen, Close */}
         <div className="flex items-center gap-2">
-          {!selectedGame.srcDoc && (
+          {isPlayingGame && !selectedGame.srcDoc && (
             <button
               onClick={() => {
                 if (
@@ -357,25 +379,25 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
             </button>
           )}
 
-          <button
-            onClick={() => setIsCatalogDrawerOpen((prev) => !prev)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition-all text-xs font-semibold ${
-              isCatalogDrawerOpen
-                ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300'
-                : 'bg-white/5 border-white/10 text-white/80 hover:bg-white/10 hover:text-white'
-            }`}
-          >
-            <Sliders className="w-3.5 h-3.5 text-cyan-400" />
-            <span>Games ({GAMES_CATALOG.length})</span>
-          </button>
+          {isPlayingGame && (
+            <button
+              onClick={() => setIsPlayingGame(false)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-cyan-400/40 bg-cyan-500/20 text-cyan-300 text-xs font-semibold hover:bg-cyan-500/30 transition-all cursor-pointer"
+            >
+              <Gamepad2 className="w-3.5 h-3.5" />
+              <span>Browse Games</span>
+            </button>
+          )}
 
-          <button
-            onClick={handleReload}
-            className="p-2 rounded-xl bg-white/5 hover:bg-white/15 border border-white/10 text-white/70 hover:text-white transition-all"
-            title="Restart Game"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-          </button>
+          {isPlayingGame && (
+            <button
+              onClick={handleReload}
+              className="p-2 rounded-xl bg-white/5 hover:bg-white/15 border border-white/10 text-white/70 hover:text-white transition-all"
+              title="Restart Game"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+            </button>
+          )}
 
           <button
             onClick={handleToggleFullscreen}
@@ -402,100 +424,102 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
       {/* MAIN VIEWPORT BODY */}
       <div className="relative flex-1 w-full h-full bg-[#03060a] overflow-hidden">
         {/* GAME IFRAME VIEWPORT */}
-        <div className="w-full h-full flex items-center justify-center bg-black relative">
-          <iframe
-            key={`${selectedGame.id}-${gameKey}`}
-            ref={iframeRef}
-            srcDoc={selectedGame.srcDoc}
-            src={!selectedGame.srcDoc ? selectedGame.url : undefined}
-            title={selectedGame.title}
-            sandbox="allow-scripts allow-same-origin allow-forms allow-pointer-lock allow-popups"
-            allow="fullscreen; autoplay; gamepad; focus-without-user-activation *"
-            className="w-full h-full border-0 bg-black"
-            onLoad={() => {
-              setIsLoadingIframe(false);
-              setIframeError(false);
-            }}
-            onError={() => {
-              setIsLoadingIframe(false);
-              setIframeError(true);
-            }}
-          />
+        {isPlayingGame && (
+          <div className="w-full h-full flex items-center justify-center bg-black relative">
+            <iframe
+              key={`${selectedGame.id}-${gameKey}`}
+              ref={iframeRef}
+              srcDoc={selectedGame.srcDoc}
+              src={!selectedGame.srcDoc ? selectedGame.url : undefined}
+              title={selectedGame.title}
+              sandbox="allow-scripts allow-same-origin allow-forms allow-pointer-lock allow-popups"
+              allow="fullscreen; autoplay; gamepad; focus-without-user-activation *"
+              className="w-full h-full border-0 bg-black"
+              onLoad={() => {
+                setIsLoadingIframe(false);
+                setIframeError(false);
+              }}
+              onError={() => {
+                setIsLoadingIframe(false);
+                setIframeError(true);
+              }}
+            />
 
-          {/* Loading Indicator for Remote Games */}
-          {isLoadingIframe && !selectedGame.srcDoc && (
-            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/75 backdrop-blur-sm gap-3 pointer-events-none">
-              <div className="w-8 h-8 rounded-full border-2 border-purple-500 border-t-transparent animate-spin" />
-              <span className="text-xs text-white/70 font-mono">Loading {selectedGame.title}...</span>
-            </div>
-          )}
+            {/* Loading Indicator for Remote Games */}
+            {isLoadingIframe && !selectedGame.srcDoc && (
+              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/75 backdrop-blur-sm gap-3 pointer-events-none">
+                <div className="w-8 h-8 rounded-full border-2 border-purple-500 border-t-transparent animate-spin" />
+                <span className="text-xs text-white/70 font-mono">Loading {selectedGame.title}...</span>
+              </div>
+            )}
 
-          {/* Graceful Fallback Card when embedding is restricted or fails */}
-          {iframeError && !selectedGame.srcDoc && (
-            <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/90 backdrop-blur-md p-6">
-              <div className="max-w-md w-full p-6 rounded-3xl bg-slate-900 border border-purple-500/30 flex flex-col items-center text-center gap-4 shadow-2xl">
-                <div className="p-3 rounded-2xl bg-purple-500/20 text-purple-400">
-                  <AlertCircle className="w-8 h-8" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-white">
-                    {selectedGame.title} Embedding Restricted
-                  </h3>
-                  <p className="text-xs text-white/60 mt-1.5 leading-relaxed">
-                    This game server restricts third-party iframe embedding or is temporarily unreachable. You can launch it directly in the ad-shielded browser or enjoy an instant offline inbuilt title.
-                  </p>
-                </div>
-                <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full mt-2">
+            {/* Graceful Fallback Card when embedding is restricted or fails */}
+            {iframeError && !selectedGame.srcDoc && (
+              <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/90 backdrop-blur-md p-6">
+                <div className="max-w-md w-full p-6 rounded-3xl bg-slate-900 border border-purple-500/30 flex flex-col items-center text-center gap-4 shadow-2xl">
+                  <div className="p-3 rounded-2xl bg-purple-500/20 text-purple-400">
+                    <AlertCircle className="w-8 h-8" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-white">
+                      {selectedGame.title} Embedding Restricted
+                    </h3>
+                    <p className="text-xs text-white/60 mt-1.5 leading-relaxed">
+                      This game server restricts third-party iframe embedding or is temporarily unreachable. You can launch it directly in the ad-shielded browser or enjoy an instant offline inbuilt title.
+                    </p>
+                  </div>
+                  <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full mt-2">
+                    <button
+                      onClick={() => {
+                        const fallback = GAMES_CATALOG.find((g) => g.isInbuilt && g.id === 'pacman') || GAMES_CATALOG[0];
+                        setSelectedGame(fallback);
+                        setPreviewGame(fallback);
+                        setIframeError(false);
+                        setGameKey((k) => k + 1);
+                      }}
+                      className="flex-1 w-full py-2.5 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs transition-all shadow-lg shadow-purple-600/30 flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      <span>Play Inbuilt Alternative</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (
+                          typeof window !== 'undefined' &&
+                          (window as unknown as { webkit?: { messageHandlers?: { browserViewAction?: { postMessage: (msg: unknown) => void } } } }).webkit?.messageHandlers?.browserViewAction
+                        ) {
+                          (window as unknown as { webkit: { messageHandlers: { browserViewAction: { postMessage: (msg: unknown) => void } } } }).webkit.messageHandlers.browserViewAction.postMessage({
+                            action: 'open',
+                            url: selectedGame.url,
+                          });
+                          onClose();
+                        } else {
+                          window.open(selectedGame.url, '_blank');
+                        }
+                      }}
+                      className="flex-1 w-full py-2.5 px-4 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs border border-white/10 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <ExternalLink className="w-4 h-4 text-cyan-400" />
+                      <span>Launch in Web Browser</span>
+                    </button>
+                  </div>
                   <button
                     onClick={() => {
-                      const fallback = GAMES_CATALOG.find((g) => g.isInbuilt && g.id === 'pacman') || GAMES_CATALOG[0];
-                      setSelectedGame(fallback);
-                      setPreviewGame(fallback);
                       setIframeError(false);
                       setGameKey((k) => k + 1);
                     }}
-                    className="flex-1 w-full py-2.5 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs transition-all shadow-lg shadow-purple-600/30 flex items-center justify-center gap-1.5 cursor-pointer"
+                    className="text-[11px] text-white/40 hover:text-white transition-colors cursor-pointer mt-1"
                   >
-                    <Sparkles className="w-4 h-4" />
-                    <span>Play Inbuilt Alternative</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (
-                        typeof window !== 'undefined' &&
-                        (window as unknown as { webkit?: { messageHandlers?: { browserViewAction?: { postMessage: (msg: unknown) => void } } } }).webkit?.messageHandlers?.browserViewAction
-                      ) {
-                        (window as unknown as { webkit: { messageHandlers: { browserViewAction: { postMessage: (msg: unknown) => void } } } }).webkit.messageHandlers.browserViewAction.postMessage({
-                          action: 'open',
-                          url: selectedGame.url,
-                        });
-                        onClose();
-                      } else {
-                        window.open(selectedGame.url, '_blank');
-                      }
-                    }}
-                    className="flex-1 w-full py-2.5 px-4 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs border border-white/10 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    <ExternalLink className="w-4 h-4 text-cyan-400" />
-                    <span>Launch in Web Browser</span>
+                    Retry Loading
                   </button>
                 </div>
-                <button
-                  onClick={() => {
-                    setIframeError(false);
-                    setGameKey((k) => k + 1);
-                  }}
-                  className="text-[11px] text-white/40 hover:text-white transition-colors cursor-pointer mt-1"
-                >
-                  Retry Loading
-                </button>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
 
         {/* 50+ GAMES DRAWER / SELECTOR OVERLAY */}
-        {isCatalogDrawerOpen && (
+        {(!isPlayingGame || isCatalogDrawerOpen) && (
           <div className="absolute inset-0 z-30 bg-black/85 backdrop-blur-2xl flex flex-col p-4 sm:p-6 animate-fadeIn">
             {/* Drawer Header */}
             <div className="flex items-center justify-between pb-4 border-b border-white/10">
@@ -570,6 +594,7 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
                       onDoubleClick={() => {
                         setSelectedGame(game);
                         setPreviewGame(game);
+                        setIsPlayingGame(true);
                         setIsCatalogDrawerOpen(false);
                         setGameKey((k) => k + 1);
                       }}
@@ -623,6 +648,7 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
                               e.stopPropagation();
                               setSelectedGame(game);
                               setPreviewGame(game);
+                              setIsPlayingGame(true);
                               setIsCatalogDrawerOpen(false);
                               setGameKey((k) => k + 1);
                             }}
@@ -692,6 +718,7 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
                 <button
                   onClick={() => {
                     setSelectedGame(previewGame);
+                    setIsPlayingGame(true);
                     setIsCatalogDrawerOpen(false);
                     setGameKey((k) => k + 1);
                   }}

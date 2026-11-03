@@ -368,20 +368,16 @@ export function getGamePreviewSvg(gameId: string): string {
       `;
 
     case 'solitaire':
-    case 'spider-solitaire':
-    case 'freecell':
       return `
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" width="100%" height="100%">
           <rect width="320" height="180" fill="#065f46"/>
           <!-- Cards layout -->
           <g transform="translate(35, 20)">
-            <!-- Top Foundation Deck -->
             <rect x="0" y="0" width="34" height="48" rx="4" fill="#047857" stroke="#34d399" stroke-width="1.5"/>
             <rect x="42" y="0" width="34" height="48" rx="4" fill="#ffffff" stroke="#94a3b8"/>
             <text x="59" y="30" font-family="serif" font-size="18" fill="#dc2626" text-anchor="middle">♥ A</text>
             <rect x="84" y="0" width="34" height="48" rx="4" fill="#047857" stroke="#34d399" stroke-width="1.5"/>
             <rect x="126" y="0" width="34" height="48" rx="4" fill="#047857" stroke="#34d399" stroke-width="1.5"/>
-            <!-- Cascading Tableau -->
             <rect x="42" y="60" width="34" height="48" rx="4" fill="#ffffff" stroke="#cbd5e1"/>
             <text x="59" y="85" font-family="serif" font-size="16" font-weight="bold" fill="#000000" text-anchor="middle">♠ K</text>
             <rect x="84" y="60" width="34" height="48" rx="4" fill="#ffffff" stroke="#cbd5e1"/>
@@ -389,6 +385,42 @@ export function getGamePreviewSvg(gameId: string): string {
             <rect x="84" y="80" width="34" height="48" rx="4" fill="#ffffff" stroke="#cbd5e1"/>
             <text x="101" y="105" font-family="serif" font-size="16" font-weight="bold" fill="#000000" text-anchor="middle">♣ J</text>
           </g>
+          <text x="235" y="150" font-family="sans-serif" font-size="11" font-weight="bold" fill="#34d399">KLONDIKE</text>
+        </svg>
+      `;
+
+    case 'spider-solitaire':
+      return `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" width="100%" height="100%">
+          <rect width="320" height="180" fill="#1e1b4b"/>
+          <g transform="translate(30, 20)">
+            <rect x="0" y="0" width="32" height="45" rx="4" fill="#312e81" stroke="#818cf8"/>
+            <rect x="38" y="0" width="32" height="45" rx="4" fill="#312e81" stroke="#818cf8"/>
+            <rect x="76" y="0" width="32" height="45" rx="4" fill="#312e81" stroke="#818cf8"/>
+            <rect x="114" y="0" width="32" height="45" rx="4" fill="#ffffff"/>
+            <text x="130" y="28" font-family="serif" font-size="16" fill="#000" text-anchor="middle">♠ A</text>
+            <rect x="38" y="55" width="32" height="45" rx="4" fill="#ffffff"/>
+            <text x="54" y="82" font-family="serif" font-size="15" fill="#000" text-anchor="middle">♠ K</text>
+            <rect x="38" y="75" width="32" height="45" rx="4" fill="#ffffff"/>
+            <text x="54" y="102" font-family="serif" font-size="15" fill="#000" text-anchor="middle">♠ Q</text>
+          </g>
+          <text x="240" y="150" font-family="sans-serif" font-size="11" font-weight="bold" fill="#818cf8">SPIDER</text>
+        </svg>
+      `;
+
+    case 'freecell':
+      return `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" width="100%" height="100%">
+          <rect width="320" height="180" fill="#115e59"/>
+          <g transform="translate(25, 20)">
+            <rect x="0" y="0" width="30" height="42" rx="4" fill="#134e4a" stroke="#2dd4bf" stroke-dasharray="3,3"/>
+            <rect x="36" y="0" width="30" height="42" rx="4" fill="#134e4a" stroke="#2dd4bf" stroke-dasharray="3,3"/>
+            <rect x="72" y="0" width="30" height="42" rx="4" fill="#ffffff"/>
+            <text x="87" y="27" font-family="serif" font-size="15" fill="#dc2626" text-anchor="middle">♦ A</text>
+            <rect x="140" y="0" width="30" height="42" rx="4" fill="#ffffff"/>
+            <text x="155" y="27" font-family="serif" font-size="15" fill="#000" text-anchor="middle">♣ A</text>
+          </g>
+          <text x="240" y="150" font-family="sans-serif" font-size="11" font-weight="bold" fill="#2dd4bf">FREECELL</text>
         </svg>
       `;
 

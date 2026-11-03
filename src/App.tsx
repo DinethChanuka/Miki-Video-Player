@@ -20,6 +20,8 @@ import { WebEmbedPlayer } from './components/player/WebEmbedPlayer';
 import { SubtitleOverlay } from './components/player/SubtitleOverlay';
 import { ApplicationMenu } from './components/hud/ApplicationMenu';
 import { GmailSignInModal } from './components/hud/GmailSignInModal';
+import { FullWindowMusicPlayer } from './components/music/FullWindowMusicPlayer';
+import { FullWindowDashboard } from './components/dashboard/FullWindowDashboard';
 import { parseWebStream, WebPlatform } from './utils/webStreamUtils';
 import { getWebsiteFaviconUrl } from './utils/faviconService';
 import {
@@ -119,7 +121,6 @@ export const App: React.FC = () => {
     | 'youtube'
     | 'tiktok'
     | 'instagram'
-    | 'demos'
     | 'recent'
     | 'bookmarks'
     | 'cinema'
@@ -133,6 +134,8 @@ export const App: React.FC = () => {
   const [webBrowserUrl, setWebBrowserUrl] = useState('https://www.youtube.com');
   const [isGamesOpen, setIsGamesOpen] = useState(false);
   const [selectedGameId, setSelectedGameId] = useState<string | undefined>(undefined);
+  const [isMusicPlayerOpen, setIsMusicPlayerOpen] = useState(false);
+  const [isDashboardOpen, setIsDashboardOpen] = useState(false);
   const [isChannelsOpen, setIsChannelsOpen] = useState(false);
   const [isSystemAccessOpen, setIsSystemAccessOpen] = useState(false);
   const [isGmailSignInOpen, setIsGmailSignInOpen] = useState(false);
@@ -282,7 +285,7 @@ export const App: React.FC = () => {
     const handleOpenGmail = () => setIsGmailSignInOpen(true);
     const handleOpenSettings = () => setIsSettingsOpen(true);
     const handleOpenEq = () => setIsEqOpen(true);
-    const handleOpenLibrary = () => setIsFileBrowserOpen(true);
+    const handleOpenLibrary = () => setIsDashboardOpen(true);
     const handleOpenStream = (e: Event) => {
       const detail = (e as CustomEvent<{ tab?: 'youtube' | 'tiktok' | 'instagram' | 'cinema' }>).detail;
       if (detail?.tab) setFileBrowserInitialTab(detail.tab);
@@ -657,6 +660,7 @@ export const App: React.FC = () => {
               if (gameId) setSelectedGameId(gameId);
               setIsGamesOpen(true);
             }}
+            onOpenMusic={() => setIsMusicPlayerOpen(true)}
             onOpenChannels={() => setIsChannelsOpen(true)}
           />
 
@@ -680,8 +684,8 @@ export const App: React.FC = () => {
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
           <button
-            onClick={() => setIsFileBrowserOpen(true)}
-            className="text-xs text-white/80 hover:text-white px-3 py-1.5 rounded-2xl bg-white/5 hover:bg-white/15 border border-white/10 transition-colors font-medium flex items-center gap-1.5 active:scale-95"
+            onClick={() => setIsDashboardOpen(true)}
+            className="text-xs text-white/80 hover:text-white px-3 py-1.5 rounded-2xl bg-white/5 hover:bg-white/15 border border-white/10 transition-colors font-medium flex items-center gap-1.5 active:scale-95 cursor-pointer"
           >
             <FolderOpen className="w-3.5 h-3.5 text-cyan-400" />
             <span>Library</span>
@@ -974,8 +978,8 @@ export const App: React.FC = () => {
                     </button>
 
                     <button
-                      onClick={() => setIsFileBrowserOpen(true)}
-                      className="px-4 py-2.5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-semibold text-xs transition-all active:scale-95 flex items-center gap-1.5"
+                      onClick={() => setIsDashboardOpen(true)}
+                      className="px-4 py-2.5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-semibold text-xs transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer"
                     >
                       <Sparkles className="w-4 h-4 text-cyan-400" />
                       <span>Library</span>
@@ -1175,8 +1179,8 @@ export const App: React.FC = () => {
                   </button>
 
                   <button
-                    onClick={() => setIsFileBrowserOpen(true)}
-                    className="flex-1 w-full flex items-center justify-center gap-2 px-5 py-3.5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 font-bold text-xs text-white/90 hover:text-white transition-all shadow-lg active:scale-95"
+                    onClick={() => setIsDashboardOpen(true)}
+                    className="flex-1 w-full flex items-center justify-center gap-2 px-5 py-3.5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 font-bold text-xs text-white/90 hover:text-white transition-all shadow-lg active:scale-95 cursor-pointer"
                   >
                     <Sparkles className="w-4 h-4 text-cyan-400" />
                     <span>Explore Library</span>
@@ -1240,7 +1244,7 @@ export const App: React.FC = () => {
           <ControlsOverlay
             onOpenEq={() => setIsEqOpen(true)}
             onOpenSettings={() => setIsSettingsOpen(true)}
-            onOpenFileBrowser={() => setIsFileBrowserOpen(true)}
+            onOpenFileBrowser={() => setIsDashboardOpen(true)}
             containerRef={containerRef}
             isVisible={areControlsVisible}
           />
@@ -1248,6 +1252,24 @@ export const App: React.FC = () => {
       </div>
 
       {/* Modals wrapped in ErrorBoundary to guarantee uninterrupted UI */}
+      <ErrorBoundary onReset={() => setIsDashboardOpen(false)}>
+        <FullWindowDashboard
+          isOpen={isDashboardOpen}
+          onClose={() => setIsDashboardOpen(false)}
+          onOpenGames={(gameId) => {
+            if (gameId) setSelectedGameId(gameId);
+            setIsGamesOpen(true);
+          }}
+          onOpenMusic={() => setIsMusicPlayerOpen(true)}
+          onOpenWebBrowser={(url) => {
+            if (url) setWebBrowserUrl(url);
+            setIsWebBrowserOpen(true);
+          }}
+          onOpenSettings={() => setIsSettingsOpen(true)}
+          onOpenEq={() => setIsEqOpen(true)}
+        />
+      </ErrorBoundary>
+
       <ErrorBoundary onReset={() => setIsWebBrowserOpen(false)}>
         <WebBrowserModal
           isOpen={isWebBrowserOpen}
@@ -1280,6 +1302,14 @@ export const App: React.FC = () => {
           isOpen={isGamesOpen}
           initialGameId={selectedGameId}
           onClose={() => setIsGamesOpen(false)}
+        />
+      </ErrorBoundary>
+
+      <ErrorBoundary onReset={() => setIsMusicPlayerOpen(false)}>
+        <FullWindowMusicPlayer
+          isOpen={isMusicPlayerOpen}
+          onClose={() => setIsMusicPlayerOpen(false)}
+          onOpenEq={() => setIsEqOpen(true)}
         />
       </ErrorBoundary>
 

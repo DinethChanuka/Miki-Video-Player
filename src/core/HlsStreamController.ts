@@ -1,6 +1,14 @@
 import Hls from 'hls.js';
 import { diagnoseStreamFailure, type StreamDiagnosticResult } from './StreamDiagnostics.ts';
 
+export interface StreamQualityLevel {
+  id: number;
+  name: string;
+  height: number;
+  width: number;
+  bitrate: number;
+}
+
 export interface HlsStreamControllerConfig {
   maxNetworkRetries?: number;
   onFatalError?: (diagnostic: StreamDiagnosticResult) => void;
@@ -42,6 +50,35 @@ export class HlsStreamController {
 
   getHlsInstance(): Hls | null {
     return this.hls;
+  }
+
+  getQualityLevels(): StreamQualityLevel[] {
+    if (!this.hls || !this.hls.levels || this.hls.levels.length === 0) {
+      return [];
+    }
+    const levels: StreamQualityLevel[] = [
+      { id: -1, name: 'Auto', height: 0, width: 0, bitrate: 0 },
+    ];
+    this.hls.levels.forEach((lvl, idx) => {
+      const name = lvl.height ? `${lvl.height}p` : `Level ${idx + 1}`;
+      levels.push({
+        id: idx,
+        name,
+        height: lvl.height || 0,
+        width: lvl.width || 0,
+        bitrate: lvl.bitrate || 0,
+      });
+    });
+    return levels;
+  }
+
+  getCurrentQualityLevel(): number {
+    return this.hls ? this.hls.currentLevel : -1;
+  }
+
+  setQualityLevel(levelId: number): void {
+    if (!this.hls) return;
+    this.hls.currentLevel = levelId;
   }
 
   handleNetworkError(details?: string): boolean {
@@ -109,12 +146,26 @@ export class HlsStreamController {
       if (startPositionMs > 0) {
         videoEl.currentTime = startPositionMs / 1000;
       }
+      if (typeof window !== 'undefined') {
+        import('../store/playerStore')
+          .then(({ usePlayerStore }) => {
+            usePlayerStore.getState().updateStreamQualityLevels(this.getQualityLevels());
+          })
+          .catch(() => {});
+      }
       if (this.onManifestParsed) {
         this.onManifestParsed();
       }
     });
 
     this.hls.on(Hls.Events.LEVEL_SWITCHED, (_event, data) => {
+      if (typeof window !== 'undefined') {
+        import('../store/playerStore')
+          .then(({ usePlayerStore }) => {
+            usePlayerStore.setState({ currentQualityLevel: data.level });
+          })
+          .catch(() => {});
+      }
       if (this.onLevelChanged) {
         this.onLevelChanged(data.level);
       }
@@ -144,14 +195,37 @@ export class HlsStreamController {
         // Native AVPlayer Fallback for WebKit / Safari on CORS or network issues
         if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
           this.destroy();
+          const onNativeError = () => {
+            videoEl.removeEventListener('error', onNativeError);
+            const diag = diagnoseStreamFailure(
+              'Native WebKit HLS load failure: ' + (videoEl.error?.message || 'network timeout'),
+              undefined,
+              uri
+            );
+            if (this.onFatalError) this.onFatalError(diag);
+          };
+          videoEl.addEventListener('error', onNativeError, { once: true });
           videoEl.src = uri;
           videoEl.load();
-          videoEl.play().catch(() => {});
+          videoEl.play().catch((err) => {
+            if (err.name !== 'AbortError' && err.name !== 'NotAllowedError') {
+              onNativeError();
+            }
+          });
           return;
         }
 
         switch (data.type) {
           case Hls.ErrorTypes.NETWORK_ERROR:
+            if (
+              data.details === Hls.ErrorDetails.MANIFEST_LOAD_ERROR ||
+              data.details === Hls.ErrorDetails.MANIFEST_LOAD_TIMEOUT
+            ) {
+              this.destroy();
+              const diag = diagnoseStreamFailure(data.details, undefined, uri);
+              if (this.onFatalError) this.onFatalError(diag);
+              break;
+            }
             if (this.handleNetworkError(data.details)) {
               this.hls?.startLoad();
             } else {

@@ -48,3 +48,4 @@ describe('HlsStreamController & Playback Routing Audit', () => {
     assert.equal(controller.getNetworkRetryCount(), 0);
   });
 });
+

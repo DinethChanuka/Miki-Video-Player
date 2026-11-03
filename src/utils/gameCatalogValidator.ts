@@ -74,3 +74,4 @@ export function validateGamesCatalog(catalog: Partial<GameItem>[]): CatalogValid
     warnings,
   };
 }
+
