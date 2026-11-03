@@ -811,6 +811,613 @@ function getRawInbuiltGameSrcDoc(id: string): string {
 </body>
 </html>`;
 
+    case 'pacman':
+      return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin:0; background:#05070d; color:#fff; font-family:sans-serif; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; overflow:hidden; user-select:none; }
+  h2 { margin:0 0 8px; font-size:16px; color:#facc15; }
+  canvas { background:#000; border:2px solid #3b82f6; border-radius:12px; box-shadow:0 0 20px rgba(59,130,246,0.3); }
+  .hud { margin-top:8px; font-size:12px; color:#94a3b8; font-family:monospace; }
+</style>
+</head>
+<body>
+  <h2>PAC-MAN 1980 <span style="color:#38bdf8">SCORE: <span id="s">0</span> | LIVES: <span id="l">3</span></span></h2>
+  <canvas id="c" width="400" height="400"></canvas>
+  <div class="hud">Use Arrow Keys or WASD to navigate Pac-Man</div>
+<script>
+  const canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
+  const cols = 20, rows = 20, sz = 20;
+  let score = 0, lives = 3, mouth = 0.2, mouthDir = 0.03;
+  let pac = { x: 1, y: 1, dx: 1, dy: 0, nextDx: 1, nextDy: 0 };
+  let ghost = { x: 10, y: 10, dx: 1, dy: 0 };
+  let grid = [
+    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+    [1,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,1],
+    [1,0,1,1,0,1,1,1,0,1,1,0,1,1,1,0,1,1,0,1],
+    [1,0,1,1,0,1,1,1,0,1,1,0,1,1,1,0,1,1,0,1],
+    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+    [1,0,1,1,0,1,0,1,1,1,1,1,1,0,1,0,1,1,0,1],
+    [1,0,0,0,0,1,0,0,0,1,1,0,0,0,1,0,0,0,0,1],
+    [1,1,1,1,0,1,1,1,2,1,1,2,1,1,1,0,1,1,1,1],
+    [2,2,2,1,0,1,2,2,2,2,2,2,2,2,1,0,1,2,2,2],
+    [1,1,1,1,0,1,2,1,1,2,2,1,1,2,1,0,1,1,1,1],
+    [2,2,2,2,0,2,2,1,2,2,2,2,1,2,2,0,2,2,2,2],
+    [1,1,1,1,0,1,2,1,1,1,1,1,1,2,1,0,1,1,1,1],
+    [2,2,2,1,0,1,2,2,2,2,2,2,2,2,1,0,1,2,2,2],
+    [1,1,1,1,0,1,2,1,1,1,1,1,1,2,1,0,1,1,1,1],
+    [1,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,1],
+    [1,0,1,1,0,1,1,1,0,1,1,0,1,1,1,0,1,1,0,1],
+    [1,0,0,1,0,0,0,0,0,2,2,0,0,0,0,0,1,0,0,1],
+    [1,1,0,1,0,1,0,1,1,1,1,1,1,0,1,0,1,0,1,1],
+    [1,0,0,0,0,1,0,0,0,1,1,0,0,0,1,0,0,0,0,1],
+    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+  ];
+  window.addEventListener('keydown', e => {
+    if (e.code === 'ArrowUp' || e.code === 'KeyW') { pac.nextDx = 0; pac.nextDy = -1; }
+    if (e.code === 'ArrowDown' || e.code === 'KeyS') { pac.nextDx = 0; pac.nextDy = 1; }
+    if (e.code === 'ArrowLeft' || e.code === 'KeyA') { pac.nextDx = -1; pac.nextDy = 0; }
+    if (e.code === 'ArrowRight' || e.code === 'KeyD') { pac.nextDx = 1; pac.nextDy = 0; }
+  });
+  function canMove(x, y) {
+    if (x < 0 || x >= cols || y < 0 || y >= rows) return true;
+    return grid[y][x] !== 1;
+  }
+  let step = 0;
+  function update() {
+    step++;
+    if (step % 8 === 0) {
+      if (canMove(pac.x + pac.nextDx, pac.y + pac.nextDy)) {
+        pac.dx = pac.nextDx; pac.dy = pac.nextDy;
+      }
+      if (canMove(pac.x + pac.dx, pac.y + pac.dy)) {
+        pac.x += pac.dx; pac.y += pac.dy;
+        if (pac.x < 0) pac.x = cols - 1;
+        if (pac.x >= cols) pac.x = 0;
+      }
+      if (grid[pac.y] && grid[pac.y][pac.x] === 0) {
+        grid[pac.y][pac.x] = 2;
+        score += 10;
+        document.getElementById('s').innerText = score;
+      }
+      const gdirs = [{dx:1,dy:0},{dx:-1,dy:0},{dx:0,dy:1},{dx:0,dy:-1}].filter(d => canMove(ghost.x+d.dx, ghost.y+d.dy));
+      if (gdirs.length > 0) {
+        const best = gdirs.sort((a,b) => (Math.hypot(ghost.x+a.dx-pac.x, ghost.y+a.dy-pac.y) - Math.hypot(ghost.x+b.dx-pac.x, ghost.y+b.dy-pac.y)))[0];
+        ghost.x += best.dx; ghost.y += best.dy;
+      }
+      if (Math.hypot(ghost.x - pac.x, ghost.y - pac.y) < 1) {
+        lives--;
+        document.getElementById('l').innerText = lives;
+        pac.x = 1; pac.y = 1; pac.dx = 1; pac.dy = 0;
+        if (lives <= 0) { alert('Game Over! Final Score: ' + score); lives = 3; score = 0; location.reload(); }
+      }
+    }
+    mouth += mouthDir;
+    if (mouth > 0.4 || mouth < 0.05) mouthDir = -mouthDir;
+    render();
+    requestAnimationFrame(update);
+  }
+  function render() {
+    ctx.clearRect(0,0,400,400);
+    for (let r=0; r<rows; r++) {
+      for (let c=0; c<cols; c++) {
+        if (grid[r][c] === 1) {
+          ctx.fillStyle = '#1e3a8a';
+          ctx.fillRect(c*sz, r*sz, sz, sz);
+        } else if (grid[r][c] === 0) {
+          ctx.fillStyle = '#fde047';
+          ctx.beginPath(); ctx.arc(c*sz+sz/2, r*sz+sz/2, 2.5, 0, Math.PI*2); ctx.fill();
+        }
+      }
+    }
+    const angle = pac.dx === 1 ? 0 : pac.dx === -1 ? Math.PI : pac.dy === 1 ? Math.PI/2 : -Math.PI/2;
+    ctx.fillStyle = '#facc15';
+    ctx.beginPath();
+    ctx.arc(pac.x*sz+sz/2, pac.y*sz+sz/2, sz/2 - 1, angle + mouth * Math.PI, angle + (2 - mouth) * Math.PI);
+    ctx.lineTo(pac.x*sz+sz/2, pac.y*sz+sz/2);
+    ctx.fill();
+    ctx.fillStyle = '#ef4444';
+    ctx.beginPath();
+    ctx.arc(ghost.x*sz+sz/2, ghost.y*sz+sz/2 - 2, sz/2 - 2, Math.PI, 0, false);
+    ctx.lineTo(ghost.x*sz+sz - 2, ghost.y*sz+sz - 2);
+    ctx.lineTo(ghost.x*sz+2, ghost.y*sz+sz - 2);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(ghost.x*sz+4, ghost.y*sz+4, 4, 4);
+    ctx.fillRect(ghost.x*sz+12, ghost.y*sz+4, 4, 4);
+  }
+  update();
+</script>
+</body>
+</html>`;
+
+    case 'space-invaders':
+      return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin:0; background:#020617; color:#fff; font-family:sans-serif; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; overflow:hidden; user-select:none; }
+  h2 { margin:0 0 8px; font-size:16px; color:#22c55e; }
+  canvas { background:#000; border:2px solid #22c55e; border-radius:12px; box-shadow:0 0 20px rgba(34,197,94,0.3); }
+  .hud { margin-top:8px; font-size:12px; color:#94a3b8; font-family:monospace; }
+</style>
+</head>
+<body>
+  <h2>SPACE INVADERS 1978 <span style="color:#38bdf8">SCORE: <span id="s">0</span> | LEVEL: <span id="lvl">1</span></span></h2>
+  <canvas id="c" width="400" height="420"></canvas>
+  <div class="hud">Left / Right Arrow to steer | Spacebar to shoot lasers</div>
+<script>
+  const canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
+  let player = { x: 180, y: 390, w: 28, h: 14, speed: 4 };
+  let lasers = [], invaders = [], invaderSpeed = 1, invaderDir = 1, score = 0, level = 1;
+  let keys = {};
+  window.addEventListener('keydown', e => { keys[e.code] = true; if (e.code === 'Space') shoot(); });
+  window.addEventListener('keyup', e => { keys[e.code] = false; });
+  function shoot() {
+    if (lasers.length < 4) { lasers.push({ x: player.x + player.w/2 - 2, y: player.y - 6, w: 4, h: 10 }); }
+  }
+  function spawnInvaders() {
+    invaders = [];
+    for (let r=0; r<4; r++) {
+      for (let c=0; c<8; c++) {
+        invaders.push({ x: 40 + c*40, y: 40 + r*30, w: 24, h: 18, color: r===0?'#ef4444':r===1?'#eab308':'#22c55e' });
+      }
+    }
+  }
+  spawnInvaders();
+  function update() {
+    if (keys['ArrowLeft'] || keys['KeyA']) player.x = Math.max(10, player.x - player.speed);
+    if (keys['ArrowRight'] || keys['KeyD']) player.x = Math.min(canvas.width - player.w - 10, player.x + player.speed);
+    for (let i = lasers.length - 1; i >= 0; i--) {
+      lasers[i].y -= 7;
+      if (lasers[i].y < 0) { lasers.splice(i, 1); continue; }
+      for (let j = invaders.length - 1; j >= 0; j--) {
+        const inv = invaders[j], l = lasers[i];
+        if (l && l.x > inv.x && l.x < inv.x + inv.w && l.y > inv.y && l.y < inv.y + inv.h) {
+          invaders.splice(j, 1);
+          lasers.splice(i, 1);
+          score += 20;
+          document.getElementById('s').innerText = score;
+          break;
+        }
+      }
+    }
+    let hitEdge = false;
+    for (const inv of invaders) {
+      inv.x += invaderSpeed * invaderDir;
+      if (inv.x <= 10 || inv.x + inv.w >= canvas.width - 10) hitEdge = true;
+    }
+    if (hitEdge) {
+      invaderDir = -invaderDir;
+      for (const inv of invaders) {
+        inv.y += 12;
+        if (inv.y + inv.h >= player.y) {
+          alert('Earth has fallen! Score: ' + score);
+          score = 0; level = 1; spawnInvaders(); return;
+        }
+      }
+    }
+    if (invaders.length === 0) {
+      level++;
+      document.getElementById('lvl').innerText = level;
+      invaderSpeed += 0.4;
+      spawnInvaders();
+    }
+    render();
+    requestAnimationFrame(update);
+  }
+  function render() {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle = '#38bdf8';
+    ctx.fillRect(player.x, player.y + 4, player.w, player.h - 4);
+    ctx.fillRect(player.x + player.w/2 - 3, player.y, 6, 6);
+    ctx.fillStyle = '#fde047';
+    for (const l of lasers) ctx.fillRect(l.x, l.y, l.w, l.h);
+    for (const inv of invaders) {
+      ctx.fillStyle = inv.color;
+      ctx.fillRect(inv.x+2, inv.y, inv.w-4, inv.h-4);
+      ctx.fillRect(inv.x, inv.y+4, inv.w-8, inv.h-8);
+      ctx.fillStyle = '#000';
+      ctx.fillRect(inv.x+4, inv.y+4, 4, 4);
+      ctx.fillRect(inv.x+inv.w-8, inv.y+4, 4, 4);
+    }
+  }
+  update();
+</script>
+</body>
+</html>`;
+
+    case 'solitaire':
+      return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin:0; background:#064e3b; color:#fff; font-family:sans-serif; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; overflow:hidden; user-select:none; }
+  h2 { margin:0 0 8px; font-size:16px; color:#fde047; }
+  canvas { background:#047857; border:3px solid #065f46; border-radius:12px; box-shadow:0 0 25px rgba(0,0,0,0.5); cursor:pointer; }
+  .hud { margin-top:8px; font-size:12px; color:#a7f3d0; font-family:monospace; }
+</style>
+</head>
+<body>
+  <h2>KLONDIKE SOLITAIRE <span style="color:#fde047">MOVES: <span id="m">0</span> | SCORE: <span id="s">100</span></span></h2>
+  <canvas id="c" width="460" height="380"></canvas>
+  <div class="hud">Click Stockpile to deal | Click cards to auto-play to Foundations</div>
+<script>
+  const canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
+  let moves = 0, score = 100;
+  const suits = ['♠','♥','♦','♣'];
+  const values = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+  let deck = [];
+  for (let s of suits) for (let v of values) deck.push({ suit: s, val: v, red: (s==='♥'||s==='♦') });
+  deck.sort(() => Math.random() - 0.5);
+  let piles = Array(7).fill(0).map((_, i) => deck.splice(0, i + 1));
+  let stock = deck, waste = [], foundations = [[],[],[],[]];
+  
+  canvas.addEventListener('click', e => {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left, y = e.clientY - rect.top;
+    moves++; document.getElementById('m').innerText = moves;
+    if (x >= 20 && x <= 65 && y >= 20 && y <= 85) {
+      if (stock.length > 0) waste.push(stock.pop());
+      else { stock = waste.reverse(); waste = []; }
+      render(); return;
+    }
+    for (let c=0; c<7; c++) {
+      const colX = 20 + c * 62;
+      if (x >= colX && x <= colX + 45 && piles[c].length > 0) {
+        const card = piles[c][piles[c].length - 1];
+        for (let f=0; f<4; f++) {
+          if (foundations[f].length === 0 && card.val === 'A') {
+            foundations[f].push(piles[c].pop()); score += 15;
+            document.getElementById('s').innerText = score;
+            render(); return;
+          }
+        }
+      }
+    }
+    render();
+  });
+
+  function render() {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle = stock.length > 0 ? '#1e40af' : '#065f46';
+    ctx.fillRect(20, 20, 45, 65);
+    ctx.strokeStyle = '#fff'; ctx.strokeRect(20, 20, 45, 65);
+    if (waste.length > 0) {
+      drawCard(waste[waste.length-1], 80, 20);
+    }
+    for (let i=0; i<4; i++) {
+      ctx.strokeStyle = '#10b981'; ctx.strokeRect(200 + i*65, 20, 45, 65);
+      if (foundations[i].length > 0) {
+        drawCard(foundations[i][foundations[i].length-1], 200 + i*65, 20);
+      }
+    }
+    for (let c=0; c<7; c++) {
+      const colX = 20 + c*62;
+      ctx.strokeStyle = '#065f46'; ctx.strokeRect(colX, 110, 45, 65);
+      piles[c].forEach((card, idx) => {
+        drawCard(card, colX, 110 + idx*20);
+      });
+    }
+  }
+  function drawCard(c, x, y) {
+    ctx.fillStyle = '#fff'; ctx.fillRect(x, y, 45, 65);
+    ctx.strokeStyle = '#333'; ctx.strokeRect(x, y, 45, 65);
+    ctx.fillStyle = c.red ? '#dc2626' : '#000';
+    ctx.font = 'bold 12px sans-serif';
+    ctx.fillText(c.val + c.suit, x+4, y+16);
+  }
+  render();
+</script>
+</body>
+</html>`;
+
+    case 'sudoku':
+      return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin:0; background:#0f172a; color:#fff; font-family:sans-serif; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; overflow:hidden; user-select:none; }
+  h2 { margin:0 0 8px; font-size:16px; color:#38bdf8; }
+  canvas { background:#fff; border:3px solid #0284c7; border-radius:12px; box-shadow:0 0 20px rgba(56,189,248,0.25); cursor:pointer; }
+  .hud { margin-top:8px; font-size:12px; color:#94a3b8; font-family:monospace; }
+</style>
+</head>
+<body>
+  <h2>SUDOKU PUZZLE <span style="color:#fde047">CLICK CELL & PRESS 1-9</span></h2>
+  <canvas id="c" width="360" height="360"></canvas>
+  <div class="hud">Use number keys (1-9) or Backspace to solve</div>
+<script>
+  const canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
+  let selected = { r: 0, c: 0 };
+  let initial = [
+    [5,3,0,0,7,0,0,0,0],
+    [6,0,0,1,9,5,0,0,0],
+    [0,9,8,0,0,0,0,6,0],
+    [8,0,0,0,6,0,0,0,3],
+    [4,0,0,8,0,3,0,0,1],
+    [7,0,0,0,2,0,0,0,6],
+    [0,6,0,0,0,0,2,8,0],
+    [0,0,0,4,1,9,0,0,5],
+    [0,0,0,0,8,0,0,7,9]
+  ];
+  let board = initial.map(r => [...r]);
+  canvas.addEventListener('click', e => {
+    const rect = canvas.getBoundingClientRect();
+    selected.c = Math.floor((e.clientX - rect.left) / 40);
+    selected.r = Math.floor((e.clientY - rect.top) / 40);
+    render();
+  });
+  window.addEventListener('keydown', e => {
+    const num = parseInt(e.key);
+    if (initial[selected.r][selected.c] === 0) {
+      if (num >= 1 && num <= 9) board[selected.r][selected.c] = num;
+      if (e.code === 'Backspace' || e.code === 'Delete' || e.key === '0') board[selected.r][selected.c] = 0;
+      render();
+    }
+  });
+  function render() {
+    ctx.clearRect(0,0,360,360);
+    ctx.fillStyle = '#bae6fd';
+    ctx.fillRect(selected.c*40, selected.r*40, 40, 40);
+    for (let i=0; i<=9; i++) {
+      ctx.beginPath();
+      ctx.lineWidth = i%3===0 ? 3 : 1;
+      ctx.strokeStyle = i%3===0 ? '#0f172a' : '#cbd5e1';
+      ctx.moveTo(i*40, 0); ctx.lineTo(i*40, 360);
+      ctx.moveTo(0, i*40); ctx.lineTo(360, i*40);
+      ctx.stroke();
+    }
+    ctx.font = 'bold 20px sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (let r=0; r<9; r++) {
+      for (let c=0; c<9; c++) {
+        const val = board[r][c];
+        if (val !== 0) {
+          ctx.fillStyle = initial[r][c] !== 0 ? '#0f172a' : '#0284c7';
+          ctx.fillText(val, c*40+20, r*40+20);
+        }
+      }
+    }
+  }
+  render();
+</script>
+</body>
+</html>`;
+
+    case 'simon-says':
+      return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin:0; background:#09090b; color:#fff; font-family:sans-serif; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; overflow:hidden; user-select:none; }
+  h2 { margin:0 0 8px; font-size:16px; color:#ec4899; }
+  canvas { border-radius:50%; box-shadow:0 0 30px rgba(236,72,153,0.3); cursor:pointer; }
+  .hud { margin-top:8px; font-size:12px; color:#94a3b8; font-family:monospace; }
+</style>
+</head>
+<body>
+  <h2>SIMON SAYS <span style="color:#38bdf8">ROUND: <span id="rnd">1</span></span></h2>
+  <canvas id="c" width="340" height="340"></canvas>
+  <div class="hud">Repeat the audio-visual color sequence!</div>
+<script>
+  const canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
+  const colors = ['#22c55e', '#ef4444', '#eab308', '#3b82f6'];
+  const bright = ['#86efac', '#fca5a5', '#fef08a', '#93c5fd'];
+  let sequence = [Math.floor(Math.random()*4)], playerStep = 0, active = -1;
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  function beep(freq) {
+    try {
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.frequency.value = freq; g.gain.setValueAtTime(0.1, audioCtx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+      o.connect(g); g.connect(audioCtx.destination);
+      o.start(); o.stop(audioCtx.currentTime + 0.3);
+    } catch(e) {}
+  }
+  function playSequence() {
+    let i = 0;
+    const timer = setInterval(() => {
+      active = sequence[i];
+      beep([300, 400, 500, 600][active]);
+      render();
+      setTimeout(() => { active = -1; render(); }, 350);
+      i++;
+      if (i >= sequence.length) clearInterval(timer);
+    }, 650);
+  }
+  setTimeout(playSequence, 500);
+  canvas.addEventListener('click', e => {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left - 170, y = e.clientY - rect.top - 170;
+    let clicked = -1;
+    if (x < 0 && y < 0) clicked = 0;
+    if (x >= 0 && y < 0) clicked = 1;
+    if (x < 0 && y >= 0) clicked = 2;
+    if (x >= 0 && y >= 0) clicked = 3;
+    if (clicked === sequence[playerStep]) {
+      beep([300, 400, 500, 600][clicked]);
+      playerStep++;
+      if (playerStep >= sequence.length) {
+        sequence.push(Math.floor(Math.random()*4));
+        playerStep = 0;
+        document.getElementById('rnd').innerText = sequence.length;
+        setTimeout(playSequence, 800);
+      }
+    } else {
+      beep(150);
+      alert('Wrong sequence! Replaying...');
+      playerStep = 0; playSequence();
+    }
+  });
+  function render() {
+    ctx.clearRect(0,0,340,340);
+    const rad = 160;
+    const quadrants = [
+      { start: Math.PI, end: Math.PI*1.5, c: active===0?bright[0]:colors[0] },
+      { start: Math.PI*1.5, end: Math.PI*2, c: active===1?bright[1]:colors[1] },
+      { start: Math.PI*0.5, end: Math.PI, c: active===2?bright[2]:colors[2] },
+      { start: 0, end: Math.PI*0.5, c: active===3?bright[3]:colors[3] }
+    ];
+    for (let q of quadrants) {
+      ctx.beginPath(); ctx.moveTo(170, 170); ctx.arc(170, 170, rad, q.start, q.end);
+      ctx.closePath(); ctx.fillStyle = q.c; ctx.fill();
+    }
+    ctx.beginPath(); ctx.arc(170, 170, 55, 0, Math.PI*2); ctx.fillStyle = '#09090b'; ctx.fill();
+  }
+  render();
+</script>
+</body>
+</html>`;
+
+    case 'space-defender':
+      return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin:0; background:#020617; color:#fff; font-family:sans-serif; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; overflow:hidden; user-select:none; }
+  h2 { margin:0 0 8px; font-size:16px; color:#38bdf8; }
+  canvas { background:#030712; border:2px solid #0284c7; border-radius:12px; box-shadow:0 0 25px rgba(2,132,199,0.3); }
+  .hud { margin-top:8px; font-size:12px; color:#94a3b8; font-family:monospace; }
+</style>
+</head>
+<body>
+  <h2>SPACE DEFENDER <span style="color:#fde047">SCORE: <span id="s">0</span> | HULL: <span id="h">100</span>%</span></h2>
+  <canvas id="c" width="460" height="340"></canvas>
+  <div class="hud">W/S or Up/Down to fly | Spacebar to shoot lasers</div>
+<script>
+  const canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
+  let ship = { x: 30, y: 150, vy: 0, speed: 4 };
+  let lasers = [], enemies = [], stars = [], score = 0, hull = 100;
+  for (let i=0; i<40; i++) stars.push({ x: Math.random()*460, y: Math.random()*340, speed: 1 + Math.random()*3 });
+  let keys = {};
+  window.addEventListener('keydown', e => { keys[e.code] = true; if (e.code === 'Space') lasers.push({ x: ship.x + 24, y: ship.y + 8, w: 10, h: 4 }); });
+  window.addEventListener('keyup', e => { keys[e.code] = false; });
+  function update() {
+    if (keys['ArrowUp'] || keys['KeyW']) ship.y = Math.max(10, ship.y - ship.speed);
+    if (keys['ArrowDown'] || keys['KeyS']) ship.y = Math.min(canvas.height - 30, ship.y + ship.speed);
+    for (let st of stars) { st.x -= st.speed; if (st.x < 0) st.x = 460; }
+    if (Math.random() < 0.03) enemies.push({ x: 460, y: Math.random()*300, w: 20, h: 20, speed: 2.5 + Math.random()*2 });
+    for (let i = lasers.length - 1; i >= 0; i--) {
+      lasers[i].x += 8;
+      if (lasers[i].x > 460) { lasers.splice(i, 1); continue; }
+      for (let j = enemies.length - 1; j >= 0; j--) {
+        const en = enemies[j], l = lasers[i];
+        if (l && l.x > en.x && l.x < en.x + en.w && l.y > en.y && l.y < en.y + en.h) {
+          enemies.splice(j, 1); lasers.splice(i, 1);
+          score += 50; document.getElementById('s').innerText = score;
+          break;
+        }
+      }
+    }
+    for (let i = enemies.length - 1; i >= 0; i--) {
+      enemies[i].x -= enemies[i].speed;
+      if (enemies[i].x < -20) { enemies.splice(i, 1); continue; }
+      if (Math.hypot(enemies[i].x - ship.x, enemies[i].y - ship.y) < 22) {
+        enemies.splice(i, 1); hull -= 20;
+        document.getElementById('h').innerText = hull;
+        if (hull <= 0) { alert('Ship Destroyed! Score: ' + score); score = 0; hull = 100; ship.y = 150; }
+      }
+    }
+    render();
+    requestAnimationFrame(update);
+  }
+  function render() {
+    ctx.clearRect(0,0,460,340);
+    ctx.fillStyle = '#fff';
+    for (let st of stars) ctx.fillRect(st.x, st.y, st.speed>2?2:1, st.speed>2?2:1);
+    ctx.fillStyle = '#38bdf8';
+    ctx.beginPath(); ctx.moveTo(ship.x, ship.y); ctx.lineTo(ship.x+24, ship.y+10); ctx.lineTo(ship.x, ship.y+20); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#fde047';
+    for (const l of lasers) ctx.fillRect(l.x, l.y, l.w, l.h);
+    ctx.fillStyle = '#ef4444';
+    for (const en of enemies) {
+      ctx.fillRect(en.x, en.y+4, en.w, en.h-8);
+      ctx.fillRect(en.x+4, en.y, en.w-8, en.h);
+    }
+  }
+  update();
+</script>
+</body>
+</html>`;
+
+    case 'whack-a-mole':
+      return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin:0; background:#1c1917; color:#fff; font-family:sans-serif; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; overflow:hidden; user-select:none; }
+  h2 { margin:0 0 8px; font-size:16px; color:#f97316; }
+  canvas { background:#451a03; border:3px solid #78350f; border-radius:16px; box-shadow:0 0 25px rgba(249,115,22,0.25); cursor:crosshair; }
+  .hud { margin-top:8px; font-size:12px; color:#d6d3d1; font-family:monospace; }
+</style>
+</head>
+<body>
+  <h2>WHACK-A-MOLE <span style="color:#fde047">WHACKS: <span id="s">0</span> | TIME: <span id="t">30</span>s</span></h2>
+  <canvas id="c" width="360" height="360"></canvas>
+  <div class="hud">Click the popping moles before they burrow down!</div>
+<script>
+  const canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
+  let score = 0, timeLeft = 30, activeHole = -1;
+  const holes = [
+    {x:60,y:60},{x:180,y:60},{x:300,y:60},
+    {x:60,y:180},{x:180,y:180},{x:300,y:180},
+    {x:60,y:300},{x:180,y:300},{x:300,y:300}
+  ];
+  setInterval(() => {
+    activeHole = Math.floor(Math.random() * 9);
+    render();
+  }, 750);
+  setInterval(() => {
+    if (timeLeft > 0) {
+      timeLeft--;
+      document.getElementById('t').innerText = timeLeft;
+      if (timeLeft === 0) alert('Time Up! Total Whacks: ' + score);
+    }
+  }, 1000);
+  canvas.addEventListener('click', e => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    if (activeHole >= 0) {
+      const h = holes[activeHole];
+      if (Math.hypot(mx - h.x, my - h.y) < 35) {
+        score++;
+        document.getElementById('s').innerText = score;
+        activeHole = -1;
+        render();
+      }
+    }
+  });
+  function render() {
+    ctx.clearRect(0,0,360,360);
+    for (let i=0; i<9; i++) {
+      const h = holes[i];
+      ctx.fillStyle = '#1c1917';
+      ctx.beginPath(); ctx.ellipse(h.x, h.y+10, 36, 18, 0, 0, Math.PI*2); ctx.fill();
+      if (activeHole === i) {
+        ctx.fillStyle = '#b45309';
+        ctx.beginPath(); ctx.arc(h.x, h.y-10, 24, Math.PI, 0, false); ctx.fill();
+        ctx.fillStyle = '#000';
+        ctx.beginPath(); ctx.arc(h.x-8, h.y-14, 3, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(h.x+8, h.y-14, 3, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#f43f5e';
+        ctx.beginPath(); ctx.arc(h.x, h.y-8, 4, 0, Math.PI*2); ctx.fill();
+      }
+    }
+  }
+  render();
+</script>
+</body>
+</html>`;
+
     default:
       return '';
   }
