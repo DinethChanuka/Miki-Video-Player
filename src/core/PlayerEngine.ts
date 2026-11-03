@@ -517,10 +517,10 @@ export class WebMediaEngine implements IPlayerEngine {
               .catch(() => {});
           }
           this.emitError({
-            code: data.type === Hls.ErrorTypes.NETWORK_ERROR ? 'STREAM_TIMEOUT' : 'CODEC_UNSUPPORTED',
+            code: 'CODEC_UNSUPPORTED',
             message: `HLS stream error: ${data.details}`,
             severity: 'recoverable',
-            recovery: data.type === Hls.ErrorTypes.NETWORK_ERROR ? 'retry_with_backoff' : 'none',
+            recovery: 'retry_with_backoff',
             timestampMs: Date.now(),
           });
         }
