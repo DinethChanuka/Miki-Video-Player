@@ -98,6 +98,11 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
 
       if (trackedKeys.includes(key)) {
         setActiveKeys((prev) => ({ ...prev, [key]: true }));
+        // Forward key event to game iframe
+        iframeRef.current?.contentWindow?.postMessage(
+          { type: 'miki:game-input', action: 'down', key: e.key, code: e.code },
+          '*'
+        );
         // Stop propagation so media player doesn't seek or pause
         e.stopPropagation();
       }
@@ -110,10 +115,32 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
       if (!isOpen) return;
       const key = e.code;
       setActiveKeys((prev) => ({ ...prev, [key]: false }));
+      iframeRef.current?.contentWindow?.postMessage(
+        { type: 'miki:game-input', action: 'up', key: e.key, code: e.code },
+        '*'
+      );
       e.stopPropagation();
     },
     [isOpen]
   );
+
+  // Auto-focus game iframe on mount and game switch
+  useEffect(() => {
+    if (isOpen && iframeRef.current) {
+      iframeRef.current?.focus();
+    }
+  }, [isOpen, selectedGame.id, gameKey]);
+
+  // Synchronize bi-directional key activity reported from inside game iframe
+  useEffect(() => {
+    const handleMessage = (e: MessageEvent) => {
+      if (e.data?.type === 'miki:key-activity') {
+        setActiveKeys((prev) => ({ ...prev, [e.data.code]: Boolean(e.data.isDown) }));
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
 
   const handleMouseMove = useCallback(() => {
     if (!isOpen) return;

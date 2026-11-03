@@ -82,6 +82,8 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
   onOpenEq,
 }) => {
   const [currentUrl, setCurrentUrl] = useState<string>(initialUrl);
+  const [isQuickUrlOpen, setIsQuickUrlOpen] = useState<boolean>(false);
+  const [quickUrlInput, setQuickUrlInput] = useState<string>('');
   const [isAdShieldActive, setIsAdShieldActive] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [blockedCount, setBlockedCount] = useState<number>(18);
@@ -210,6 +212,74 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
       iframeRef.current.src = resolveBrowserFrameUrl(currentUrl);
     }
   };
+
+  const handleGoBack = () => {
+    const handlers = getWebkitHandlers();
+    if (handlers?.browserViewAction) {
+      handlers.browserViewAction.postMessage({ action: 'goBack' });
+    } else if (iframeRef.current?.contentWindow) {
+      try {
+        iframeRef.current.contentWindow.history.back();
+      } catch {}
+    }
+  };
+
+  const handleGoForward = () => {
+    const handlers = getWebkitHandlers();
+    if (handlers?.browserViewAction) {
+      handlers.browserViewAction.postMessage({ action: 'goForward' });
+    } else if (iframeRef.current?.contentWindow) {
+      try {
+        iframeRef.current.contentWindow.history.forward();
+      } catch {}
+    }
+  };
+
+  // Keyboard navigation shortcuts: <Esc>, <Cmd/Ctrl+R>, <Cmd/Ctrl+L>, <Alt+Arrows>
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (isQuickUrlOpen) {
+          setIsQuickUrlOpen(false);
+        } else {
+          handleClose();
+        }
+        e.preventDefault();
+        return;
+      }
+
+      const isCmdOrCtrl = e.metaKey || e.ctrlKey;
+
+      if ((isCmdOrCtrl && e.code === 'KeyR') || e.key === 'F5') {
+        handleReload();
+        e.preventDefault();
+        return;
+      }
+
+      if (isCmdOrCtrl && e.code === 'KeyL') {
+        setQuickUrlInput(currentUrl);
+        setIsQuickUrlOpen((prev) => !prev);
+        e.preventDefault();
+        return;
+      }
+
+      if (e.altKey && e.code === 'ArrowLeft') {
+        handleGoBack();
+        e.preventDefault();
+        return;
+      }
+
+      if (e.altKey && e.code === 'ArrowRight') {
+        handleGoForward();
+        e.preventDefault();
+        return;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, isQuickUrlOpen, currentUrl]);
 
   const handleToggleShield = () => {
     const nextState = !isAdShieldActive;
@@ -443,6 +513,42 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Quick Keyboard URL Input Popover Bar (<Cmd/Ctrl+L>) */}
+      {isQuickUrlOpen && (
+        <div className="absolute top-12 left-4 right-4 max-w-xl mx-auto z-40 bg-slate-900/95 border border-cyan-500/40 rounded-2xl p-2.5 shadow-2xl backdrop-blur-2xl flex items-center gap-2 animate-in fade-in zoom-in-95 duration-100">
+          <Globe className="w-4 h-4 text-cyan-400 shrink-0 ml-1.5" />
+          <input
+            type="text"
+            autoFocus
+            value={quickUrlInput}
+            onChange={(e) => setQuickUrlInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                let dest = quickUrlInput.trim();
+                if (dest && !dest.startsWith('http://') && !dest.startsWith('https://')) {
+                  dest = 'https://' + dest;
+                }
+                setCurrentUrl(dest);
+                setIsLoading(true);
+                setIsQuickUrlOpen(false);
+                const handlers = getWebkitHandlers();
+                if (handlers?.browserViewAction) {
+                  handlers.browserViewAction.postMessage({ action: 'navigate', url: dest });
+                }
+              }
+            }}
+            placeholder="Enter website URL (e.g. cinesubz.co, youtube.com) and press Enter..."
+            className="flex-1 bg-transparent border-0 text-xs text-white placeholder-white/40 focus:outline-none"
+          />
+          <button
+            onClick={() => setIsQuickUrlOpen(false)}
+            className="px-2 py-0.5 rounded-lg text-white/50 hover:text-white hover:bg-white/10 text-xs font-mono"
+          >
+            Esc
+          </button>
+        </div>
+      )}
 
       {/* Main Full-Window Viewport: Loading Indicator + Edge-to-Edge Website Frame */}
       <div className="relative flex-1 w-full h-full bg-transparent overflow-hidden flex flex-col items-center justify-center">

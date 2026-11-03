@@ -4,7 +4,48 @@
  * Includes Web Audio API retro sound synthesis and full responsive canvas.
  */
 
+const UNIVERSAL_INPUT_BRIDGE_SCRIPT = `
+<script>
+(function() {
+  window.addEventListener('message', function(ev) {
+    if (ev.data && ev.data.type === 'miki:game-input') {
+      try {
+        var synthetic = new KeyboardEvent(ev.data.action === 'down' ? 'keydown' : 'keyup', {
+          key: ev.data.key,
+          code: ev.data.code,
+          bubbles: true,
+          cancelable: true
+        });
+        window.dispatchEvent(synthetic);
+      } catch(err) {}
+    }
+  });
+
+  window.addEventListener('keydown', function(e) {
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code)) {
+      e.preventDefault();
+    }
+    try {
+      window.parent.postMessage({ type: 'miki:key-activity', code: e.code, isDown: true }, '*');
+    } catch(err) {}
+  }, true);
+
+  window.addEventListener('keyup', function(e) {
+    try {
+      window.parent.postMessage({ type: 'miki:key-activity', code: e.code, isDown: false }, '*');
+    } catch(err) {}
+  }, true);
+})();
+</script>
+`;
+
 export function getInbuiltGameSrcDoc(id: string): string {
+  const rawDoc = getRawInbuiltGameSrcDoc(id);
+  if (!rawDoc) return '';
+  return rawDoc.replace('</body>', `${UNIVERSAL_INPUT_BRIDGE_SCRIPT}</body>`);
+}
+
+function getRawInbuiltGameSrcDoc(id: string): string {
   switch (id) {
     case '2048':
       return `<!DOCTYPE html>
