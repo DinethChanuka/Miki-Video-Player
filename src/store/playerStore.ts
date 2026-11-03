@@ -937,7 +937,10 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
           }
           const uri = get().currentUri;
           if (uri && !/(?:youtube\.com|youtu\.be)/.test(uri)) {
-            get().engine?.load(uri, get().positionMs);
+            // Only retry engine.load on local files or direct media files; avoid retrying web pages or cinema embeds
+            if (isDirectMediaUrl(uri) || (!uri.startsWith('http://') && !uri.startsWith('https://'))) {
+              get().engine?.load(uri, get().positionMs);
+            }
           }
         }, delayMs);
       } else if (error.recovery === 'reset_audio_filters') {
