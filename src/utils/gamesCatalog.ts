@@ -5,8 +5,10 @@
  */
 
 import { getInbuiltGameSrcDoc } from './inbuiltGames.ts';
+import { getGameThumbnailUrl } from './gameThumbnails.ts';
 
 export { getInbuiltGameSrcDoc } from './inbuiltGames.ts';
+export { getGameThumbnailUrl, getGamePreviewSvg } from './gameThumbnails.ts';
 
 export type GameCategory =
   | 'Arcade'
@@ -31,7 +33,7 @@ export interface GameItem {
   isInbuilt?: boolean;
 }
 
-export const GAMES_CATALOG: GameItem[] = [
+const RAW_GAMES_CATALOG: GameItem[] = [
   // --- INBUILT ZERO-LATENCY CANVAS GAMES ---
   {
     id: '2048',
@@ -610,3 +612,8 @@ export const GAMES_CATALOG: GameItem[] = [
     controlsHint: 'Click square & type letters with keyboard',
   },
 ];
+
+export const GAMES_CATALOG: GameItem[] = RAW_GAMES_CATALOG.map((g) => ({
+  ...g,
+  thumbnail: getGameThumbnailUrl(g.id),
+}));

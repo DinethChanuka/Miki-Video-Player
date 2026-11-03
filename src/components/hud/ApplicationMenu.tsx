@@ -36,7 +36,7 @@ export const ApplicationMenu: React.FC<ApplicationMenuProps> = ({
   onOpenEq,
   onOpenLocalFile,
   onOpenSystemAccess,
-  onOpenGames,
+  onOpenGames: _onOpenGames,
   onOpenMusic,
   onOpenChannels,
 }) => {
@@ -251,11 +251,7 @@ export const ApplicationMenu: React.FC<ApplicationMenuProps> = ({
             <button
               onClick={() => {
                 setIsOpen(false);
-                if (onOpenGames) {
-                  onOpenGames();
-                } else {
-                  onOpenLibrary('games');
-                }
+                onOpenLibrary('games');
               }}
               className="flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/15 text-xs font-medium text-white transition-all text-left"
             >

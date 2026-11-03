@@ -62,8 +62,8 @@ describe('Normal User Journey End-to-End Simulation Audit', () => {
   it('Simulation 4: User launches Games -> opens full window arcade with responsive keyboard HUD', () => {
     assert.match(
       fileBrowserModalCode,
-      /initialTab\s*===\s*['"]games['"][\s\S]*?onOpenGames/,
-      'Games tab navigation must open full window modal'
+      /initialTab\s*===\s*['"]games['"][\s\S]*?setActiveTab\(['"]games['"]\)/,
+      'Games tab navigation must activate games gallery'
     );
     assert.match(
       fullWindowGamesCode,

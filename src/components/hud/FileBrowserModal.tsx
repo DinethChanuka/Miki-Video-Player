@@ -264,12 +264,7 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({
       } else if (initialTab === 'bookmarks') {
         setActiveTab('saved');
       } else if (initialTab === 'games') {
-        if (onOpenGames) {
-          onClose();
-          onOpenGames();
-        } else {
-          setActiveTab('games');
-        }
+        setActiveTab('games');
       } else {
         setActiveTab(initialTab);
       }
@@ -503,14 +498,7 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({
           </button>
 
           <button
-            onClick={() => {
-              if (onOpenGames) {
-                onClose();
-                onOpenGames();
-              } else {
-                setActiveTab('games');
-              }
-            }}
+            onClick={() => setActiveTab('games')}
             className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-2xl text-xs font-semibold transition-all whitespace-nowrap ${
               activeTab === 'games'
                 ? 'bg-purple-500/20 text-purple-300 border border-purple-400/30 shadow-sm'

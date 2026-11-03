@@ -138,7 +138,7 @@ export const App: React.FC = () => {
   const [isGmailSignInOpen, setIsGmailSignInOpen] = useState(false);
   const [pendingResumeItem, setPendingResumeItem] = useState<MediaHistoryItem | null>(null);
   const [isResumeChoiceOpen, setIsResumeChoiceOpen] = useState(false);
-  const [showSplash, setShowSplash] = useState(true);
+  const [showSplash, setShowSplash] = useState(false);
   const [areControlsVisible, setAreControlsVisible] = useState(true);
   const hideControlsTimerRef = useRef<number | null>(null);
   const lastThumbCaptureTimeRef = useRef<number>(0);

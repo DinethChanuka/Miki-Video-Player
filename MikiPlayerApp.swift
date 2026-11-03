@@ -200,10 +200,12 @@ class AppAssetSchemeHandler: NSObject, WKURLSchemeHandler {
         else if ext == "woff" { mimeType = "font/woff" }
         else if ext == "ttf" { mimeType = "font/ttf" }
         else if ext == "ico" { mimeType = "image/x-icon" }
+        else if ext == "mp4" { mimeType = "video/mp4" }
 
         let headers: [String: String] = [
             "Content-Type": mimeType,
             "Content-Length": "\(data.count)",
+            "Accept-Ranges": "bytes",
             "Access-Control-Allow-Origin": "*",
             "Cache-Control": "no-cache"
         ]

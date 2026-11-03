@@ -55,7 +55,7 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
 
   const [activeCategory, setActiveCategory] = useState<'All' | GameCategory>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [isCatalogDrawerOpen, setIsCatalogDrawerOpen] = useState<boolean>(false);
+  const [isCatalogDrawerOpen, setIsCatalogDrawerOpen] = useState<boolean>(() => !initialGameId);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [activeKeys, setActiveKeys] = useState<{ [key: string]: boolean }>({});
   const [mouseActive, setMouseActive] = useState<boolean>(false);
@@ -69,7 +69,13 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
   useEffect(() => {
     if (initialGameId) {
       const match = GAMES_CATALOG.find((g) => g.id === initialGameId);
-      if (match) setSelectedGame(match);
+      if (match) {
+        setSelectedGame(match);
+        setPreviewGame(match);
+        setIsCatalogDrawerOpen(false);
+      }
+    } else {
+      setIsCatalogDrawerOpen(true);
     }
   }, [initialGameId]);
 

@@ -29,10 +29,10 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete }) => {
     };
     window.addEventListener('keydown', handleKeyDown);
 
-    // Safeguard timeout: automatically transition after 12 seconds maximum
+    // Safeguard timeout: automatically transition after 1.5 seconds maximum if video stalls
     const safeguardTimer = setTimeout(() => {
       handleFinish();
-    }, 12000);
+    }, 1500);
 
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
