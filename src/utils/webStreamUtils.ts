@@ -1,9 +1,19 @@
 /**
  * Web Stream Parsing & Embed URL Generation Utilities
- * Supports YouTube, TikTok, Instagram, and Facebook standalone web playback
+ * Supports YouTube, TikTok, Instagram, Facebook, Vimeo, Twitch, Dailymotion,
+ * Cinema Portals (CineSubz, FMovies, etc.) and Universal Web Video Streams.
  */
 
-export type WebPlatform = 'youtube' | 'tiktok' | 'instagram' | 'facebook';
+export type WebPlatform =
+  | 'youtube'
+  | 'tiktok'
+  | 'instagram'
+  | 'facebook'
+  | 'vimeo'
+  | 'twitch'
+  | 'dailymotion'
+  | 'cinema'
+  | 'web';
 
 export interface ParsedWebStream {
   platform: WebPlatform;
@@ -39,11 +49,93 @@ export function parseFacebookUrl(url: string): { id: string; embedUrl: string } 
   const isFb = /(?:facebook\.com|fb\.watch)/i.test(trimmed);
   if (!isFb) return null;
 
-  // Extract ID if available
   const match = trimmed.match(/(?:videos\/|reel\/|\?v=)(\d+)/i) || trimmed.match(/fb\.watch\/([a-zA-Z0-9_-]+)/i);
   const id = match ? match[1] : `fb_${Date.now()}`;
   const embedUrl = `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(trimmed)}&show_text=0`;
   return { id, embedUrl };
+}
+
+export function parseVimeoUrl(url: string): { id: string; embedUrl: string } | null {
+  if (!url) return null;
+  const match = url.trim().match(/vimeo\.com\/(?:video\/)?(\d+)/i);
+  if (!match) return null;
+  const id = match[1];
+  return {
+    id,
+    embedUrl: `https://player.vimeo.com/video/${id}?autoplay=1`,
+  };
+}
+
+export function parseTwitchUrl(url: string): { id: string; embedUrl: string } | null {
+  if (!url) return null;
+  const trimmed = url.trim();
+  if (!/twitch\.tv/i.test(trimmed)) return null;
+
+  const videoMatch = trimmed.match(/twitch\.tv\/videos\/(\d+)/i);
+  if (videoMatch) {
+    const id = videoMatch[1];
+    return {
+      id,
+      embedUrl: `https://player.twitch.tv/?video=${id}&parent=localhost&autoplay=true`,
+    };
+  }
+
+  const channelMatch = trimmed.match(/twitch\.tv\/([a-zA-Z0-9_]+)/i);
+  if (channelMatch && channelMatch[1] !== 'directory') {
+    const channel = channelMatch[1];
+    return {
+      id: channel,
+      embedUrl: `https://player.twitch.tv/?channel=${channel}&parent=localhost&autoplay=true`,
+    };
+  }
+
+  return null;
+}
+
+export function parseDailymotionUrl(url: string): { id: string; embedUrl: string } | null {
+  if (!url) return null;
+  const match = url.trim().match(/dailymotion\.com\/(?:video|embed\/video)\/([a-zA-Z0-9]+)/i);
+  if (!match) return null;
+  const id = match[1];
+  return {
+    id,
+    embedUrl: `https://www.dailymotion.com/embed/video/${id}?autoplay=1`,
+  };
+}
+
+export function parseCinemaUrl(url: string): { id: string; embedUrl: string } | null {
+  if (!url) return null;
+  const trimmed = url.trim();
+  const cinemaDomains = [
+    'cinesubz.co',
+    'fmoviesz.to',
+    '123movies',
+    'bflix',
+    'vidsrc.to',
+    'vidsrc.me',
+    'vidsrc.cc',
+    'streamtape.com',
+    'rabbitstream.net',
+    'filelions.to',
+    'embed.su',
+    'superembed.stream',
+    '2embed.cc',
+  ];
+
+  const matchesCinemaDomain = cinemaDomains.some((d) => trimmed.toLowerCase().includes(d));
+  if (matchesCinemaDomain) {
+    let embedUrl = trimmed;
+    // Resolve clean embed URL if available
+    try {
+      const parsed = new URL(trimmed);
+      embedUrl = parsed.toString();
+    } catch {}
+
+    const id = `cinema_${encodeURIComponent(trimmed.replace(/https?:\/\//, '').split('/')[0])}`;
+    return { id, embedUrl };
+  }
+
+  return null;
 }
 
 export function parseWebStream(url: string): ParsedWebStream | null {
@@ -94,6 +186,50 @@ export function parseWebStream(url: string): ParsedWebStream | null {
     };
   }
 
+  // 5. Vimeo
+  const vimeo = parseVimeoUrl(trimmed);
+  if (vimeo) {
+    return {
+      platform: 'vimeo',
+      id: vimeo.id,
+      embedUrl: vimeo.embedUrl,
+      originalUrl: trimmed,
+    };
+  }
+
+  // 6. Twitch
+  const twitch = parseTwitchUrl(trimmed);
+  if (twitch) {
+    return {
+      platform: 'twitch',
+      id: twitch.id,
+      embedUrl: twitch.embedUrl,
+      originalUrl: trimmed,
+    };
+  }
+
+  // 7. Dailymotion
+  const dm = parseDailymotionUrl(trimmed);
+  if (dm) {
+    return {
+      platform: 'dailymotion',
+      id: dm.id,
+      embedUrl: dm.embedUrl,
+      originalUrl: trimmed,
+    };
+  }
+
+  // 8. Cinema Movie Portals & Stream Embeds
+  const cinema = parseCinemaUrl(trimmed);
+  if (cinema) {
+    return {
+      platform: 'cinema',
+      id: cinema.id,
+      embedUrl: cinema.embedUrl,
+      originalUrl: trimmed,
+    };
+  }
+
   return null;
 }
 
@@ -116,8 +252,6 @@ export function isDirectMediaUrl(uri: string): boolean {
     clean.endsWith('.wav') ||
     clean.endsWith('.flac') ||
     clean.endsWith('.aac') ||
-    clean.endsWith('.ogg') ||
-    clean.endsWith('.ts')
+    clean.endsWith('.ogg')
   );
 }
-
