@@ -779,7 +779,7 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({
                   </button>
                 </div>
               )}
-              <GamesSection onClose={onClose} onOpenGames={onOpenGames} />
+              <GamesSection onClose={onClose} onOpenGames={onOpenGames} searchTerm={searchTerm} />
             </div>
           )}
 

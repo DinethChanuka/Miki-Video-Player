@@ -620,6 +620,7 @@ function getRawInbuiltGameSrcDoc(id: string): string {
 </html>`;
 
     case 'tic-tac-toe':
+    case 'tictactoe':
       return `<!DOCTYPE html>
 <html>
 <head>
@@ -1414,6 +1415,335 @@ function getRawInbuiltGameSrcDoc(id: string): string {
     }
   }
   render();
+</script>
+</body>
+</html>`;
+
+    case 'tron':
+    case 'tron-light-cycles':
+      return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; background: #030712; color: #fff; font-family: monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; user-select: none; }
+  h2 { margin: 0 0 10px; color: #06b6d4; font-size: 20px; letter-spacing: 2px; }
+  canvas { background: #020617; border: 2px solid #06b6d4; box-shadow: 0 0 20px rgba(6,182,212,0.4); border-radius: 8px; }
+  .hud { margin-top: 10px; font-size: 12px; color: #94a3b8; display: flex; gap: 20px; }
+</style>
+</head>
+<body>
+  <h2>TRON LIGHT CYCLES</h2>
+  <canvas id="c" width="480" height="360"></canvas>
+  <div class="hud">
+    <span>YOU: <b id="s1" style="color:#06b6d4">0</b></span>
+    <span>AI: <b id="s2" style="color:#f43f5e">0</b></span>
+    <span>Arrows / WASD to Steer</span>
+  </div>
+<script>
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  const GRID_W = 120, GRID_H = 90, CELL = 4;
+  let grid = new Uint8Array(GRID_W * GRID_H);
+  let p1, p2, score1 = 0, score2 = 0, running = true;
+
+  function reset() {
+    grid.fill(0);
+    p1 = { x: 30, y: 45, dx: 1, dy: 0, dead: false };
+    p2 = { x: 90, y: 45, dx: -1, dy: 0, dead: false };
+    running = true;
+  }
+
+  function step() {
+    if (!running) return;
+    p1.x += p1.dx; p1.y += p1.dy;
+    if (p1.x < 0 || p1.x >= GRID_W || p1.y < 0 || p1.y >= GRID_H || grid[p1.y * GRID_W + p1.x]) {
+      p1.dead = true;
+    } else {
+      grid[p1.y * GRID_W + p1.x] = 1;
+    }
+
+    const dirs = [{dx: 0, dy: -1}, {dx: 1, dy: 0}, {dx: 0, dy: 1}, {dx: -1, dy: 0}];
+    const safe = dirs.filter(d => {
+      if (d.dx === -p2.dx && d.dy === -p2.dy) return false;
+      const nx = p2.x + d.dx, ny = p2.y + d.dy;
+      return nx >= 0 && nx < GRID_W && ny >= 0 && ny < GRID_H && !grid[ny * GRID_W + nx];
+    });
+    if (safe.length) {
+      const forward = safe.find(d => d.dx === p2.dx && d.dy === p2.dy);
+      if (!forward || Math.random() < 0.1) {
+        const choice = safe[Math.floor(Math.random() * safe.length)];
+        p2.dx = choice.dx; p2.dy = choice.dy;
+      }
+    }
+    p2.x += p2.dx; p2.y += p2.dy;
+    if (p2.x < 0 || p2.x >= GRID_W || p2.y < 0 || p2.y >= GRID_H || grid[p2.y * GRID_W + p2.x]) {
+      p2.dead = true;
+    } else {
+      grid[p2.y * GRID_W + p2.x] = 2;
+    }
+
+    if (p1.dead || p2.dead) {
+      running = false;
+      if (p1.dead && !p2.dead) score2++;
+      else if (p2.dead && !p1.dead) score1++;
+      document.getElementById('s1').innerText = score1;
+      document.getElementById('s2').innerText = score2;
+      setTimeout(reset, 1200);
+    }
+    draw();
+  }
+
+  function draw() {
+    ctx.fillStyle = '#020617';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    for (let y = 0; y < GRID_H; y++) {
+      for (let x = 0; x < GRID_W; x++) {
+        const val = grid[y * GRID_W + x];
+        if (val === 1) { ctx.fillStyle = '#06b6d4'; ctx.fillRect(x * CELL, y * CELL, CELL, CELL); }
+        else if (val === 2) { ctx.fillStyle = '#f43f5e'; ctx.fillRect(x * CELL, y * CELL, CELL, CELL); }
+      }
+    }
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(p1.x * CELL, p1.y * CELL, CELL, CELL);
+    ctx.fillRect(p2.x * CELL, p2.y * CELL, CELL, CELL);
+  }
+
+  window.addEventListener('keydown', e => {
+    if ((e.code === 'ArrowUp' || e.code === 'KeyW') && p1.dy === 0) { p1.dx = 0; p1.dy = -1; }
+    else if ((e.code === 'ArrowDown' || e.code === 'KeyS') && p1.dy === 0) { p1.dx = 0; p1.dy = 1; }
+    else if ((e.code === 'ArrowLeft' || e.code === 'KeyA') && p1.dx === 0) { p1.dx = -1; p1.dy = 0; }
+    else if ((e.code === 'ArrowRight' || e.code === 'KeyD') && p1.dx === 0) { p1.dx = 1; p1.dy = 0; }
+  });
+
+  reset();
+  setInterval(step, 45);
+</script>
+</body>
+</html>`;
+
+    case 'lunar-lander':
+      return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; background: #030712; color: #fff; font-family: monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; user-select: none; }
+  h2 { margin: 0 0 10px; color: #fbbf24; font-size: 18px; letter-spacing: 2px; }
+  canvas { background: #020617; border: 2px solid #334155; border-radius: 8px; }
+  .hud { margin-top: 10px; font-size: 12px; color: #94a3b8; display: flex; gap: 20px; }
+</style>
+</head>
+<body>
+  <h2>APOLLO LUNAR LANDER</h2>
+  <canvas id="c" width="480" height="360"></canvas>
+  <div class="hud">
+    <span>FUEL: <b id="fuel" style="color:#22c55e">100%</b></span>
+    <span>ALT: <b id="alt" style="color:#38bdf8">0</b></span>
+    <span>SPEED: <b id="spd" style="color:#fbbf24">0.0</b></span>
+    <span>[SPACE/W] Thrust [A/D] Rotate</span>
+  </div>
+<script>
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  let x = 240, y = 50, vx = 0, vy = 0, angle = 0, fuel = 1000, landed = false, crashed = false;
+  let keys = {};
+
+  const terrain = [
+    {x: 0, y: 320}, {x: 80, y: 300}, {x: 150, y: 330},
+    {x: 200, y: 320}, {x: 280, y: 320},
+    {x: 350, y: 300}, {x: 480, y: 330}
+  ];
+
+  function reset() {
+    x = 100 + Math.random() * 280; y = 40; vx = (Math.random() - 0.5) * 1.5; vy = 0; angle = 0; fuel = 1000;
+    landed = false; crashed = false;
+  }
+
+  window.addEventListener('keydown', e => { keys[e.code] = true; if ((landed || crashed) && e.code === 'Space') reset(); });
+  window.addEventListener('keyup', e => { keys[e.code] = false; });
+
+  function step() {
+    if (!landed && !crashed) {
+      vy += 0.03;
+      if ((keys['Space'] || keys['ArrowUp'] || keys['KeyW']) && fuel > 0) {
+        vx += Math.sin(angle) * 0.08;
+        vy -= Math.cos(angle) * 0.08;
+        fuel -= 2;
+      }
+      if (keys['ArrowLeft'] || keys['KeyA']) angle -= 0.05;
+      if (keys['ArrowRight'] || keys['KeyD']) angle += 0.05;
+
+      x += vx; y += vy;
+      if (y >= 310) {
+        const onPad = x >= 195 && x <= 275;
+        const safeSpd = Math.hypot(vx, vy) < 1.4 && Math.abs(angle) < 0.2;
+        if (onPad && safeSpd) { landed = true; } else { crashed = true; }
+      }
+    }
+    draw();
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, 480, 360);
+    ctx.fillStyle = '#1e293b'; ctx.strokeStyle = '#64748b';
+    ctx.beginPath();
+    ctx.moveTo(terrain[0].x, terrain[0].y);
+    for (let p of terrain) ctx.lineTo(p.x, p.y);
+    ctx.lineTo(480, 360); ctx.lineTo(0, 360); ctx.fill(); ctx.stroke();
+
+    ctx.strokeStyle = '#22c55e'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(200, 320); ctx.lineTo(280, 320); ctx.stroke();
+    ctx.lineWidth = 1;
+
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+    ctx.fillStyle = '#f8fafc'; ctx.fillRect(-8, -8, 16, 14);
+    ctx.fillStyle = '#38bdf8'; ctx.fillRect(-4, -4, 8, 5);
+    ctx.strokeStyle = '#94a3b8';
+    ctx.beginPath();
+    ctx.moveTo(-8, 6); ctx.lineTo(-12, 12);
+    ctx.moveTo(8, 6); ctx.lineTo(12, 12);
+    ctx.stroke();
+
+    if ((keys['Space'] || keys['ArrowUp'] || keys['KeyW']) && fuel > 0 && !landed && !crashed) {
+      ctx.fillStyle = '#f59e0b';
+      ctx.beginPath();
+      ctx.moveTo(-5, 6); ctx.lineTo(5, 6); ctx.lineTo(0, 16 + Math.random() * 8);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    if (landed) {
+      ctx.fillStyle = '#22c55e'; ctx.font = 'bold 20px monospace';
+      ctx.fillText('THE EAGLE HAS LANDED!', 110, 160);
+      ctx.font = '12px monospace'; ctx.fillText('Press SPACE to Restart', 160, 190);
+    } else if (crashed) {
+      ctx.fillStyle = '#ef4444'; ctx.font = 'bold 20px monospace';
+      ctx.fillText('LANDER DESTROYED!', 140, 160);
+      ctx.font = '12px monospace'; ctx.fillText('Press SPACE to Restart', 160, 190);
+    }
+
+    document.getElementById('fuel').innerText = Math.max(0, Math.round(fuel / 10)) + '%';
+    document.getElementById('alt').innerText = Math.max(0, Math.round(320 - y));
+    document.getElementById('spd').innerText = Math.hypot(vx, vy).toFixed(1) + ' m/s';
+  }
+
+  setInterval(step, 30);
+</script>
+</body>
+</html>`;
+
+    case 'wordle':
+      return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; background: #0b0f19; color: #fff; font-family: -apple-system, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; user-select: none; }
+  h2 { margin: 0 0 10px; color: #38bdf8; letter-spacing: 3px; }
+  #grid { display: grid; grid-template-rows: repeat(6, 44px); gap: 6px; margin-bottom: 12px; }
+  .row { display: grid; grid-template-columns: repeat(5, 44px); gap: 6px; }
+  .tile { width: 44px; height: 44px; border: 2px solid #334155; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: bold; background: #1e293b; text-transform: uppercase; }
+  .tile.correct { background: #22c55e; border-color: #22c55e; color: #000; }
+  .tile.present { background: #eab308; border-color: #eab308; color: #000; }
+  .tile.absent { background: #475569; border-color: #475569; }
+  #kb { display: flex; flex-direction: column; gap: 4px; align-items: center; }
+  .kb-row { display: flex; gap: 4px; }
+  .key { padding: 8px 10px; border-radius: 6px; background: #334155; font-size: 11px; font-weight: bold; cursor: pointer; }
+  .msg { font-size: 13px; color: #38bdf8; height: 18px; margin-top: 6px; }
+</style>
+</head>
+<body>
+  <h2>WORDLE 5-LETTER</h2>
+  <div id="grid"></div>
+  <div id="kb"></div>
+  <div class="msg" id="msg">Type or click letters, ENTER to submit</div>
+<script>
+  const WORDS = ['AUDIO','REACT','LIGHT','SPACE','MUSIC','VIDEO','ROBOT','CABLE','SPEED','LASER','STORM','EARTH','SMART','POWER','MAGIC'];
+  const target = WORDS[Math.floor(Math.random() * WORDS.length)];
+  let row = 0, col = 0, current = '', over = false;
+
+  const gridEl = document.getElementById('grid');
+  for (let r = 0; r < 6; r++) {
+    const rowEl = document.createElement('div');
+    rowEl.className = 'row';
+    for (let c = 0; c < 5; c++) {
+      const tile = document.createElement('div');
+      tile.className = 'tile';
+      tile.id = 't-' + r + '-' + c;
+      rowEl.appendChild(tile);
+    }
+    gridEl.appendChild(rowEl);
+  }
+
+  function handleInput(key) {
+    if (over) return;
+    if (key === 'ENTER') {
+      if (current.length === 5) {
+        checkWord();
+      } else {
+        document.getElementById('msg').innerText = 'Not enough letters!';
+      }
+    } else if (key === 'BACKSPACE' || key === 'DEL') {
+      if (current.length > 0) {
+        current = current.slice(0, -1);
+        col--;
+        document.getElementById('t-' + row + '-' + col).innerText = '';
+      }
+    } else if (/^[A-Z]$/.test(key) && current.length < 5) {
+      document.getElementById('t-' + row + '-' + col).innerText = key;
+      current += key;
+      col++;
+    }
+  }
+
+  function checkWord() {
+    for (let i = 0; i < 5; i++) {
+      const tile = document.getElementById('t-' + row + '-' + i);
+      const ch = current[i];
+      if (ch === target[i]) tile.className = 'tile correct';
+      else if (target.includes(ch)) tile.className = 'tile present';
+      else tile.className = 'tile absent';
+    }
+    if (current === target) {
+      over = true;
+      document.getElementById('msg').innerText = 'Splendid! You guessed the word!';
+      return;
+    }
+    row++; col = 0; current = '';
+    if (row >= 6) {
+      over = true;
+      document.getElementById('msg').innerText = 'Game Over! The word was: ' + target;
+    }
+  }
+
+  window.addEventListener('keydown', e => {
+    if (e.key === 'Enter') handleInput('ENTER');
+    else if (e.key === 'Backspace') handleInput('BACKSPACE');
+    else if (/^[a-zA-Z]$/.test(e.key)) handleInput(e.key.toUpperCase());
+  });
+
+  const KB_LAYOUT = ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'];
+  const kbEl = document.getElementById('kb');
+  KB_LAYOUT.forEach((str, i) => {
+    const kRow = document.createElement('div');
+    kRow.className = 'kb-row';
+    if (i === 2) {
+      const ent = document.createElement('div'); ent.className = 'key'; ent.innerText = 'ENTER';
+      ent.onclick = () => handleInput('ENTER'); kRow.appendChild(ent);
+    }
+    str.split('').forEach(ch => {
+      const key = document.createElement('div'); key.className = 'key'; key.innerText = ch;
+      key.onclick = () => handleInput(ch); kRow.appendChild(key);
+    });
+    if (i === 2) {
+      const del = document.createElement('div'); del.className = 'key'; del.innerText = 'DEL';
+      del.onclick = () => handleInput('BACKSPACE'); kRow.appendChild(del);
+    }
+    kbEl.appendChild(kRow);
+  });
 </script>
 </body>
 </html>`;

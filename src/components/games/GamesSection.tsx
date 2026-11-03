@@ -14,11 +14,12 @@ import {
 interface GamesSectionProps {
   onClose?: () => void;
   onOpenGames?: (gameId?: string) => void;
+  searchTerm?: string;
 }
 
 const CATEGORIES = ['All', 'Arcade', 'Retro', 'Classic', 'Puzzle', 'Action', 'Sports'];
 
-export const GamesSection: React.FC<GamesSectionProps> = ({ onClose: _onClose, onOpenGames }) => {
+export const GamesSection: React.FC<GamesSectionProps> = ({ onClose: _onClose, onOpenGames, searchTerm = '' }) => {
   const [selectedGame, setSelectedGame] = useState<GameItem>(GAMES_CATALOG[0]);
   const [activeCategory, setActiveCategory] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -31,15 +32,17 @@ export const GamesSection: React.FC<GamesSectionProps> = ({ onClose: _onClose, o
   const mouseTimeoutRef = useRef<any>(null);
 
   const filteredGames = useMemo(() => {
+    const effectiveQuery = (searchTerm || searchQuery).trim().toLowerCase();
     return GAMES_CATALOG.filter((game) => {
       const matchesCat = activeCategory === 'All' || game.category.toLowerCase() === activeCategory.toLowerCase();
       const matchesSearch =
-        searchQuery.trim() === '' ||
-        game.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        game.description.toLowerCase().includes(searchQuery.toLowerCase());
+        effectiveQuery === '' ||
+        game.title.toLowerCase().includes(effectiveQuery) ||
+        game.description.toLowerCase().includes(effectiveQuery) ||
+        game.category.toLowerCase().includes(effectiveQuery);
       return matchesCat && matchesSearch;
     });
-  }, [activeCategory, searchQuery]);
+  }, [activeCategory, searchQuery, searchTerm]);
 
   // Keyboard input detector & event capturer to prevent global hotkeys while gaming
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -226,11 +229,7 @@ export const GamesSection: React.FC<GamesSectionProps> = ({ onClose: _onClose, o
             title={selectedGame.title}
             className="w-full h-full min-h-[460px] border-0"
             allow="autoplay; fullscreen; gamepad; focus-without-user-activation *"
-            sandbox={
-              selectedGame.srcDoc
-                ? 'allow-scripts allow-pointer-lock allow-forms'
-                : 'allow-scripts allow-same-origin allow-forms allow-pointer-lock allow-popups'
-            }
+            sandbox="allow-scripts allow-same-origin allow-forms allow-pointer-lock allow-popups"
             tabIndex={0}
           />
           <button
