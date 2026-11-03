@@ -308,7 +308,6 @@ export class WebMediaEngine implements IPlayerEngine {
     this.videoEl = el;
     this.videoEl.playsInline = true;
     this.videoEl.preload = 'auto';
-    this.videoEl.crossOrigin = 'anonymous';
     this.setupWebAudioGraph();
 
     // Hook critical HTML5 video events
@@ -320,6 +319,15 @@ export class WebMediaEngine implements IPlayerEngine {
       const src = this.videoEl?.src || '';
       // Completely ignore video errors for YouTube links or blank sources
       if (!src || src.includes('youtube.com') || src.includes('youtu.be')) return;
+
+      // Adaptive CORS Recovery: if crossOrigin was active, remove it and reload without failing
+      if (this.videoEl?.hasAttribute('crossOrigin')) {
+        this.videoEl.removeAttribute('crossOrigin');
+        this.videoEl.load();
+        this.videoEl.play().catch(() => {});
+        return;
+      }
+
       const err = this.videoEl?.error;
       this.emitError({
         code: 'CODEC_UNSUPPORTED',
@@ -410,7 +418,20 @@ export class WebMediaEngine implements IPlayerEngine {
     }
 
     const resolvedUri = resolveMediaStreamUrl(uri);
-    const isHls = resolvedUri.includes('.m3u8');
+    const isRemote = resolvedUri.startsWith('http://') || resolvedUri.startsWith('https://');
+    const isHls =
+      resolvedUri.includes('.m3u8') ||
+      resolvedUri.includes('/hls/') ||
+      resolvedUri.includes('master.m3u8') ||
+      resolvedUri.includes('playlist.m3u8');
+
+    // For remote streams without CORS headers, do not force crossOrigin to avoid MediaError rejection
+    if (isRemote) {
+      el.removeAttribute('crossOrigin');
+    } else {
+      el.crossOrigin = 'anonymous';
+    }
+
     if (isHls && Hls.isSupported()) {
       // High-performance Network Optimizer configuration
       this.hls = new Hls({

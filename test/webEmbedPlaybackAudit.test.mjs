@@ -19,22 +19,14 @@ describe('Seamless Inbuilt Web Video Playback & Auto-Fallback Audit', () => {
     assert.match(embedCode, /case\s+['"]dailymotion['"]:/i, 'WebEmbedPlayer must handle dailymotion platform');
   });
 
-  it('verifies <video> elements set crossOrigin="anonymous" for cross-origin audio & WebAudio EQ', () => {
-    const appPath = path.join(rootDir, 'src/App.tsx');
-    const appCode = fs.readFileSync(appPath, 'utf8');
+  it('verifies PlayerEngine manages crossOrigin adaptively for remote web streams & WebAudio EQ', () => {
     const enginePath = path.join(rootDir, 'src/core/PlayerEngine.ts');
     const engineCode = fs.readFileSync(enginePath, 'utf8');
 
     assert.match(
-      appCode,
-      /<video[\s\S]*?crossOrigin=["']anonymous["']/i,
-      '<video id="aether-video-viewport"> must set crossOrigin="anonymous"'
-    );
-
-    assert.match(
       engineCode,
-      /this\.videoEl\.crossOrigin\s*=\s*['"]anonymous['"]/i,
-      'PlayerEngine bindVideoElement must set crossOrigin = "anonymous"'
+      /removeAttribute\(['"]crossOrigin['"]\)|crossOrigin\s*=\s*['"]anonymous['"]/,
+      'PlayerEngine must manage crossOrigin adaptively to prevent CORS blocks on remote streams'
     );
   });
 

@@ -748,7 +748,6 @@ export const App: React.FC = () => {
               className={`w-full h-full object-contain z-10 cursor-pointer ${!currentUri ? 'hidden' : ''}`}
               playsInline
               preload="auto"
-              crossOrigin="anonymous"
               onWaiting={() => usePlayerStore.setState({ isBuffering: true })}
               onPlaying={() => usePlayerStore.setState({ isBuffering: false })}
               onCanPlay={() => usePlayerStore.setState({ isBuffering: false })}
