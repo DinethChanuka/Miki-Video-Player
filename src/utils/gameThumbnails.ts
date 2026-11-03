@@ -470,6 +470,346 @@ export function getGamePreviewSvg(gameId: string): string {
         </svg>
       `;
 
+    case 'tictactoe':
+      return `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" width="100%" height="100%">
+          <rect width="320" height="180" fill="#18181b"/>
+          <g transform="translate(100, 20)">
+            <line x1="40" y1="5" x2="40" y2="135" stroke="#3b82f6" stroke-width="4"/>
+            <line x1="80" y1="5" x2="80" y2="135" stroke="#3b82f6" stroke-width="4"/>
+            <line x1="5" y1="48" x2="115" y2="48" stroke="#3b82f6" stroke-width="4"/>
+            <line x1="5" y1="92" x2="115" y2="92" stroke="#3b82f6" stroke-width="4"/>
+            <text x="20" y="38" font-family="sans-serif" font-size="30" font-weight="bold" fill="#10b981" text-anchor="middle">O</text>
+            <text x="60" y="38" font-family="sans-serif" font-size="30" font-weight="bold" fill="#ef4444" text-anchor="middle">X</text>
+            <text x="100" y="82" font-family="sans-serif" font-size="30" font-weight="bold" fill="#ef4444" text-anchor="middle">X</text>
+            <text x="60" y="82" font-family="sans-serif" font-size="30" font-weight="bold" fill="#10b981" text-anchor="middle">O</text>
+            <text x="20" y="126" font-family="sans-serif" font-size="30" font-weight="bold" fill="#ef4444" text-anchor="middle">X</text>
+          </g>
+          <text x="160" y="168" font-family="sans-serif" font-size="11" font-weight="bold" fill="#94a3b8" text-anchor="middle">MINIMAX AI ENGINE</text>
+        </svg>
+      `;
+
+    case 'connect-four':
+      return `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" width="100%" height="100%">
+          <rect width="320" height="180" fill="#0a0f1d"/>
+          <!-- Connect 4 Blue Stand -->
+          <g transform="translate(45, 20)">
+            <rect width="230" height="140" rx="12" fill="#1d4ed8" stroke="#3b82f6" stroke-width="2"/>
+            <!-- Column 1 -->
+            <circle cx="25" cy="25" r="11" fill="#0a0f1d"/>
+            <circle cx="25" cy="55" r="11" fill="#0a0f1d"/>
+            <circle cx="25" cy="85" r="11" fill="#ef4444"/>
+            <circle cx="25" cy="115" r="11" fill="#eab308"/>
+            <!-- Column 2 -->
+            <circle cx="55" cy="25" r="11" fill="#0a0f1d"/>
+            <circle cx="55" cy="55" r="11" fill="#ef4444"/>
+            <circle cx="55" cy="85" r="11" fill="#eab308"/>
+            <circle cx="55" cy="115" r="11" fill="#ef4444"/>
+            <!-- Column 3 -->
+            <circle cx="85" cy="25" r="11" fill="#0a0f1d"/>
+            <circle cx="85" cy="55" r="11" fill="#0a0f1d"/>
+            <circle cx="85" cy="85" r="11" fill="#ef4444"/>
+            <circle cx="85" cy="115" r="11" fill="#eab308"/>
+            <!-- Column 4 (Winning Column) -->
+            <circle cx="115" cy="25" r="11" fill="#ef4444" stroke="#fef08a" stroke-width="3"/>
+            <circle cx="115" cy="55" r="11" fill="#ef4444" stroke="#fef08a" stroke-width="3"/>
+            <circle cx="115" cy="85" r="11" fill="#ef4444" stroke="#fef08a" stroke-width="3"/>
+            <circle cx="115" cy="115" r="11" fill="#ef4444" stroke="#fef08a" stroke-width="3"/>
+            <!-- Column 5 -->
+            <circle cx="145" cy="25" r="11" fill="#0a0f1d"/>
+            <circle cx="145" cy="55" r="11" fill="#0a0f1d"/>
+            <circle cx="145" cy="85" r="11" fill="#eab308"/>
+            <circle cx="145" cy="115" r="11" fill="#eab308"/>
+            <!-- Column 6 -->
+            <circle cx="175" cy="25" r="11" fill="#0a0f1d"/>
+            <circle cx="175" cy="55" r="11" fill="#0a0f1d"/>
+            <circle cx="175" cy="85" r="11" fill="#0a0f1d"/>
+            <circle cx="175" cy="115" r="11" fill="#ef4444"/>
+            <!-- Column 7 -->
+            <circle cx="205" cy="25" r="11" fill="#0a0f1d"/>
+            <circle cx="205" cy="55" r="11" fill="#0a0f1d"/>
+            <circle cx="205" cy="85" r="11" fill="#0a0f1d"/>
+            <circle cx="205" cy="115" r="11" fill="#eab308"/>
+          </g>
+        </svg>
+      `;
+
+    case 'memory-match':
+      return `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" width="100%" height="100%">
+          <rect width="320" height="180" fill="#111827"/>
+          <g transform="translate(40, 20)">
+            <!-- Card 1 (Matched Star) -->
+            <rect x="0" y="0" width="50" height="60" rx="8" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/>
+            <polygon points="25,18 29,28 40,28 31,35 34,46 25,39 16,46 19,35 10,28 21,28" fill="#38bdf8"/>
+            <!-- Card 2 (Unflipped) -->
+            <rect x="62" y="0" width="50" height="60" rx="8" fill="#4f46e5" stroke="#818cf8" stroke-width="2"/>
+            <text x="87" y="38" font-family="sans-serif" font-size="24" font-weight="bold" fill="#ffffff" text-anchor="middle">?</text>
+            <!-- Card 3 (Matched Star) -->
+            <rect x="124" y="0" width="50" height="60" rx="8" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/>
+            <polygon points="149,18 153,28 164,28 155,35 158,46 149,39 140,46 143,35 134,28 145,28" fill="#38bdf8"/>
+            <!-- Card 4 (Unflipped) -->
+            <rect x="186" y="0" width="50" height="60" rx="8" fill="#4f46e5" stroke="#818cf8" stroke-width="2"/>
+            <text x="211" y="38" font-family="sans-serif" font-size="24" font-weight="bold" fill="#ffffff" text-anchor="middle">?</text>
+
+            <!-- Card 5 (Flipped Heart) -->
+            <rect x="0" y="70" width="50" height="60" rx="8" fill="#1e293b" stroke="#f43f5e" stroke-width="2"/>
+            <path d="M25 100 C15 88 12 96 25 110 C38 96 35 88 25 100 Z" fill="#f43f5e" transform="translate(0,-10)"/>
+            <!-- Card 6 (Unflipped) -->
+            <rect x="62" y="70" width="50" height="60" rx="8" fill="#4f46e5" stroke="#818cf8" stroke-width="2"/>
+            <text x="87" y="108" font-family="sans-serif" font-size="24" font-weight="bold" fill="#ffffff" text-anchor="middle">?</text>
+            <!-- Card 7 (Flipped Heart) -->
+            <rect x="124" y="70" width="50" height="60" rx="8" fill="#1e293b" stroke="#f43f5e" stroke-width="2"/>
+            <path d="M149 100 C139 88 136 96 149 110 C162 96 159 88 149 100 Z" fill="#f43f5e" transform="translate(0,-10)"/>
+            <!-- Card 8 (Unflipped) -->
+            <rect x="186" y="70" width="50" height="60" rx="8" fill="#4f46e5" stroke="#818cf8" stroke-width="2"/>
+            <text x="211" y="108" font-family="sans-serif" font-size="24" font-weight="bold" fill="#ffffff" text-anchor="middle">?</text>
+          </g>
+        </svg>
+      `;
+
+    case 'maze':
+      return `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" width="100%" height="100%">
+          <rect width="320" height="180" fill="#090d16"/>
+          <g transform="translate(50, 15)">
+            <rect width="220" height="150" fill="none" stroke="#38bdf8" stroke-width="4" rx="4"/>
+            <path d="M 0 30 H 160 V 60 H 40 V 90 H 180 V 120 H 60 M 100 0 V 30 M 140 60 V 90 M 80 90 V 150 M 180 30 V 90 M 180 120 V 150" stroke="#38bdf8" stroke-width="4" fill="none" stroke-linecap="round"/>
+            <!-- Start player dot -->
+            <circle cx="20" cy="15" r="8" fill="#10b981"/>
+            <!-- Goal star -->
+            <polygon points="200,135 204,142 212,142 206,147 208,155 200,150 192,155 194,147 188,142 196,142" fill="#fbbf24"/>
+          </g>
+        </svg>
+      `;
+
+    case 'air-hockey':
+      return `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" width="100%" height="100%">
+          <rect width="320" height="180" fill="#030712"/>
+          <rect x="30" y="20" width="260" height="140" rx="20" fill="#0f172a" stroke="#06b6d4" stroke-width="3"/>
+          <line x1="160" y1="20" x2="160" y2="160" stroke="#334155" stroke-width="2" stroke-dasharray="6 6"/>
+          <circle cx="160" cy="90" r="30" fill="none" stroke="#334155" stroke-width="2"/>
+          <circle cx="80" cy="90" r="18" fill="#0284c7" stroke="#38bdf8" stroke-width="4"/>
+          <circle cx="80" cy="90" r="6" fill="#ffffff"/>
+          <circle cx="240" cy="70" r="18" fill="#dc2626" stroke="#f87171" stroke-width="4"/>
+          <circle cx="240" cy="70" r="6" fill="#ffffff"/>
+          <line x1="120" y1="92" x2="148" y2="88" stroke="#facc15" stroke-width="2" opacity="0.6"/>
+          <circle cx="152" cy="88" r="8" fill="#facc15" stroke="#ffffff" stroke-width="2"/>
+        </svg>
+      `;
+
+    case 'cyber-hockey':
+      return `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" width="100%" height="100%">
+          <rect width="320" height="180" fill="#020617"/>
+          <rect x="30" y="20" width="260" height="140" rx="20" fill="#0f172a" stroke="#8b5cf6" stroke-width="3"/>
+          <!-- Hexagonal grid lines -->
+          <line x1="160" y1="20" x2="160" y2="160" stroke="#a855f7" stroke-width="3"/>
+          <circle cx="160" cy="90" r="35" fill="none" stroke="#a855f7" stroke-width="2"/>
+          <circle cx="80" cy="90" r="20" fill="#7c3aed" stroke="#c084fc" stroke-width="4"/>
+          <circle cx="80" cy="90" r="7" fill="#ffffff"/>
+          <circle cx="240" cy="100" r="20" fill="#db2777" stroke="#f472b6" stroke-width="4"/>
+          <circle cx="240" cy="100" r="7" fill="#ffffff"/>
+          <circle cx="150" cy="90" r="9" fill="#38bdf8" stroke="#ffffff" stroke-width="2"/>
+          <text x="160" y="15" font-family="monospace" font-size="9" fill="#c084fc" text-anchor="middle">CYBER HOCKEY 60FPS</text>
+        </svg>
+      `;
+
+    case 'drift-racing':
+      return `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" width="100%" height="100%">
+          <rect width="320" height="180" fill="#18181b"/>
+          <!-- Track curve -->
+          <path d="M 30 180 C 40 80, 200 60, 290 20" stroke="#3f3f46" stroke-width="70" fill="none"/>
+          <path d="M 30 180 C 40 80, 200 60, 290 20" stroke="#ef4444" stroke-width="4" stroke-dasharray="10 10" fill="none"/>
+          <!-- Red Racing Car drifting -->
+          <g transform="translate(130, 80) rotate(-25)">
+            <rect x="0" y="0" width="40" height="22" rx="6" fill="#dc2626"/>
+            <rect x="10" y="4" width="16" height="14" rx="3" fill="#1e293b"/>
+            <!-- Wheels -->
+            <rect x="4" y="-3" width="8" height="5" rx="1" fill="#000000"/>
+            <rect x="28" y="-3" width="8" height="5" rx="1" fill="#000000"/>
+            <rect x="4" y="20" width="8" height="5" rx="1" fill="#000000"/>
+            <rect x="28" y="20" width="8" height="5" rx="1" fill="#000000"/>
+            <!-- Drift Smoke -->
+            <circle cx="-5" cy="5" r="7" fill="#e4e4e7" opacity="0.4"/>
+            <circle cx="-12" cy="14" r="9" fill="#e4e4e7" opacity="0.3"/>
+          </g>
+        </svg>
+      `;
+
+    case 'synthwave-racer-3d':
+      return `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" width="100%" height="100%">
+          <defs>
+            <linearGradient id="synthSky" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#2e1065"/>
+              <stop offset="50%" stop-color="#701a75"/>
+              <stop offset="100%" stop-color="#db2777"/>
+            </linearGradient>
+          </defs>
+          <rect width="320" height="90" fill="url(#synthSky)"/>
+          <circle cx="160" cy="90" r="36" fill="#fde047"/>
+          <rect x="0" y="90" width="320" height="90" fill="#090514"/>
+          <!-- Perspective grid highway -->
+          <line x1="160" y1="90" x2="20" y2="180" stroke="#a855f7" stroke-width="2"/>
+          <line x1="160" y1="90" x2="90" y2="180" stroke="#06b6d4" stroke-width="2"/>
+          <line x1="160" y1="90" x2="160" y2="180" stroke="#f43f5e" stroke-width="3" stroke-dasharray="10 10"/>
+          <line x1="160" y1="90" x2="230" y2="180" stroke="#06b6d4" stroke-width="2"/>
+          <line x1="160" y1="90" x2="300" y2="180" stroke="#a855f7" stroke-width="2"/>
+          <!-- Sports Car -->
+          <g transform="translate(142, 130)">
+            <rect x="5" y="0" width="26" height="28" rx="6" fill="#06b6d4"/>
+            <rect x="8" y="5" width="20" height="12" rx="3" fill="#1e1b4b"/>
+            <rect x="1" y="4" width="4" height="8" rx="2" fill="#000000"/>
+            <rect x="31" y="4" width="4" height="8" rx="2" fill="#000000"/>
+            <rect x="1" y="18" width="4" height="8" rx="2" fill="#000000"/>
+            <rect x="31" y="18" width="4" height="8" rx="2" fill="#000000"/>
+            <rect x="6" y="25" width="7" height="3" fill="#38bdf8"/>
+            <rect x="23" y="25" width="7" height="3" fill="#38bdf8"/>
+          </g>
+        </svg>
+      `;
+
+    case 'pinball':
+      return `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" width="100%" height="100%">
+          <rect width="320" height="180" fill="#1e1b4b"/>
+          <g transform="translate(85, 10)">
+            <rect width="150" height="160" rx="16" fill="#312e81" stroke="#facc15" stroke-width="3"/>
+            <circle cx="50" cy="50" r="15" fill="#f43f5e" stroke="#fda4af" stroke-width="3"/>
+            <circle cx="100" cy="50" r="15" fill="#06b6d4" stroke="#67e8f9" stroke-width="3"/>
+            <circle cx="75" cy="85" r="14" fill="#eab308" stroke="#fef08a" stroke-width="3"/>
+            <line x1="30" y1="135" x2="65" y2="148" stroke="#facc15" stroke-width="8" stroke-linecap="round"/>
+            <line x1="120" y1="135" x2="85" y2="148" stroke="#facc15" stroke-width="8" stroke-linecap="round"/>
+            <circle cx="75" cy="115" r="6" fill="#ffffff" stroke="#94a3b8" stroke-width="2"/>
+          </g>
+        </svg>
+      `;
+
+    case 'cyber-pinball':
+      return `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" width="100%" height="100%">
+          <rect width="320" height="180" fill="#0b0f19"/>
+          <g transform="translate(85, 10)">
+            <rect width="150" height="160" rx="16" fill="#111827" stroke="#8b5cf6" stroke-width="3"/>
+            <circle cx="50" cy="50" r="15" fill="#f43f5e" stroke="#fda4af" stroke-width="3"/>
+            <circle cx="100" cy="50" r="15" fill="#06b6d4" stroke="#67e8f9" stroke-width="3"/>
+            <circle cx="75" cy="85" r="14" fill="#a855f7" stroke="#d8b4fe" stroke-width="3"/>
+            <line x1="30" y1="135" x2="65" y2="148" stroke="#38bdf8" stroke-width="8" stroke-linecap="round"/>
+            <line x1="120" y1="135" x2="85" y2="148" stroke="#38bdf8" stroke-width="8" stroke-linecap="round"/>
+            <circle cx="75" cy="115" r="6" fill="#ffffff" stroke="#94a3b8" stroke-width="2"/>
+          </g>
+        </svg>
+      `;
+
+    case 'wordle':
+      return `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" width="100%" height="100%">
+          <rect width="320" height="180" fill="#121213"/>
+          <g transform="translate(60, 20)">
+            <!-- Row 1: Word "AUDIO" -->
+            <rect x="0" y="0" width="36" height="36" rx="4" fill="#538d4e"/>
+            <text x="18" y="26" font-family="sans-serif" font-size="20" font-weight="bold" fill="#ffffff" text-anchor="middle">A</text>
+            <rect x="42" y="0" width="36" height="36" rx="4" fill="#3a3a3c"/>
+            <text x="60" y="26" font-family="sans-serif" font-size="20" font-weight="bold" fill="#ffffff" text-anchor="middle">U</text>
+            <rect x="84" y="0" width="36" height="36" rx="4" fill="#b59f3b"/>
+            <text x="102" y="26" font-family="sans-serif" font-size="20" font-weight="bold" fill="#ffffff" text-anchor="middle">D</text>
+            <rect x="126" y="0" width="36" height="36" rx="4" fill="#3a3a3c"/>
+            <text x="144" y="26" font-family="sans-serif" font-size="20" font-weight="bold" fill="#ffffff" text-anchor="middle">I</text>
+            <rect x="168" y="0" width="36" height="36" rx="4" fill="#538d4e"/>
+            <text x="186" y="26" font-family="sans-serif" font-size="20" font-weight="bold" fill="#ffffff" text-anchor="middle">O</text>
+
+            <!-- Row 2: Winning Word "MEDIA" -->
+            <rect x="0" y="44" width="36" height="36" rx="4" fill="#538d4e"/>
+            <text x="18" y="70" font-family="sans-serif" font-size="20" font-weight="bold" fill="#ffffff" text-anchor="middle">M</text>
+            <rect x="42" y="44" width="36" height="36" rx="4" fill="#538d4e"/>
+            <text x="60" y="70" font-family="sans-serif" font-size="20" font-weight="bold" fill="#ffffff" text-anchor="middle">E</text>
+            <rect x="84" y="44" width="36" height="36" rx="4" fill="#538d4e"/>
+            <text x="102" y="70" font-family="sans-serif" font-size="20" font-weight="bold" fill="#ffffff" text-anchor="middle">D</text>
+            <rect x="126" y="44" width="36" height="36" rx="4" fill="#538d4e"/>
+            <text x="144" y="70" font-family="sans-serif" font-size="20" font-weight="bold" fill="#ffffff" text-anchor="middle">I</text>
+            <rect x="168" y="44" width="36" height="36" rx="4" fill="#538d4e"/>
+            <text x="186" y="70" font-family="sans-serif" font-size="20" font-weight="bold" fill="#ffffff" text-anchor="middle">A</text>
+
+            <!-- Row 3: Empty placeholders -->
+            <rect x="0" y="88" width="36" height="36" rx="4" fill="none" stroke="#3a3a3c" stroke-width="2"/>
+            <rect x="42" y="88" width="36" height="36" rx="4" fill="none" stroke="#3a3a3c" stroke-width="2"/>
+            <rect x="84" y="88" width="36" height="36" rx="4" fill="none" stroke="#3a3a3c" stroke-width="2"/>
+            <rect x="126" y="88" width="36" height="36" rx="4" fill="none" stroke="#3a3a3c" stroke-width="2"/>
+            <rect x="168" y="88" width="36" height="36" rx="4" fill="none" stroke="#3a3a3c" stroke-width="2"/>
+          </g>
+        </svg>
+      `;
+
+    case 'helix-jump-canvas':
+      return `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" width="100%" height="100%">
+          <rect width="320" height="180" fill="#0f0728"/>
+          <g transform="translate(120, 15)">
+            <rect x="30" y="0" width="20" height="150" fill="#3b0764"/>
+            <ellipse cx="40" cy="30" rx="35" ry="12" fill="#7e22ce"/>
+            <ellipse cx="40" cy="70" rx="35" ry="12" fill="#a855f7"/>
+            <ellipse cx="25" cy="70" rx="15" ry="8" fill="#0f0728"/>
+            <ellipse cx="40" cy="110" rx="35" ry="12" fill="#7e22ce"/>
+            <ellipse cx="50" cy="110" rx="12" ry="6" fill="#ef4444"/>
+            <circle cx="40" cy="52" r="8" fill="#38bdf8" stroke="#e0f2fe" stroke-width="2"/>
+          </g>
+        </svg>
+      `;
+
+    case 'traffic-crossy-road':
+      return `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" width="100%" height="100%">
+          <rect width="320" height="180" fill="#064e3b"/>
+          <rect x="0" y="25" width="320" height="40" fill="#0284c7"/>
+          <rect x="40" y="32" width="60" height="14" rx="4" fill="#78350f"/>
+          <rect x="180" y="44" width="70" height="14" rx="4" fill="#78350f"/>
+          <rect x="0" y="80" width="320" height="60" fill="#1f2937"/>
+          <line x1="0" y1="110" x2="320" y2="110" stroke="#facc15" stroke-width="2" stroke-dasharray="12 12"/>
+          <rect x="60" y="86" width="36" height="18" rx="4" fill="#ef4444"/>
+          <rect x="220" y="116" width="40" height="18" rx="4" fill="#06b6d4"/>
+          <circle cx="160" cy="155" r="9" fill="#22c55e"/>
+          <circle cx="157" cy="152" r="2.5" fill="#000000"/>
+          <circle cx="163" cy="152" r="2.5" fill="#000000"/>
+        </svg>
+      `;
+
+    case 'frogger':
+      return `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" width="100%" height="100%">
+          <rect width="320" height="180" fill="#022c22"/>
+          <rect x="0" y="20" width="320" height="45" fill="#0369a1"/>
+          <rect x="20" y="26" width="70" height="14" rx="3" fill="#854d0e"/>
+          <rect x="150" y="40" width="85" height="14" rx="3" fill="#854d0e"/>
+          <rect x="0" y="75" width="320" height="30" fill="#166534"/>
+          <rect x="0" y="110" width="320" height="50" fill="#111827"/>
+          <rect x="70" y="118" width="34" height="16" rx="3" fill="#f59e0b"/>
+          <rect x="190" y="128" width="34" height="16" rx="3" fill="#ec4899"/>
+          <circle cx="160" cy="90" r="10" fill="#4ade80"/>
+          <text x="160" y="172" font-family="monospace" font-size="9" fill="#86efac" text-anchor="middle">RETRO FROGGER 1981</text>
+        </svg>
+      `;
+
+    case 'sand-physics-sandbox':
+      return `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" width="100%" height="100%">
+          <rect width="320" height="180" fill="#0b0f19"/>
+          <line x1="60" y1="30" x2="130" y2="90" stroke="#64748b" stroke-width="6" stroke-linecap="round"/>
+          <line x1="260" y1="30" x2="190" y2="90" stroke="#64748b" stroke-width="6" stroke-linecap="round"/>
+          <circle cx="160" cy="100" r="3" fill="#facc15"/>
+          <circle cx="160" cy="110" r="3" fill="#facc15"/>
+          <circle cx="160" cy="120" r="3" fill="#facc15"/>
+          <polygon points="110,165 160,130 210,165" fill="#eab308"/>
+          <rect x="20" y="150" width="60" height="15" rx="3" fill="#0284c7" opacity="0.8"/>
+          <circle cx="250" cy="140" r="5" fill="#ef4444"/>
+          <circle cx="255" cy="130" r="4" fill="#f97316"/>
+          <circle cx="250" cy="122" r="3" fill="#facc15"/>
+        </svg>
+      `;
+
     default:
       // Generic high-res arcade visualizer tailored to category colors
       return `
