@@ -36,11 +36,11 @@ describe('Local Media Resolution & macOS Packaging Audit', () => {
       'MikiPlayerApp.swift must register media-stream URL scheme handler'
     );
 
-    // 2. Verify bundled asset loading (loadFileURL) instead of only localhost:1420
+    // 2. Verify bundled asset loading (AppAssetSchemeHandler / app://localhost or loadFileURL) instead of only localhost:1420
     assert.match(
       swiftCode,
-      /loadFileURL/i,
-      'MikiPlayerApp.swift must support loadFileURL for bundled production assets'
+      /(app:\/\/localhost|AppAssetSchemeHandler|loadFileURL)/i,
+      'MikiPlayerApp.swift must support bundled production asset loading'
     );
   });
 });

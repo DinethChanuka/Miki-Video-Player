@@ -142,6 +142,81 @@ class MediaStreamSchemeHandler: NSObject, WKURLSchemeHandler {
     func webView(_ webView: WKWebView, stop urlSchemeTask: WKURLSchemeTask) {}
 }
 
+class AppAssetSchemeHandler: NSObject, WKURLSchemeHandler {
+    func getDistUrl() -> URL? {
+        if let bundleDist = Bundle.main.url(forResource: "index", withExtension: "html", subdirectory: "dist") {
+            return bundleDist.deletingLastPathComponent()
+        }
+        if let resUrl = Bundle.main.resourceURL?.appendingPathComponent("dist"),
+           FileManager.default.fileExists(atPath: resUrl.path) {
+            return resUrl
+        }
+        let devDist = URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("dist")
+        if FileManager.default.fileExists(atPath: devDist.path) {
+            return devDist
+        }
+        return nil
+    }
+
+    func webView(_ webView: WKWebView, start urlSchemeTask: WKURLSchemeTask) {
+        guard let url = urlSchemeTask.request.url else {
+            urlSchemeTask.didFailWithError(NSError(domain: "AppScheme", code: 400, userInfo: nil))
+            return
+        }
+
+        var path = url.path
+        if path.isEmpty || path == "/" {
+            path = "/index.html"
+        }
+
+        let cleanRelPath = path.hasPrefix("/") ? String(path.dropFirst()) : path
+
+        guard let distUrl = getDistUrl() else {
+            urlSchemeTask.didFailWithError(NSError(domain: "AppScheme", code: 404, userInfo: [NSLocalizedDescriptionKey: "Dist directory not found"]))
+            return
+        }
+
+        let fileUrl = distUrl.appendingPathComponent(cleanRelPath)
+
+        guard FileManager.default.fileExists(atPath: fileUrl.path),
+              let data = try? Data(contentsOf: fileUrl) else {
+            NSLog("[Miki AppScheme] Resource not found: %@", cleanRelPath)
+            let res = HTTPURLResponse(url: url, statusCode: 404, httpVersion: "HTTP/1.1", headerFields: nil)!
+            urlSchemeTask.didReceive(res)
+            urlSchemeTask.didFinish()
+            return
+        }
+
+        var mimeType = "application/octet-stream"
+        let ext = fileUrl.pathExtension.lowercased()
+        if ext == "html" { mimeType = "text/html; charset=utf-8" }
+        else if ext == "js" || ext == "mjs" { mimeType = "text/javascript; charset=utf-8" }
+        else if ext == "css" { mimeType = "text/css; charset=utf-8" }
+        else if ext == "png" { mimeType = "image/png" }
+        else if ext == "jpg" || ext == "jpeg" { mimeType = "image/jpeg" }
+        else if ext == "svg" { mimeType = "image/svg+xml" }
+        else if ext == "json" { mimeType = "application/json" }
+        else if ext == "woff2" { mimeType = "font/woff2" }
+        else if ext == "woff" { mimeType = "font/woff" }
+        else if ext == "ttf" { mimeType = "font/ttf" }
+        else if ext == "ico" { mimeType = "image/x-icon" }
+
+        let headers: [String: String] = [
+            "Content-Type": mimeType,
+            "Content-Length": "\(data.count)",
+            "Access-Control-Allow-Origin": "*",
+            "Cache-Control": "no-cache"
+        ]
+
+        let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: headers)!
+        urlSchemeTask.didReceive(response)
+        urlSchemeTask.didReceive(data)
+        urlSchemeTask.didFinish()
+    }
+
+    func webView(_ webView: WKWebView, stop urlSchemeTask: WKURLSchemeTask) {}
+}
+
 class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMessageHandler, WKUIDelegate, WKNavigationDelegate {
     var window: BorderlessKeyWindow!
     var webView: WKWebView!
@@ -215,7 +290,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
             config.preferences.isElementFullscreenEnabled = true
         }
 
-        // Register custom scheme handler for local media streaming (HTTP 206 partial content)
+        // Register custom scheme handlers:
+        // 1. "app://" for serving the bundled React SPA assets with standard CORS origin isolation
+        // 2. "media-stream://" for local file streaming with HTTP 206 byte-range seeking
+        config.setURLSchemeHandler(AppAssetSchemeHandler(), forURLScheme: "app")
         config.setURLSchemeHandler(MediaStreamSchemeHandler(), forURLScheme: "media-stream")
 
         // Window controls & Native dialogs IPC script handler
@@ -233,22 +311,21 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         webView.autoresizingMask = [.width, .height]
         webView.setValue(false, forKey: "drawsBackground") // Transparent background
         webView.uiDelegate = self
+        webView.navigationDelegate = self
 
         window.contentView?.addSubview(webView)
         window.makeKeyAndOrderFront(nil)
         window.makeFirstResponder(webView)
         NSApp.activate(ignoringOtherApps: true)
 
-        // Production: Load bundled dist/index.html via loadFileURL with allowingReadAccessTo
-        if let bundleDist = Bundle.main.url(forResource: "index", withExtension: "html", subdirectory: "dist") {
-            webView.loadFileURL(bundleDist, allowingReadAccessTo: URL(fileURLWithPath: "/"))
-        } else if let resourceUrl = Bundle.main.resourceURL?.appendingPathComponent("dist/index.html"),
-                  FileManager.default.fileExists(atPath: resourceUrl.path) {
-            webView.loadFileURL(resourceUrl, allowingReadAccessTo: URL(fileURLWithPath: "/"))
-        } else {
-            let appUrl = URL(string: "http://localhost:1420/")!
-            webView.load(URLRequest(url: appUrl))
-        }
+        // Production: Load bundled dist/index.html via custom "app://" scheme handler
+        let appUrl = URL(string: "app://localhost/index.html")!
+        webView.load(URLRequest(url: appUrl))
+    }
+
+    // Fallback loadFileURL method for legacy direct file loading
+    private func loadFileUrlFallback(_ url: URL) {
+        webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
     }
 
     private func setupMainMenu() {
@@ -608,6 +685,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         if webView == self.browserWebView {
             let js = "window.dispatchEvent(new CustomEvent('miki:browser-loading-finish', { detail: { error: '\(error.localizedDescription)' } }));"
             self.webView.evaluateJavaScript(js, completionHandler: nil)
+        } else if webView == self.webView {
+            NSLog("[Miki] Main webView navigation failed: %@. Falling back to dev server.", error.localizedDescription)
+            let devUrl = URL(string: "http://localhost:1420/")!
+            self.webView.load(URLRequest(url: devUrl))
         }
     }
 
@@ -615,6 +696,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         if webView == self.browserWebView {
             let js = "window.dispatchEvent(new CustomEvent('miki:browser-loading-finish', { detail: { error: '\(error.localizedDescription)' } }));"
             self.webView.evaluateJavaScript(js, completionHandler: nil)
+        } else if webView == self.webView {
+            NSLog("[Miki] Main webView provisional navigation failed: %@. Falling back to dev server.", error.localizedDescription)
+            let devUrl = URL(string: "http://localhost:1420/")!
+            self.webView.load(URLRequest(url: devUrl))
         }
     }
 

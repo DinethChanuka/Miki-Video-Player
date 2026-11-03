@@ -36,3 +36,4 @@ describe('Task 2: Buffering Error State & Infinite Spinner Prevention Audit', ()
     );
   });
 });
+

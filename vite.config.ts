@@ -203,6 +203,7 @@ function localMediaStreamerPlugin() {
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  base: './',
   plugins: [react(), localMediaStreamerPlugin()],
   clearScreen: false,
   server: {
