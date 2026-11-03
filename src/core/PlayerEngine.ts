@@ -460,7 +460,38 @@ export class WebMediaEngine implements IPlayerEngine {
         this.play().catch(() => {});
       });
       this.hls.on(Hls.Events.ERROR, (_event, data) => {
+        // Dynamic Stream Healing: If a specific stream level fails to load (e.g. 404 on high bitrate variant),
+        // gracefully downscale level index instead of throwing fatal crash
+        if (
+          data.details === Hls.ErrorDetails.LEVEL_LOAD_ERROR ||
+          data.details === Hls.ErrorDetails.LEVEL_LOAD_TIMEOUT
+        ) {
+          if (this.hls && this.hls.levels && this.hls.levels.length > 1) {
+            logWarn(`[PlayerEngine] LEVEL_LOAD_ERROR (${data.details}). Attempting level downscale recovery.`);
+            const nextIdx = Math.max(0, this.hls.currentLevel > 0 ? this.hls.currentLevel - 1 : 0);
+            this.hls.nextLevel = nextIdx;
+            this.hls.startLoad();
+            return;
+          }
+        }
+
         if (data.fatal) {
+          // Attempt built-in HLS.js automated recoveries before propagating error
+          switch (data.type) {
+            case Hls.ErrorTypes.NETWORK_ERROR:
+              logWarn(`[PlayerEngine] Fatal HLS network error (${data.details}). Attempting hls.startLoad() recovery.`);
+              this.hls?.startLoad();
+              break;
+            case Hls.ErrorTypes.MEDIA_ERROR:
+              logWarn(`[PlayerEngine] Fatal HLS media error (${data.details}). Attempting hls.recoverMediaError() recovery.`);
+              this.hls?.recoverMediaError();
+              break;
+            default:
+              this.hls?.destroy();
+              this.hls = null;
+              break;
+          }
+
           if (typeof window !== 'undefined') {
             import('../store/playerStore')
               .then(({ usePlayerStore }) => usePlayerStore.setState({ isBuffering: false }))

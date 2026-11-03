@@ -912,6 +912,25 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
         return;
       }
 
+      // Automated Channel Self-Healing: If a live channel fails, immediately attempt backup mirror URLs
+      if (curUri && (error.code === 'STREAM_TIMEOUT' || error.code === 'STREAM_ERROR' || error.code === 'CODEC_UNSUPPORTED')) {
+        try {
+          const { getChannelByUri, getChannelBackupUrl } = await import('../utils/channelCatalog.ts');
+          const channel = getChannelByUri(curUri);
+          if (channel && channel.backupUrls && channel.backupUrls.length > 0) {
+            const nextBackup = getChannelBackupUrl(channel.streamUrl, curUri);
+            if (nextBackup && nextBackup !== curUri) {
+              console.log(`[playerStore] Live channel ${channel.name} encountered ${error.message}. Auto-healing via backup mirror: ${nextBackup}`);
+              set({ isBuffering: true, lastError: null, retryCount: 0 });
+              await get().openMedia(nextBackup, channel.name);
+              return;
+            }
+          }
+        } catch (e) {
+          console.warn('[playerStore] Channel failover lookup error:', e);
+        }
+      }
+
       set({ lastError: error, isBuffering: false });
 
       // Automated Self-Healing Recovery Execution
