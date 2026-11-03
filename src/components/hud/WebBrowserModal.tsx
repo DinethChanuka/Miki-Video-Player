@@ -86,6 +86,7 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
   const [quickUrlInput, setQuickUrlInput] = useState<string>('');
   const [isAdShieldActive, setIsAdShieldActive] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [frameBlocked, setFrameBlocked] = useState<boolean>(false);
   const [blockedCount, setBlockedCount] = useState<number>(18);
   const [detectedMediaUrl, setDetectedMediaUrl] = useState<string | null>(null);
   const [detectedMediaTitle, setDetectedMediaTitle] = useState<string | null>(null);
@@ -110,9 +111,10 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
   // Synchronize with native top-level WKWebView when browser modal is opened
   useEffect(() => {
     if (isOpen) {
-      const clean = getCleanUrl(initialUrl || 'https://cinesubz.co');
+      const clean = getCleanUrl(initialUrl || 'https://cinesubz.lk');
       setCurrentUrl(clean);
       setIsLoading(true);
+      setFrameBlocked(false);
       setDetectedMediaUrl(null);
 
       const handlers = getWebkitHandlers();
@@ -124,6 +126,19 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
       }
     }
   }, [isOpen, initialUrl]);
+
+  // Fallback detection for iframe X-Frame-Options SAMEORIGIN blocking
+  useEffect(() => {
+    if (!isNativeBrowserSupported && isOpen) {
+      const timer = setTimeout(() => {
+        if (isLoading) {
+          setIsLoading(false);
+          setFrameBlocked(true);
+        }
+      }, 6000);
+      return () => clearTimeout(timer);
+    }
+  }, [isNativeBrowserSupported, isOpen, currentUrl, isLoading]);
 
   // Listen for native browser loading & navigation events
   useEffect(() => {
@@ -580,10 +595,55 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
             sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation allow-downloads allow-modals"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
             allowFullScreen
-            onLoad={() => setIsLoading(false)}
-            onError={() => setIsLoading(false)}
+            onLoad={() => {
+              setIsLoading(false);
+              setFrameBlocked(false);
+            }}
+            onError={() => {
+              setIsLoading(false);
+              setFrameBlocked(true);
+            }}
             className="w-full h-full border-0 bg-slate-950 pointer-events-auto"
           />
+        )}
+
+        {/* Framing Protection & Black Screen Prevention Card */}
+        {!isNativeBrowserSupported && frameBlocked && (
+          <div className="absolute inset-0 z-30 flex flex-col items-center justify-center p-6 bg-slate-950/95 text-center pointer-events-auto animate-in fade-in duration-200">
+            <div className="w-14 h-14 rounded-2xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-4 shadow-lg shadow-amber-500/10">
+              <ShieldAlert className="w-7 h-7" />
+            </div>
+            <h3 className="text-base font-bold text-white mb-1.5">Website Embed Protected</h3>
+            <p className="text-xs text-slate-300 max-w-md mb-6 leading-relaxed">
+              This cinema portal (<span className="text-cyan-400 font-mono font-semibold">{siteHostname}</span>) enforces strict frame security (<span className="font-mono text-amber-300">X-Frame-Options: SAMEORIGIN</span>).
+              You can play streams directly in the native player engine or open the website in your browser.
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <button
+                onClick={handlePlayInPlayer}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:brightness-110 active:scale-95 text-white font-bold text-xs shadow-lg transition-all"
+              >
+                <Play className="w-4 h-4 fill-white" />
+                <span>Play in Native Player</span>
+              </button>
+              <a
+                href={currentUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-white font-semibold text-xs transition-all border border-white/10"
+              >
+                <ExternalLink className="w-4 h-4 text-cyan-400" />
+                <span>Open in External Browser</span>
+              </a>
+              <button
+                onClick={handleReload}
+                className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/70 hover:text-white text-xs font-semibold transition-all"
+              >
+                <RotateCw className="w-3.5 h-3.5" />
+                <span>Retry</span>
+              </button>
+            </div>
+          </div>
         )}
       </div>
     </div>

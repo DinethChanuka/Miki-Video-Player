@@ -532,6 +532,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         let initialFrame = NSRect(x: 0, y: 0, width: contentBounds.width, height: max(100, contentBounds.height - 44))
         let bView = WKWebView(frame: initialFrame, configuration: config)
         bView.autoresizingMask = [.width, .height]
+        bView.wantsLayer = true
+        bView.setValue(true, forKey: "drawsBackground")
         bView.customUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15"
         bView.uiDelegate = self
         bView.navigationDelegate = self

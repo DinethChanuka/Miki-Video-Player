@@ -28,7 +28,7 @@ export const CINEMA_LINKS: CinemaSiteItem[] = [
   {
     id: 'cinesubz',
     name: 'CineSubz Movies & Series',
-    url: 'https://cinesubz.co',
+    url: 'https://cinesubz.lk',
     logoUrl: 'https://www.google.com/s2/favicons?domain=cinesubz.lk&sz=128',
     category: 'Subtitles',
     description: 'Premier Sinhala subtitle movie portal with international HD blockbusters & TV series.',
