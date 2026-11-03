@@ -35,6 +35,9 @@ import {
 } from '../utils/pathUtils';
 import { parseWebStream, isDirectMediaUrl, WebPlatform } from '../utils/webStreamUtils';
 import { getChannelByUri, getChannelBackupUrl, getChannelByName } from '../utils/channelCatalog';
+import { StreamFailoverManager } from '../core/StreamFailoverManager.ts';
+
+let activeFailoverManager: StreamFailoverManager | null = null;
 
 export interface MediaHistoryItem {
   mediaId: string;
@@ -176,6 +179,7 @@ export interface PlayerStoreState {
 
   // Actions
   bootEngine: (preferred?: EngineType, videoEl?: HTMLVideoElement) => Promise<void>;
+  handleStreamError: (error: PlayerErrorEnvelope) => Promise<void>;
   openMedia: (uri: string, title?: string, autoResume?: boolean, startPositionMs?: number) => Promise<void>;
   closeMedia: () => Promise<void>;
   togglePlay: () => Promise<void>;
@@ -907,65 +911,7 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     });
 
     engine.onError(async (error: PlayerErrorEnvelope) => {
-      // Never display codec errors or trigger retry loops for YouTube embeds
-      const curUri = get().currentUri;
-      if (curUri && /(?:youtube\.com|youtu\.be)/.test(curUri)) {
-        return;
-      }
-
-      // Automated Channel Self-Healing: If a live channel fails, immediately attempt backup mirror URLs
-      if (curUri && (error.code === 'STREAM_TIMEOUT' || error.code === 'STREAM_ERROR' || error.code === 'CODEC_UNSUPPORTED')) {
-        try {
-          const curTitle = get().currentTitle;
-          const channel = (curTitle ? getChannelByName(curTitle) : undefined) || getChannelByUri(curUri);
-          if (channel && channel.backupUrls && channel.backupUrls.length > 0) {
-            const nextBackup = getChannelBackupUrl(channel.name, curUri) || getChannelBackupUrl(channel.streamUrl, curUri);
-            if (nextBackup && nextBackup !== curUri) {
-              console.log(`[playerStore] Live channel ${channel.name} encountered ${error.message}. Auto-healing via backup mirror: ${nextBackup}`);
-              set({ isBuffering: true, lastError: null, retryCount: 0 });
-              await get().openMedia(nextBackup, channel.name);
-              return;
-            }
-          }
-        } catch (e) {
-          console.warn('[playerStore] Channel failover lookup error:', e);
-        }
-      }
-
-      set({ lastError: error, isBuffering: false });
-
-      // Automated Self-Healing Recovery Execution
-      if (error.recovery === 'fallback_to_web_engine' && get().activeEngineType !== 'web-media') {
-        await get().bootEngine('web-media', videoEl);
-        const uri = get().currentUri;
-        if (uri) await get().openMedia(uri, get().currentTitle);
-      } else if (error.recovery === 'retry_with_backoff' && get().retryCount < 3) {
-        const nextRetry = get().retryCount + 1;
-        set({ retryCount: nextRetry });
-        const delayMs = Math.pow(2, nextRetry) * 500;
-        const capturedSessionId = get().currentSessionId;
-
-        if (activeRetryTimer) {
-          clearTimeout(activeRetryTimer);
-        }
-
-        activeRetryTimer = setTimeout(() => {
-          activeRetryTimer = null;
-          if (get().currentSessionId !== capturedSessionId) {
-            // Media was switched or session was closed during the backoff delay
-            return;
-          }
-          const uri = get().currentUri;
-          if (uri && !/(?:youtube\.com|youtu\.be)/.test(uri)) {
-            // Only retry engine.load on local files or direct media files; avoid retrying web pages or cinema embeds
-            if (isDirectMediaUrl(uri) || (!uri.startsWith('http://') && !uri.startsWith('https://'))) {
-              get().engine?.load(uri, get().positionMs);
-            }
-          }
-        }, delayMs);
-      } else if (error.recovery === 'reset_audio_filters') {
-        await get().setEqualizer([0, 0, 0, 0, 0, 0, 0, 0, 0, 0], false);
-      }
+      await get().handleStreamError(error);
     });
 
     try {
@@ -981,6 +927,90 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
       } else {
         set({ lastError: parsed });
       }
+    }
+  },
+
+  handleStreamError: async (error: PlayerErrorEnvelope) => {
+    // Never display codec errors or trigger retry loops for YouTube embeds
+    const curUri = get().currentUri;
+    if (curUri && /(?:youtube\.com|youtu\.be)/.test(curUri)) {
+      return;
+    }
+
+    // Automated Channel Self-Healing: If a live channel fails, coordinate with StreamFailoverManager
+    if (curUri && (error.code === 'STREAM_TIMEOUT' || error.code === 'STREAM_ERROR' || error.code === 'CODEC_UNSUPPORTED')) {
+      try {
+        const curTitle = get().currentTitle;
+        const channel = (curTitle ? getChannelByName(curTitle) : undefined) || getChannelByUri(curUri);
+        if (channel && channel.backupUrls && channel.backupUrls.length > 0) {
+          if (!activeFailoverManager || activeFailoverManager.getCurrentUrl() !== curUri) {
+            activeFailoverManager = new StreamFailoverManager({
+              primaryUrl: channel.streamUrl,
+              backupUrls: channel.backupUrls,
+              channelName: channel.name,
+              maxRetriesPerSource: 1,
+            });
+          }
+          const failover = activeFailoverManager.recordFailure(error.message);
+          const nextBackup = failover.action === 'switch_source' ? failover.url : (getChannelBackupUrl(channel.name, curUri) || getChannelBackupUrl(channel.streamUrl, curUri));
+
+          if (failover.action === 'switch_source' && nextBackup && nextBackup !== curUri) {
+            console.log(`[playerStore] Live channel ${channel.name} encountered ${error.message}. Auto-healing via backup mirror: ${nextBackup}`);
+            set({ isBuffering: true, lastError: null, retryCount: 0 });
+            await get().openMedia(nextBackup, channel.name, false);
+            return;
+          } else if (failover.action === 'exhausted') {
+            console.warn(`[playerStore] All backup mirrors exhausted for ${channel.name}`);
+            set({
+              isBuffering: false,
+              lastError: {
+                code: 'STREAM_TIMEOUT',
+                message: `All broadcast streams for ${channel.name} are currently unreachable.`,
+                details: 'Every configured primary and secondary CDN mirror timed out or rejected the connection.',
+                severity: 'critical',
+                recovery: 'none',
+                timestampMs: Date.now(),
+              },
+            });
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn('[playerStore] Channel failover lookup error:', e);
+      }
+    }
+
+    set({ lastError: error, isBuffering: false });
+
+    // Automated Self-Healing Recovery Execution
+    if (error.recovery === 'fallback_to_web_engine' && get().activeEngineType !== 'web-media') {
+      await get().bootEngine('web-media');
+      const uri = get().currentUri;
+      if (uri) await get().openMedia(uri, get().currentTitle);
+    } else if (error.recovery === 'retry_with_backoff' && get().retryCount < 3) {
+      const nextRetry = get().retryCount + 1;
+      set({ retryCount: nextRetry });
+      const delayMs = Math.pow(2, nextRetry) * 500;
+      const capturedSessionId = get().currentSessionId;
+
+      if (activeRetryTimer) {
+        clearTimeout(activeRetryTimer);
+      }
+
+      activeRetryTimer = setTimeout(() => {
+        activeRetryTimer = null;
+        if (get().currentSessionId !== capturedSessionId) {
+          return;
+        }
+        const uri = get().currentUri;
+        if (uri && !/(?:youtube\.com|youtu\.be)/.test(uri)) {
+          if (isDirectMediaUrl(uri) || (!uri.startsWith('http://') && !uri.startsWith('https://'))) {
+            get().engine?.load(uri, get().positionMs);
+          }
+        }
+      }, delayMs);
+    } else if (error.recovery === 'reset_audio_filters') {
+      await get().setEqualizer([0, 0, 0, 0, 0, 0, 0, 0, 0, 0], false);
     }
   },
 
@@ -1221,6 +1251,10 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     if (activeRetryTimer) {
       clearTimeout(activeRetryTimer);
       activeRetryTimer = null;
+    }
+    if (activeFailoverManager) {
+      activeFailoverManager.cancel();
+      activeFailoverManager = null;
     }
     const closedSessionId = `session_closed_${Date.now()}_${++sessionCounter}`;
     set({ currentSessionId: closedSessionId, retryCount: 0 });

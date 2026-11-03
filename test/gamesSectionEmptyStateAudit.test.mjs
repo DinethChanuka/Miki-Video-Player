@@ -30,3 +30,4 @@ describe('Task 4: Games Section Visual Preview & Empty State Audit', () => {
     );
   });
 });
+

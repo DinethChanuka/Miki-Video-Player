@@ -1,6 +1,7 @@
 import { invoke, Channel } from '@tauri-apps/api/core';
 import Hls from 'hls.js';
 import { SpatialAudioEngine } from './SpatialAudioEngine';
+import { HlsStreamController } from './HlsStreamController.ts';
 
 export type EngineType = 'tauri-mpv' | 'web-media';
 
@@ -261,7 +262,11 @@ export function resolveMediaStreamUrl(uri: string): string {
 export class WebMediaEngine implements IPlayerEngine {
   public readonly engineType: EngineType = 'web-media';
   private videoEl: HTMLVideoElement | null = null;
-  private hls: Hls | null = null;
+  private hlsController: HlsStreamController | null = null;
+
+  public get hls(): Hls | null {
+    return this.hlsController?.getHlsInstance() || null;
+  }
   private audioCtx: AudioContext | null = null;
   private gainNode: GainNode | null = null;
   private eqBands: BiquadFilterNode[] = [];
@@ -417,18 +422,14 @@ export class WebMediaEngine implements IPlayerEngine {
     const el = this.getVideoEl();
     if (!el) return;
 
-    if (this.hls) {
-      this.hls.destroy();
-      this.hls = null;
+    if (this.hlsController) {
+      this.hlsController.destroy();
+      this.hlsController = null;
     }
 
     const resolvedUri = resolveMediaStreamUrl(uri);
     const isRemote = resolvedUri.startsWith('http://') || resolvedUri.startsWith('https://');
-    const isHls =
-      resolvedUri.includes('.m3u8') ||
-      resolvedUri.includes('/hls/') ||
-      resolvedUri.includes('master.m3u8') ||
-      resolvedUri.includes('playlist.m3u8');
+    const isHls = HlsStreamController.isHlsUrl(resolvedUri);
 
     // For remote streams without CORS headers, do not force crossOrigin to avoid MediaError rejection
     if (isRemote) {
@@ -437,94 +438,33 @@ export class WebMediaEngine implements IPlayerEngine {
       el.crossOrigin = 'anonymous';
     }
 
-    if (isHls && Hls.isSupported()) {
-      // High-performance Network Optimizer configuration with multi-tier backoff retries
-      this.hls = new Hls({
-        enableWorker: true,
-        lowLatencyMode: true,
-        startFragPrefetch: true, // Fast initial frame prefetch
-        backBufferLength: 90,
-        maxBufferLength: 60,     // 60-second forward buffer
-        maxMaxBufferLength: 120,
-        maxBufferSize: 60 * 1024 * 1024, // 60MB memory buffer
-        progressive: true,
-        fragLoadingTimeOut: 20000,
-        manifestLoadingTimeOut: 15000,
-        levelLoadingTimeOut: 15000,
-        fragLoadingMaxRetry: 4,
-        manifestLoadingMaxRetry: 4,
-        levelLoadingMaxRetry: 4,
-        fragLoadingRetryDelay: 1000,
-        manifestLoadingRetryDelay: 1000,
-        levelLoadingRetryDelay: 1000,
-      });
-      this.hls.loadSource(resolvedUri);
-      this.hls.attachMedia(el);
-      this.hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        if (startPositionMs > 0) {
-          el.currentTime = startPositionMs / 1000;
-        }
-        this.play().catch(() => {});
-      });
-      this.hls.on(Hls.Events.ERROR, (_event, data) => {
-        // Dynamic Stream Healing: If a specific stream level fails to load (e.g. 404 on high bitrate variant),
-        // gracefully downscale level index instead of throwing fatal crash
-        if (
-          data.details === Hls.ErrorDetails.LEVEL_LOAD_ERROR ||
-          data.details === Hls.ErrorDetails.LEVEL_LOAD_TIMEOUT
-        ) {
-          if (this.hls && this.hls.levels && this.hls.levels.length > 1) {
-            logWarn(`[PlayerEngine] LEVEL_LOAD_ERROR (${data.details}). Attempting level downscale recovery.`);
-            const nextIdx = Math.max(0, this.hls.currentLevel > 0 ? this.hls.currentLevel - 1 : 0);
-            this.hls.nextLevel = nextIdx;
-            this.hls.startLoad();
-            return;
+    if (isHls) {
+      this.hlsController = new HlsStreamController({
+        maxNetworkRetries: 3,
+        onManifestParsed: () => {
+          if (startPositionMs > 0) {
+            el.currentTime = startPositionMs / 1000;
           }
-        }
-
-        if (data.fatal) {
-          // Native AVPlayer Fallback for WebKit / Safari when HLS.js cannot load CORS-restricted manifests or network streams
-          if (el.canPlayType('application/vnd.apple.mpegurl')) {
-            logWarn(`[PlayerEngine] HLS.js failed with ${data.details}. Seamlessly falling back to native WebKit AVPlayer.`);
-            this.hls?.destroy();
-            this.hls = null;
-            el.src = resolvedUri;
-            el.load();
-            this.play().catch(() => {});
-            return;
-          }
-
-          // Attempt built-in HLS.js automated recoveries before escalating to fatal error
-          switch (data.type) {
-            case Hls.ErrorTypes.NETWORK_ERROR:
-              logWarn(`[PlayerEngine] Fatal HLS network error (${data.details}). Attempting hls.startLoad() recovery.`);
-              this.hls?.startLoad();
-              return;
-            case Hls.ErrorTypes.MEDIA_ERROR:
-              logWarn(`[PlayerEngine] Fatal HLS media error (${data.details}). Attempting hls.recoverMediaError() recovery.`);
-              this.hls?.recoverMediaError();
-              return;
-            default:
-              break;
-          }
-
-          this.hls?.destroy();
-          this.hls = null;
-
+          this.play().catch(() => {});
+        },
+        onFatalError: (diag) => {
           if (typeof window !== 'undefined') {
             import('../store/playerStore')
               .then(({ usePlayerStore }) => usePlayerStore.setState({ isBuffering: false }))
               .catch(() => {});
           }
           this.emitError({
-            code: 'CODEC_UNSUPPORTED',
-            message: `HLS stream error: ${data.details}`,
+            code: diag.reason === 'CODEC_UNSUPPORTED' ? 'CODEC_UNSUPPORTED' : 'STREAM_TIMEOUT',
+            message: diag.userMessage,
+            details: `HLS error (${diag.reason}) on ${resolvedUri}`,
             severity: 'recoverable',
             recovery: 'retry_with_backoff',
             timestampMs: Date.now(),
           });
-        }
+        },
       });
+
+      this.hlsController.load(el, resolvedUri, startPositionMs);
     } else {
       el.src = resolvedUri;
       el.load();
@@ -758,7 +698,7 @@ export class WebMediaEngine implements IPlayerEngine {
 
   async destroy(): Promise<void> {
     if (this.rafId) cancelAnimationFrame(this.rafId);
-    this.hls?.destroy();
+    this.hlsController?.destroy();
     await this.audioCtx?.close().catch(() => {});
     this.telemetryListeners.clear();
     this.errorListeners.clear();

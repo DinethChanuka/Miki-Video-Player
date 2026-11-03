@@ -204,8 +204,8 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     category: 'Movies',
     streamUrl: 'https://30a-tv.com/gh.m3u8',
     backupUrls: [
-      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
-      'https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_16x9/bipbop_16x9_variant.m3u8'
+      'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8',
+      'https://cdn-euronews.akamaized.net/live/eds/euronews-en/25002/index.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1518676599649-7c77bc385fb7?auto=format&fit=crop&w=200&q=80',
     country: 'GLOBAL',
@@ -260,10 +260,10 @@ export const CURATED_CHANNELS: LiveChannel[] = [
   { id: 'nasa-tv',
     name: 'NASA TV Public HD',
     category: 'Tech',
-    streamUrl: 'https://30a-tv.com/gh.m3u8',
+    streamUrl: 'https://live-hls-web-aje-fa.thehlive.com/AJE/index.m3u8',
     backupUrls: [
-      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
-      'https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_16x9/bipbop_16x9_variant.m3u8'
+      'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8',
+      'https://cdn-euronews.akamaized.net/live/eds/euronews-en/25002/index.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=200&q=80',
     country: 'US',
@@ -274,10 +274,10 @@ export const CURATED_CHANNELS: LiveChannel[] = [
   { id: 'nasa-iss-cam',
     name: 'ISS Earth Views Live',
     category: 'Tech',
-    streamUrl: 'https://30a-tv.com/gh.m3u8',
+    streamUrl: 'https://dwamdstream104.akamaized.net/hls/live/2015530/dwstream104/index.m3u8',
     backupUrls: [
-      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
-      'https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_16x9/bipbop_16x9_variant.m3u8'
+      'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8',
+      'https://cdn-euronews.akamaized.net/live/eds/euronews-en/25002/index.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?auto=format&fit=crop&w=200&q=80',
     country: 'US',
@@ -504,10 +504,10 @@ export const CURATED_CHANNELS: LiveChannel[] = [
   { id: 'nature-wildlife',
     name: 'Wildlife Oceans & Safari Stream',
     category: 'Nature',
-    streamUrl: 'https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_16x9/bipbop_16x9_variant.m3u8',
+    streamUrl: 'https://cdn-euronews.akamaized.net/live/eds/euronews-en/25002/index.m3u8',
     backupUrls: [
-      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
-      'https://30a-tv.com/gh.m3u8'
+      'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8',
+      'https://live-hls-web-aje-fa.thehlive.com/AJE/index.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1546182990-dffeafbe841d?auto=format&fit=crop&w=200&q=80',
     country: 'GLOBAL',
@@ -520,8 +520,8 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     category: 'Nature',
     streamUrl: 'https://playertest.longtailvideo.com/adaptive/oceans_aes/oceans_aes.m3u8',
     backupUrls: [
-      'https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_16x9/bipbop_16x9_variant.m3u8',
-      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8'
+      'https://dwamdstream104.akamaized.net/hls/live/2015530/dwstream104/index.m3u8',
+      'https://cdn-euronews.akamaized.net/live/eds/euronews-en/25002/index.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=200&q=80',
     country: 'GLOBAL',
@@ -802,8 +802,8 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     category: 'Movies',
     streamUrl: 'https://playertest.longtailvideo.com/adaptive/oceans_aes/oceans_aes.m3u8',
     backupUrls: [
-      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
-      'https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_16x9/bipbop_16x9_variant.m3u8'
+      'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8',
+      'https://cdn-euronews.akamaized.net/live/eds/euronews-en/25002/index.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=200&q=80',
     country: 'GLOBAL',
@@ -842,10 +842,10 @@ export const CURATED_CHANNELS: LiveChannel[] = [
   { id: 'extreme-sports-channel',
     name: 'Extreme Sports TV Network',
     category: 'Sports',
-    streamUrl: 'https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_16x9/bipbop_16x9_variant.m3u8',
+    streamUrl: 'https://rbmn-live.akamaized.net/hls/live/590964/BoRB-AT/master.m3u8',
     backupUrls: [
-      'https://rbmn-live.akamaized.net/hls/live/590964/BoRB-AT/master.m3u8',
-      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8'
+      'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8',
+      'https://cdn-euronews.akamaized.net/live/eds/euronews-en/25002/index.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1517649763962-0c623266ddc0?auto=format&fit=crop&w=200&q=80',
     country: 'UK',
@@ -898,10 +898,10 @@ export const CURATED_CHANNELS: LiveChannel[] = [
   { id: 'savanna-wildlife',
     name: 'African Savanna Waterhole Cam',
     category: 'Nature',
-    streamUrl: 'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
+    streamUrl: 'https://cdn-euronews.akamaized.net/live/eds/euronews-en/25002/index.m3u8',
     backupUrls: [
-      'https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_16x9/bipbop_16x9_variant.m3u8',
-      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8'
+      'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8',
+      'https://live-hls-web-aje-fa.thehlive.com/AJE/index.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1516426122078-c23e76319801?auto=format&fit=crop&w=200&q=80',
     country: 'ZA',
@@ -912,10 +912,10 @@ export const CURATED_CHANNELS: LiveChannel[] = [
   { id: 'planetary-science',
     name: 'Planetary Science & Mars Recon',
     category: 'Tech',
-    streamUrl: 'https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_16x9/bipbop_16x9_variant.m3u8',
+    streamUrl: 'https://live-hls-web-aje-fa.thehlive.com/AJE/index.m3u8',
     backupUrls: [
-      'https://30a-tv.com/gh.m3u8',
-      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8'
+      'https://dwamdstream104.akamaized.net/hls/live/2015530/dwstream104/index.m3u8',
+      'https://cdn-euronews.akamaized.net/live/eds/euronews-en/25002/index.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1614728894747-a83421e2b9c9?auto=format&fit=crop&w=200&q=80',
     country: 'US',

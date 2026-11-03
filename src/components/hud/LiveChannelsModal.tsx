@@ -26,6 +26,7 @@ interface LiveChannelsModalProps {
 const CATEGORIES: ('All' | ChannelCategory)[] = [
   'All',
   'News',
+  'Movies',
   'Tech',
   'Sports',
   'Music',
@@ -98,7 +99,7 @@ export const LiveChannelsModal: React.FC<LiveChannelsModalProps> = ({
       const imported = parseM3UPlaylist(text);
       if (imported.length > 0) {
         setChannels((prev) => [...imported, ...prev]);
-        setSelectedCategory('Custom');
+        setSelectedCategory('All');
         setSuccessNotice(`Successfully imported ${imported.length} channels from ${file.name}!`);
         setTimeout(() => setSuccessNotice(null), 4000);
       } else {
@@ -289,8 +290,8 @@ export const LiveChannelsModal: React.FC<LiveChannelsModalProps> = ({
                 {/* Card Action Footer */}
                 <div className="mt-3 pt-3 border-t border-white/5 flex items-center justify-between">
                   <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                    ONLINE BROADCAST
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    LIVE BROADCAST FEED
                   </span>
 
                   <span className="text-xs font-bold text-amber-400 flex items-center gap-1 group-hover:translate-x-1 transition-transform">

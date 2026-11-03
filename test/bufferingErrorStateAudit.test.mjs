@@ -6,10 +6,12 @@ import path from 'node:path';
 describe('Task 2: Buffering Error State & Infinite Spinner Prevention Audit', () => {
   const playerStorePath = path.resolve(process.cwd(), 'src/store/playerStore.ts');
   const playerEnginePath = path.resolve(process.cwd(), 'src/core/PlayerEngine.ts');
+  const hlsControllerPath = path.resolve(process.cwd(), 'src/core/HlsStreamController.ts');
   const appPath = path.resolve(process.cwd(), 'src/App.tsx');
 
   const playerStoreCode = fs.readFileSync(playerStorePath, 'utf-8');
   const playerEngineCode = fs.readFileSync(playerEnginePath, 'utf-8');
+  const hlsControllerCode = fs.existsSync(hlsControllerPath) ? fs.readFileSync(hlsControllerPath, 'utf-8') : '';
   const appCode = fs.readFileSync(appPath, 'utf-8');
 
   it('verifies playerStore clears isBuffering when an error occurs', () => {
@@ -29,10 +31,11 @@ describe('Task 2: Buffering Error State & Infinite Spinner Prevention Audit', ()
   });
 
   it('verifies PlayerEngine clears buffering on fatal HLS error', () => {
+    const combinedEngineCode = playerEngineCode + '\n' + hlsControllerCode;
     assert.match(
-      playerEngineCode,
+      combinedEngineCode,
       /data\.fatal[\s\S]*?isBuffering:\s*false/,
-      'PlayerEngine must ensure buffering state is cleared on fatal HLS error'
+      'PlayerEngine / HlsStreamController must ensure buffering state is cleared on fatal HLS error'
     );
   });
 });

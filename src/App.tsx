@@ -789,16 +789,13 @@ export const App: React.FC = () => {
                   severity = 'critical';
                   recovery = 'none';
                 }
-                usePlayerStore.setState({
-                  isBuffering: false,
-                  lastError: {
-                    code,
-                    message,
-                    details,
-                    severity,
-                    recovery,
-                    timestampMs: Date.now(),
-                  },
+                usePlayerStore.getState().handleStreamError({
+                  code,
+                  message,
+                  details,
+                  severity,
+                  recovery,
+                  timestampMs: Date.now(),
                 });
               }}
               onClick={() => usePlayerStore.getState().togglePlay()}

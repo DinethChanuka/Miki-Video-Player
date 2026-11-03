@@ -76,12 +76,13 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
       setIsLoadingIframe(true);
       const timer = setTimeout(() => {
         setIsLoadingIframe(false);
-      }, 4000);
+        setIframeError(true);
+      }, 5000);
       return () => clearTimeout(timer);
     } else {
       setIsLoadingIframe(false);
     }
-  }, [selectedGame.id, gameKey]);
+  }, [selectedGame.id, gameKey, selectedGame.srcDoc]);
 
   // Update initial game if prop changes
   useEffect(() => {
@@ -175,19 +176,25 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
     }, 1500);
   }, [isOpen]);
 
+  const handleBlur = useCallback(() => {
+    setActiveKeys({});
+  }, []);
+
   useEffect(() => {
     if (isOpen) {
       window.addEventListener('keydown', handleKeyDown, true);
       window.addEventListener('keyup', handleKeyUp, true);
       window.addEventListener('mousemove', handleMouseMove, true);
+      window.addEventListener('blur', handleBlur);
     }
     return () => {
       window.removeEventListener('keydown', handleKeyDown, true);
       window.removeEventListener('keyup', handleKeyUp, true);
       window.removeEventListener('mousemove', handleMouseMove, true);
+      window.removeEventListener('blur', handleBlur);
       if (mouseTimeoutRef.current) clearTimeout(mouseTimeoutRef.current);
     };
-  }, [isOpen, handleKeyDown, handleKeyUp, handleMouseMove]);
+  }, [isOpen, handleKeyDown, handleKeyUp, handleMouseMove, handleBlur]);
 
   const handleReload = () => {
     setGameKey((k) => k + 1);
@@ -324,8 +331,32 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
           />
         </div>
 
-        {/* Right Actions: Catalog Drawer Toggle, Reload, Fullscreen, Close */}
+        {/* Right Actions: Catalog Drawer Toggle, External Open, Reload, Fullscreen, Close */}
         <div className="flex items-center gap-2">
+          {!selectedGame.srcDoc && (
+            <button
+              onClick={() => {
+                if (
+                  typeof window !== 'undefined' &&
+                  (window as any).webkit?.messageHandlers?.browserViewAction
+                ) {
+                  (window as any).webkit.messageHandlers.browserViewAction.postMessage({
+                    action: 'open',
+                    url: selectedGame.url,
+                  });
+                  onClose();
+                } else {
+                  window.open(selectedGame.url, '_blank');
+                }
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-400/30 text-cyan-300 text-xs font-semibold transition-all cursor-pointer"
+              title="Open Game in Full Web Browser"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              <span className="hidden md:inline">Open in Browser</span>
+            </button>
+          )}
+
           <button
             onClick={() => setIsCatalogDrawerOpen((prev) => !prev)}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition-all text-xs font-semibold ${
@@ -381,7 +412,10 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
             sandbox="allow-scripts allow-same-origin allow-forms allow-pointer-lock allow-popups"
             allow="fullscreen; autoplay; gamepad; focus-without-user-activation *"
             className="w-full h-full border-0 bg-black"
-            onLoad={() => setIsLoadingIframe(false)}
+            onLoad={() => {
+              setIsLoadingIframe(false);
+              setIframeError(false);
+            }}
             onError={() => {
               setIsLoadingIframe(false);
               setIframeError(true);
@@ -583,16 +617,24 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
                         </div>
 
                         <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[10px] text-white/40">
-                          <span className="truncate max-w-[120px]">{game.controlsHint}</span>
-                          {isCurrent ? (
-                            <span className="text-purple-400 font-bold">PLAYING</span>
-                          ) : isPreview ? (
-                            <span className="text-cyan-300 font-bold">PREVIEWING</span>
-                          ) : (
-                            <span className="text-white/60 font-semibold group-hover:text-cyan-400 group-hover:underline">
-                              Preview →
-                            </span>
-                          )}
+                          <span className="truncate max-w-[100px]">{game.controlsHint}</span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedGame(game);
+                              setPreviewGame(game);
+                              setIsCatalogDrawerOpen(false);
+                              setGameKey((k) => k + 1);
+                            }}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                              isCurrent
+                                ? 'bg-purple-500/20 text-purple-300 border border-purple-400/30'
+                                : 'bg-gradient-to-r from-purple-600 to-cyan-500 text-white hover:brightness-110 shadow-sm'
+                            }`}
+                          >
+                            <Play className="w-3 h-3 fill-current" />
+                            <span>{isCurrent ? 'Playing' : 'Play'}</span>
+                          </button>
                         </div>
                       </div>
                     </div>

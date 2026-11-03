@@ -66,8 +66,6 @@ export const GmailSignInModal: React.FC<GmailSignInModalProps> = ({ isOpen, onCl
     }
   }, [isOpen]);
 
-  if (!isOpen) return null;
-
   const validateEmail = (val: string) => {
     const trimmed = val.trim().toLowerCase();
     const emailRegex =

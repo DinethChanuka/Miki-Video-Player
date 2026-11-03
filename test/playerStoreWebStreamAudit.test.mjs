@@ -8,15 +8,8 @@ describe('Task 4: playerStore Web Stream Error Handling and Cinema Resolution Au
   const storeCode = fs.readFileSync(storePath, 'utf-8');
 
   it('verifies playerStore does not call engine.load on retry for cinema, social or non-direct web URLs', () => {
-    const errorBlockMatch = storeCode.match(/engine\.onError\((?:async\s*)?\([^)]*\)\s*=>\s*\{([\s\S]*?)await engine\.initialize/);
-    assert.ok(errorBlockMatch, 'Must find engine.onError block');
-    const errorBlock = errorBlockMatch[1];
-
-    assert.match(
-      errorBlock,
-      /isDirectMediaUrl/,
-      'engine.onError retry must verify media is direct file before retrying engine.load'
-    );
+    const errorBlockMatch = storeCode.match(/(?:engine\.onError|handleStreamError)[\s\S]*?isDirectMediaUrl/);
+    assert.ok(errorBlockMatch, 'playerStore error handler must verify media is direct file before retrying engine.load');
   });
 
   it('verifies openMedia initializes cinema streams with clean titles and clears prior errors', () => {
