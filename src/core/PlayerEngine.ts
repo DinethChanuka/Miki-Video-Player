@@ -438,7 +438,7 @@ export class WebMediaEngine implements IPlayerEngine {
     }
 
     if (isHls && Hls.isSupported()) {
-      // High-performance Network Optimizer configuration
+      // High-performance Network Optimizer configuration with multi-tier backoff retries
       this.hls = new Hls({
         enableWorker: true,
         lowLatencyMode: true,
@@ -448,8 +448,15 @@ export class WebMediaEngine implements IPlayerEngine {
         maxMaxBufferLength: 120,
         maxBufferSize: 60 * 1024 * 1024, // 60MB memory buffer
         progressive: true,
-        fragLoadingTimeOut: 15000,
-        manifestLoadingTimeOut: 10000,
+        fragLoadingTimeOut: 20000,
+        manifestLoadingTimeOut: 15000,
+        levelLoadingTimeOut: 15000,
+        fragLoadingMaxRetry: 4,
+        manifestLoadingMaxRetry: 4,
+        levelLoadingMaxRetry: 4,
+        fragLoadingRetryDelay: 1000,
+        manifestLoadingRetryDelay: 1000,
+        levelLoadingRetryDelay: 1000,
       });
       this.hls.loadSource(resolvedUri);
       this.hls.attachMedia(el);
@@ -476,21 +483,33 @@ export class WebMediaEngine implements IPlayerEngine {
         }
 
         if (data.fatal) {
-          // Attempt built-in HLS.js automated recoveries before propagating error
+          // Attempt built-in HLS.js automated recoveries before escalating to fatal error
           switch (data.type) {
             case Hls.ErrorTypes.NETWORK_ERROR:
               logWarn(`[PlayerEngine] Fatal HLS network error (${data.details}). Attempting hls.startLoad() recovery.`);
               this.hls?.startLoad();
-              break;
+              return;
             case Hls.ErrorTypes.MEDIA_ERROR:
               logWarn(`[PlayerEngine] Fatal HLS media error (${data.details}). Attempting hls.recoverMediaError() recovery.`);
               this.hls?.recoverMediaError();
-              break;
+              return;
             default:
-              this.hls?.destroy();
-              this.hls = null;
               break;
           }
+
+          // Native AVPlayer Fallback for WebKit / Safari when HLS.js cannot load CORS-restricted manifests
+          if (el.canPlayType('application/vnd.apple.mpegurl')) {
+            logWarn(`[PlayerEngine] HLS.js failed with ${data.details}. Seamlessly falling back to native WebKit AVPlayer.`);
+            this.hls?.destroy();
+            this.hls = null;
+            el.src = resolvedUri;
+            el.load();
+            this.play().catch(() => {});
+            return;
+          }
+
+          this.hls?.destroy();
+          this.hls = null;
 
           if (typeof window !== 'undefined') {
             import('../store/playerStore')
