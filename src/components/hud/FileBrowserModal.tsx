@@ -1435,7 +1435,7 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({
                           onClick={() => {
                             window.dispatchEvent(
                               new CustomEvent('miki:open-web-browser', {
-                                detail: { url: item.url },
+                                detail: { url: item.browseUrl || item.canonicalUrl || item.url },
                               })
                             );
                             onClose();

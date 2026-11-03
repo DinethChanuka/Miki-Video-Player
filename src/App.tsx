@@ -104,6 +104,7 @@ export const App: React.FC = () => {
   const customBgBrightness = usePlayerStore((s) => s.customBgBrightness);
   const customBgTint = usePlayerStore((s) => s.customBgTint);
   const isBuffering = usePlayerStore((s) => s.isBuffering);
+  const lastError = usePlayerStore((s) => s.lastError);
   const positionMs = usePlayerStore((s) => s.positionMs);
   const activeSubtitleTrack = usePlayerStore((s) => s.activeSubtitleTrack);
   const isSubtitlesVisible = usePlayerStore((s) => s.isSubtitlesVisible);
