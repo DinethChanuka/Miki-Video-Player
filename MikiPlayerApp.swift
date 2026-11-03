@@ -422,7 +422,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         let helperScript = """
         (function() {
             var reportedMedia = new Set();
-            var mediaRegex = /\\.(m3u8|mpd|mp4|mkv|webm|avi|mov|flv|ts|m4v|3gp|mp3|m4a|aac|wav|ogg|opus)(\\?|$)/i;
+            var mediaRegex = /\\.(m3u8|mpd|mp4|mkv|webm|avi|mov|flv|m4v|3gp|mp3|m4a|aac|wav|ogg|opus)(\\?|$)/i;
             var streamRegex = /(master\\.m3u8|playlist\\.m3u8|\\/hls\\/|\\/dash\\/|\\/manifest|\\/stream\\/|googlevideo\\.com\\/videoplayback)/i;
 
             function reportMedia(url, type) {

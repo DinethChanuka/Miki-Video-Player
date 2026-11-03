@@ -15,7 +15,6 @@ import {
   Sliders,
 } from 'lucide-react';
 import { getCleanUrl, isBlockedUrl } from '../../utils/adBlockFilter';
-import { parseYouTubeId } from '../../App';
 import { getWebsiteFaviconUrl } from '../../utils/faviconService';
 import { usePlayerStore } from '../../store/playerStore';
 
@@ -229,10 +228,8 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
 
   const isPlayableInPlayer = () => {
     if (detectedMediaUrl) return true;
-    if (!currentUrl) return false;
-    if (parseYouTubeId(currentUrl)) return true;
-    if (/\.(mp4|m3u8|webm|mov|mkv)(\?.*)?$/i.test(currentUrl)) return true;
-    return false;
+    if (!currentUrl || currentUrl === 'about:blank') return false;
+    return true;
   };
 
   const handlePlayInPlayer = () => {
