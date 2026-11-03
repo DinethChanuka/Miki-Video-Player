@@ -32,3 +32,4 @@ describe('Task 2: WebBrowserModal Transparency and Fallback Resilience', () => {
     );
   });
 });
+
