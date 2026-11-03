@@ -222,11 +222,36 @@ export function resolveMediaStreamUrl(uri: string): string {
     uri.startsWith('data:') ||
     uri.startsWith('http://') ||
     uri.startsWith('https://') ||
-    uri.startsWith('/@media-stream')
+    uri.startsWith('asset:') ||
+    uri.startsWith('media-stream:') ||
+    uri.startsWith('tauri:')
   ) {
     return uri;
   }
-  // Local filesystem path e.g. /Users/... or file:///... or C:\...
+
+  // 1. In native macOS WebKit application bundle (loads via custom WKURLSchemeHandler)
+  if (
+    typeof window !== 'undefined' &&
+    (window as unknown as { webkit?: { messageHandlers?: Record<string, unknown> } }).webkit?.messageHandlers
+  ) {
+    const cleanPath = uri.replace(/^file:\/\//, '');
+    return `media-stream://localhost?path=${encodeURIComponent(cleanPath)}`;
+  }
+
+  // 2. In Tauri desktop runtime: use Tauri asset protocol
+  if (
+    typeof window !== 'undefined' &&
+    ('__TAURI_INTERNALS__' in window || (window as unknown as { __TAURI__?: unknown }).__TAURI__)
+  ) {
+    try {
+      const cleanPath = uri.replace(/^file:\/\//, '');
+      return `http://asset.localhost/${encodeURI(cleanPath.replace(/^[a-zA-Z]:[/\\]/, '').replace(/^\//, ''))}`;
+    } catch {
+      // Fallback
+    }
+  }
+
+  // 3. In Vite development environment
   return `http://localhost:1420/@media-stream?path=${encodeURIComponent(uri)}`;
 }
 
@@ -294,6 +319,20 @@ export class WebMediaEngine implements IPlayerEngine {
       const src = this.videoEl?.src || '';
       // Completely ignore video errors for YouTube links or blank sources
       if (!src || src.includes('youtube.com') || src.includes('youtu.be')) return;
+
+      // Adaptive CORS Recovery: if crossOrigin was active, remove it and reload without failing
+      if (this.videoEl?.hasAttribute('crossOrigin')) {
+        this.videoEl.removeAttribute('crossOrigin');
+        this.videoEl.load();
+        this.videoEl.play().catch(() => {});
+        return;
+      }
+
+      if (typeof window !== 'undefined') {
+        import('../store/playerStore')
+          .then(({ usePlayerStore }) => usePlayerStore.setState({ isBuffering: false }))
+          .catch(() => {});
+      }
       const err = this.videoEl?.error;
       this.emitError({
         code: 'CODEC_UNSUPPORTED',
@@ -384,9 +423,22 @@ export class WebMediaEngine implements IPlayerEngine {
     }
 
     const resolvedUri = resolveMediaStreamUrl(uri);
-    const isHls = resolvedUri.includes('.m3u8');
+    const isRemote = resolvedUri.startsWith('http://') || resolvedUri.startsWith('https://');
+    const isHls =
+      resolvedUri.includes('.m3u8') ||
+      resolvedUri.includes('/hls/') ||
+      resolvedUri.includes('master.m3u8') ||
+      resolvedUri.includes('playlist.m3u8');
+
+    // For remote streams without CORS headers, do not force crossOrigin to avoid MediaError rejection
+    if (isRemote) {
+      el.removeAttribute('crossOrigin');
+    } else {
+      el.crossOrigin = 'anonymous';
+    }
+
     if (isHls && Hls.isSupported()) {
-      // High-performance Network Optimizer configuration
+      // High-performance Network Optimizer configuration with multi-tier backoff retries
       this.hls = new Hls({
         enableWorker: true,
         lowLatencyMode: true,
@@ -396,8 +448,15 @@ export class WebMediaEngine implements IPlayerEngine {
         maxMaxBufferLength: 120,
         maxBufferSize: 60 * 1024 * 1024, // 60MB memory buffer
         progressive: true,
-        fragLoadingTimeOut: 15000,
-        manifestLoadingTimeOut: 10000,
+        fragLoadingTimeOut: 20000,
+        manifestLoadingTimeOut: 15000,
+        levelLoadingTimeOut: 15000,
+        fragLoadingMaxRetry: 4,
+        manifestLoadingMaxRetry: 4,
+        levelLoadingMaxRetry: 4,
+        fragLoadingRetryDelay: 1000,
+        manifestLoadingRetryDelay: 1000,
+        levelLoadingRetryDelay: 1000,
       });
       this.hls.loadSource(resolvedUri);
       this.hls.attachMedia(el);
@@ -408,12 +467,60 @@ export class WebMediaEngine implements IPlayerEngine {
         this.play().catch(() => {});
       });
       this.hls.on(Hls.Events.ERROR, (_event, data) => {
+        // Dynamic Stream Healing: If a specific stream level fails to load (e.g. 404 on high bitrate variant),
+        // gracefully downscale level index instead of throwing fatal crash
+        if (
+          data.details === Hls.ErrorDetails.LEVEL_LOAD_ERROR ||
+          data.details === Hls.ErrorDetails.LEVEL_LOAD_TIMEOUT
+        ) {
+          if (this.hls && this.hls.levels && this.hls.levels.length > 1) {
+            logWarn(`[PlayerEngine] LEVEL_LOAD_ERROR (${data.details}). Attempting level downscale recovery.`);
+            const nextIdx = Math.max(0, this.hls.currentLevel > 0 ? this.hls.currentLevel - 1 : 0);
+            this.hls.nextLevel = nextIdx;
+            this.hls.startLoad();
+            return;
+          }
+        }
+
         if (data.fatal) {
+          // Native AVPlayer Fallback for WebKit / Safari when HLS.js cannot load CORS-restricted manifests or network streams
+          if (el.canPlayType('application/vnd.apple.mpegurl')) {
+            logWarn(`[PlayerEngine] HLS.js failed with ${data.details}. Seamlessly falling back to native WebKit AVPlayer.`);
+            this.hls?.destroy();
+            this.hls = null;
+            el.src = resolvedUri;
+            el.load();
+            this.play().catch(() => {});
+            return;
+          }
+
+          // Attempt built-in HLS.js automated recoveries before escalating to fatal error
+          switch (data.type) {
+            case Hls.ErrorTypes.NETWORK_ERROR:
+              logWarn(`[PlayerEngine] Fatal HLS network error (${data.details}). Attempting hls.startLoad() recovery.`);
+              this.hls?.startLoad();
+              return;
+            case Hls.ErrorTypes.MEDIA_ERROR:
+              logWarn(`[PlayerEngine] Fatal HLS media error (${data.details}). Attempting hls.recoverMediaError() recovery.`);
+              this.hls?.recoverMediaError();
+              return;
+            default:
+              break;
+          }
+
+          this.hls?.destroy();
+          this.hls = null;
+
+          if (typeof window !== 'undefined') {
+            import('../store/playerStore')
+              .then(({ usePlayerStore }) => usePlayerStore.setState({ isBuffering: false }))
+              .catch(() => {});
+          }
           this.emitError({
-            code: data.type === Hls.ErrorTypes.NETWORK_ERROR ? 'STREAM_TIMEOUT' : 'CODEC_UNSUPPORTED',
+            code: 'CODEC_UNSUPPORTED',
             message: `HLS stream error: ${data.details}`,
             severity: 'recoverable',
-            recovery: data.type === Hls.ErrorTypes.NETWORK_ERROR ? 'retry_with_backoff' : 'none',
+            recovery: 'retry_with_backoff',
             timestampMs: Date.now(),
           });
         }

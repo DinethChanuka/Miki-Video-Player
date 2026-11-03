@@ -5,7 +5,43 @@ import path from 'node:path';
 
 const host = process.env.TAURI_DEV_HOST;
 
-// Custom high-performance local media streaming middleware (HTTP 206 Partial Content)
+const ALLOWED_MEDIA_EXTENSIONS = new Set([
+  '.mp4',
+  '.m4v',
+  '.webm',
+  '.mkv',
+  '.mov',
+  '.avi',
+  '.mp3',
+  '.wav',
+  '.flac',
+  '.m4a',
+  '.aac',
+  '.ogg',
+  '.ts',
+  '.m3u8',
+  '.m3u',
+]);
+
+const MIME_MAP: Record<string, string> = {
+  '.mp4': 'video/mp4',
+  '.m4v': 'video/mp4',
+  '.webm': 'video/webm',
+  '.mkv': 'video/x-matroska',
+  '.mov': 'video/quicktime',
+  '.avi': 'video/x-msvideo',
+  '.mp3': 'audio/mpeg',
+  '.wav': 'audio/wav',
+  '.flac': 'audio/flac',
+  '.m4a': 'audio/mp4',
+  '.aac': 'audio/aac',
+  '.ogg': 'audio/ogg',
+  '.ts': 'video/mp2t',
+  '.m3u8': 'application/vnd.apple.mpegurl',
+  '.m3u': 'audio/x-mpegurl',
+};
+
+// Hardened local media streaming middleware (HTTP 206 Partial Content)
 function localMediaStreamerPlugin() {
   return {
     name: 'local-media-streamer',
@@ -25,58 +61,138 @@ function localMediaStreamerPlugin() {
             filePath = path.resolve(process.cwd(), filePath);
           }
 
-          if (!fs.existsSync(filePath)) {
+          // Canonical path normalization to resolve symlinks and prevent traversal tricks
+          let canonicalPath = filePath;
+          try {
+            canonicalPath = fs.realpathSync(filePath);
+          } catch {
             res.statusCode = 404;
-            res.end(`File not found: ${filePath}`);
+            res.end('File not found');
             return;
           }
 
-          const stat = fs.statSync(filePath);
+          // Strict media extension allowlist
+          const ext = path.extname(canonicalPath).toLowerCase();
+          if (!ALLOWED_MEDIA_EXTENSIONS.has(ext)) {
+            res.statusCode = 403;
+            res.end('Access denied: not an allowed media file');
+            return;
+          }
+
+          if (!fs.existsSync(canonicalPath)) {
+            res.statusCode = 404;
+            res.end('File not found');
+            return;
+          }
+
+          const stat = fs.statSync(canonicalPath);
+          if (!stat.isFile()) {
+            res.statusCode = 403;
+            res.end('Access denied: target is not a regular file');
+            return;
+          }
+
           const fileSize = stat.size;
           const range = req.headers.range;
+          const contentType = MIME_MAP[ext] || 'application/octet-stream';
 
-          const ext = path.extname(filePath).toLowerCase();
-          const mimeMap: Record<string, string> = {
-            '.mp4': 'video/mp4',
-            '.m4v': 'video/mp4',
-            '.webm': 'video/webm',
-            '.mkv': 'video/mp4', // Modern WebKit handles H.264/HEVC in MKV/MP4 container
-            '.mov': 'video/quicktime',
-            '.avi': 'video/x-msvideo',
-            '.mp3': 'audio/mpeg',
-            '.wav': 'audio/wav',
-            '.flac': 'audio/flac',
-            '.m4a': 'audio/mp4',
-            '.aac': 'audio/aac',
+          // Safe CORS: Only allow localhost / local app origins (no wildcard '*')
+          const origin = req.headers.origin || '';
+          const isAllowedOrigin =
+            /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin) ||
+            origin === 'tauri://localhost';
+          const corsOrigin = isAllowedOrigin ? origin : 'http://localhost:1420';
+
+          const commonHeaders = {
+            'Content-Type': contentType,
+            'Accept-Ranges': 'bytes',
+            'Access-Control-Allow-Origin': corsOrigin,
+            'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+            'Access-Control-Allow-Headers': 'Range, Origin, Content-Type, Accept',
+            'X-Content-Type-Options': 'nosniff',
           };
-          const contentType = mimeMap[ext] || 'video/mp4';
+
+          if (req.method === 'OPTIONS') {
+            res.writeHead(204, commonHeaders);
+            res.end();
+            return;
+          }
 
           if (range) {
-            const parts = range.replace(/bytes=/, '').split('-');
-            const start = parseInt(parts[0], 10);
-            const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+            const rangeMatch = range.match(/^bytes=(\d*)-(\d*)$/);
+            if (!rangeMatch) {
+              res.writeHead(416, {
+                'Content-Range': `bytes */${fileSize}`,
+                ...commonHeaders,
+              });
+              res.end('Range Not Satisfiable');
+              return;
+            }
+
+            const rawStart = rangeMatch[1];
+            const rawEnd = rangeMatch[2];
+
+            let start: number;
+            let end: number;
+
+            if (rawStart === '' && rawEnd !== '') {
+              // Suffix byte range: e.g. bytes=-500 (last 500 bytes)
+              const suffixLength = parseInt(rawEnd, 10);
+              start = Math.max(0, fileSize - suffixLength);
+              end = fileSize - 1;
+            } else {
+              start = rawStart ? parseInt(rawStart, 10) : 0;
+              end = rawEnd ? parseInt(rawEnd, 10) : fileSize - 1;
+            }
+
+            // HTTP 416 Validation
+            if (
+              isNaN(start) ||
+              isNaN(end) ||
+              start > end ||
+              start >= fileSize ||
+              end >= fileSize
+            ) {
+              res.writeHead(416, {
+                'Content-Range': `bytes */${fileSize}`,
+                ...commonHeaders,
+              });
+              res.end('Range Not Satisfiable');
+              return;
+            }
+
             const chunkSize = end - start + 1;
-            const fileStream = fs.createReadStream(filePath, { start, end });
+            const fileStream = fs.createReadStream(canonicalPath, { start, end });
+
+            fileStream.on('error', (err) => {
+              if (!res.headersSent) {
+                res.statusCode = 500;
+                res.end('Stream error');
+              }
+            });
 
             res.writeHead(206, {
               'Content-Range': `bytes ${start}-${end}/${fileSize}`,
-              'Accept-Ranges': 'bytes',
               'Content-Length': chunkSize,
-              'Content-Type': contentType,
-              'Access-Control-Allow-Origin': '*',
+              ...commonHeaders,
             });
             fileStream.pipe(res);
           } else {
+            const fileStream = fs.createReadStream(canonicalPath);
+            fileStream.on('error', (err) => {
+              if (!res.headersSent) {
+                res.statusCode = 500;
+                res.end('Stream error');
+              }
+            });
+
             res.writeHead(200, {
               'Content-Length': fileSize,
-              'Content-Type': contentType,
-              'Accept-Ranges': 'bytes',
-              'Access-Control-Allow-Origin': '*',
+              ...commonHeaders,
             });
-            fs.createReadStream(filePath).pipe(res);
+            fileStream.pipe(res);
           }
         } catch (err) {
-          console.error('[MediaStreamer] Error streaming media file:', err);
           res.statusCode = 500;
           res.end('Internal media streamer error');
         }
@@ -87,6 +203,7 @@ function localMediaStreamerPlugin() {
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  base: './',
   plugins: [react(), localMediaStreamerPlugin()],
   clearScreen: false,
   server: {

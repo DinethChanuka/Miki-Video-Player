@@ -33,7 +33,8 @@ import {
   getOSPresetDirectories,
   extractCleanFileName,
 } from '../utils/pathUtils';
-import { isDirectMediaUrl } from '../utils/webStreamUtils';
+import { parseWebStream, isDirectMediaUrl, WebPlatform } from '../utils/webStreamUtils';
+import { getChannelByUri, getChannelBackupUrl, getChannelByName } from '../utils/channelCatalog';
 
 export interface MediaHistoryItem {
   mediaId: string;
@@ -48,7 +49,7 @@ export interface MediaHistoryItem {
   lastPlayedAt: number;
   isYouTube?: boolean;
   youtubeId?: string;
-  webPlatform?: 'youtube' | 'tiktok' | 'instagram' | 'facebook' | 'cinema' | 'web';
+  webPlatform?: WebPlatform;
   webStreamId?: string;
   webDomain?: string;
   faviconUrl?: string;
@@ -912,7 +913,26 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
         return;
       }
 
-      set({ lastError: error });
+      // Automated Channel Self-Healing: If a live channel fails, immediately attempt backup mirror URLs
+      if (curUri && (error.code === 'STREAM_TIMEOUT' || error.code === 'STREAM_ERROR' || error.code === 'CODEC_UNSUPPORTED')) {
+        try {
+          const curTitle = get().currentTitle;
+          const channel = (curTitle ? getChannelByName(curTitle) : undefined) || getChannelByUri(curUri);
+          if (channel && channel.backupUrls && channel.backupUrls.length > 0) {
+            const nextBackup = getChannelBackupUrl(channel.name, curUri) || getChannelBackupUrl(channel.streamUrl, curUri);
+            if (nextBackup && nextBackup !== curUri) {
+              console.log(`[playerStore] Live channel ${channel.name} encountered ${error.message}. Auto-healing via backup mirror: ${nextBackup}`);
+              set({ isBuffering: true, lastError: null, retryCount: 0 });
+              await get().openMedia(nextBackup, channel.name);
+              return;
+            }
+          }
+        } catch (e) {
+          console.warn('[playerStore] Channel failover lookup error:', e);
+        }
+      }
+
+      set({ lastError: error, isBuffering: false });
 
       // Automated Self-Healing Recovery Execution
       if (error.recovery === 'fallback_to_web_engine' && get().activeEngineType !== 'web-media') {
@@ -937,7 +957,10 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
           }
           const uri = get().currentUri;
           if (uri && !/(?:youtube\.com|youtu\.be)/.test(uri)) {
-            get().engine?.load(uri, get().positionMs);
+            // Only retry engine.load on local files or direct media files; avoid retrying web pages or cinema embeds
+            if (isDirectMediaUrl(uri) || (!uri.startsWith('http://') && !uri.startsWith('https://'))) {
+              get().engine?.load(uri, get().positionMs);
+            }
           }
         }, delayMs);
       } else if (error.recovery === 'reset_audio_filters') {
@@ -973,36 +996,24 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     const resolvedTitle = title ?? extractCleanFileName(uri);
     let startPos = startPositionMs ?? 0;
 
-    // Check if it's an external web stream (YouTube, TikTok, Instagram)
-    const isYouTube = /(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/.test(uri);
-    const ytMatch = uri.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
-    const ytId = ytMatch ? ytMatch[1] : null;
+    // Check if it's an external web stream (YouTube, TikTok, Instagram, Vimeo, Twitch, Dailymotion, Cinema portals or Web stream)
+    const webStream = parseWebStream(uri);
+    const isHttp = uri.startsWith('http://') || uri.startsWith('https://');
+    const activeWebStream = webStream || (isHttp && !isDirectMediaUrl(uri) ? {
+      platform: 'cinema' as const,
+      id: `cinema_${Date.now()}`,
+      embedUrl: uri,
+      originalUrl: uri,
+      title: resolvedTitle,
+    } : null);
 
-    const isTikTok = /tiktok\.com/i.test(uri);
-    const ttMatch = uri.match(/(?:video\/|v\/|embed\/v2\/|embed\/|item\/)(\d{15,22})/i);
-    const ttId = ttMatch ? ttMatch[1] : null;
-
-    const isInstagram = /instagram\.com/i.test(uri);
-    const igMatch = uri.match(/(?:instagram\.com\/(?:p|reel|tv)\/([a-zA-Z0-9_-]+))/i);
-    const igCode = igMatch ? igMatch[1] : null;
-
-    const isFacebook = /(?:facebook\.com|fb\.watch)/i.test(uri);
-    const fbMatch = uri.match(/(?:videos\/|reel\/|\?v=)(\d+)/i) || uri.match(/fb\.watch\/([a-zA-Z0-9_-]+)/i);
-    const fbCode = fbMatch ? fbMatch[1] : null;
-
-    if (isYouTube || isTikTok || isInstagram || isFacebook) {
-      if (isYouTube) {
+    if (activeWebStream) {
+      if (activeWebStream.platform === 'youtube') {
         get().addYouTubeHistory(uri, resolvedTitle);
       }
 
-      const platform: 'youtube' | 'tiktok' | 'instagram' | 'facebook' = isYouTube
-        ? 'youtube'
-        : isTikTok
-        ? 'tiktok'
-        : isInstagram
-        ? 'instagram'
-        : 'facebook';
-      const streamId = ytId || ttId || igCode || fbCode || undefined;
+      const platform = activeWebStream.platform;
+      const streamId = activeWebStream.id;
 
       const existingRecent = get().recentMedia;
       const existingWeb = existingRecent.find(
@@ -1014,8 +1025,10 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
         startPos = existingWeb.lastPositionMs;
       }
 
-      const defaultThumb = isYouTube && ytId
-        ? `https://img.youtube.com/vi/${ytId}/mqdefault.jpg`
+      const defaultThumb = activeWebStream.platform === 'youtube' && activeWebStream.id
+        ? `https://img.youtube.com/vi/${activeWebStream.id}/mqdefault.jpg`
+        : isHttp
+        ? getWebsiteFaviconUrl(uri, 128)
         : undefined;
 
       const webHistoryItem: MediaHistoryItem = {
@@ -1023,7 +1036,21 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
         uri,
         title:
           resolvedTitle ||
-          (isTikTok ? `TikTok Video (${ttId || 'Web'})` : isInstagram ? `Instagram Reel (${igCode || 'Web'})` : isFacebook ? `Facebook Video (${fbCode || 'Web'})` : `YouTube (${ytId || 'Web'})`),
+          (platform === 'tiktok'
+            ? `TikTok Video (${streamId || 'Web'})`
+            : platform === 'instagram'
+            ? `Instagram Reel (${streamId || 'Web'})`
+            : platform === 'facebook'
+            ? `Facebook Video (${streamId || 'Web'})`
+            : platform === 'youtube'
+            ? `YouTube (${streamId || 'Web'})`
+            : platform === 'vimeo'
+            ? `Vimeo Video (${streamId || 'Web'})`
+            : platform === 'twitch'
+            ? `Twitch Stream (${streamId || 'Web'})`
+            : platform === 'dailymotion'
+            ? `Dailymotion Video (${streamId || 'Web'})`
+            : `Cinema Stream (${extractDomain(uri) || 'Web'})`),
         durationMs: existingWeb?.durationMs || 0,
         lastPositionMs: startPos,
         progressPercent: existingWeb?.progressPercent || 0,
@@ -1031,10 +1058,11 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
         playCount: (existingWeb?.playCount ?? 0) + 1,
         lastPlayedAt: Date.now(),
         thumbnailUri: defaultThumb,
-        isYouTube: !!isYouTube,
-        youtubeId: ytId || undefined,
+        isYouTube: platform === 'youtube',
+        youtubeId: platform === 'youtube' ? streamId : undefined,
         webPlatform: platform,
         webStreamId: streamId,
+        webDomain: isHttp ? extractDomain(uri) : undefined,
       };
 
       const updatedRecent = [
@@ -1078,44 +1106,6 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
           },
           isSubtitlesVisible: true,
         });
-      }
-      return;
-    }
-
-    // Check if it's an external website portal (CineSubz, FMovies, etc.) that is NOT a direct video stream
-    const isHttp = uri.startsWith('http://') || uri.startsWith('https://');
-    if (isHttp && !isDirectMediaUrl(uri)) {
-      const domain = extractDomain(uri);
-      const defaultThumb = getWebsiteFaviconUrl(uri, 128);
-      const webHistoryItem: MediaHistoryItem = {
-        mediaId: uri,
-        uri,
-        title: resolvedTitle,
-        durationMs: 0,
-        lastPositionMs: 0,
-        progressPercent: 0,
-        isCompleted: false,
-        playCount: 1,
-        lastPlayedAt: Date.now(),
-        thumbnailUri: defaultThumb,
-        webPlatform: 'cinema',
-        webDomain: domain,
-      };
-      const existingRecent = get().recentMedia;
-      const updatedRecent = [
-        webHistoryItem,
-        ...existingRecent.filter((m) => m.uri !== uri),
-      ].slice(0, 30);
-      set({ recentMedia: updatedRecent, lastError: null });
-      saveStoredRecentMedia(updatedRecent);
-
-      // Route directly to protected web browser view with Ad-Shield instead of feeding HTML to <video>
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(
-          new CustomEvent('miki:navigate-web-browser', {
-            detail: { url: uri },
-          })
-        );
       }
       return;
     }

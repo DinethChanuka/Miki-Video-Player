@@ -66,6 +66,41 @@ export const WebEmbedPlayer: React.FC<WebEmbedPlayerProps> = ({
           badgeBg: 'bg-black/80 text-blue-300 border-blue-500/40',
           aspect: 'max-w-[720px] aspect-video w-full h-full max-h-[82vh]',
         };
+      case 'cinema':
+        return {
+          name: 'Cinema Web Stream',
+          gradient: 'from-amber-500 via-rose-500 to-purple-600',
+          badgeBg: 'bg-black/80 text-amber-300 border-amber-500/40',
+          aspect: 'w-full h-full max-h-[85vh]',
+        };
+      case 'vimeo':
+        return {
+          name: 'Vimeo Player',
+          gradient: 'from-sky-400 via-blue-500 to-indigo-600',
+          badgeBg: 'bg-black/80 text-sky-300 border-sky-500/40',
+          aspect: 'w-full aspect-video max-h-[85vh]',
+        };
+      case 'twitch':
+        return {
+          name: 'Twitch Live Stream',
+          gradient: 'from-purple-500 via-indigo-600 to-purple-800',
+          badgeBg: 'bg-black/80 text-purple-300 border-purple-500/40',
+          aspect: 'w-full aspect-video max-h-[85vh]',
+        };
+      case 'dailymotion':
+        return {
+          name: 'Dailymotion Player',
+          gradient: 'from-blue-500 via-cyan-500 to-teal-500',
+          badgeBg: 'bg-black/80 text-cyan-300 border-cyan-500/40',
+          aspect: 'w-full aspect-video max-h-[85vh]',
+        };
+      case 'web':
+        return {
+          name: 'Universal Web Player',
+          gradient: 'from-cyan-500 to-blue-600',
+          badgeBg: 'bg-black/80 text-cyan-300 border-cyan-500/40',
+          aspect: 'w-full h-full max-h-[85vh]',
+        };
       default:
         return {
           name: 'Web Stream',

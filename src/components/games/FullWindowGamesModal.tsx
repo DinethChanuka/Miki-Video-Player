@@ -12,6 +12,8 @@ import {
   Play,
   MousePointer,
   Sliders,
+  AlertCircle,
+  ExternalLink,
 } from 'lucide-react';
 
 interface FullWindowGamesModalProps {
@@ -45,23 +47,53 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
     return GAMES_CATALOG[0];
   });
 
+  const [previewGame, setPreviewGame] = useState<GameItem>(() => {
+    if (initialGameId) {
+      const match = GAMES_CATALOG.find((g) => g.id === initialGameId);
+      if (match) return match;
+    }
+    return GAMES_CATALOG[0];
+  });
+
   const [activeCategory, setActiveCategory] = useState<'All' | GameCategory>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [isCatalogDrawerOpen, setIsCatalogDrawerOpen] = useState<boolean>(false);
+  const [isCatalogDrawerOpen, setIsCatalogDrawerOpen] = useState<boolean>(() => !initialGameId);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [activeKeys, setActiveKeys] = useState<{ [key: string]: boolean }>({});
   const [mouseActive, setMouseActive] = useState<boolean>(false);
   const [gameKey, setGameKey] = useState<number>(0);
+  const [iframeError, setIframeError] = useState<boolean>(false);
+  const [isLoadingIframe, setIsLoadingIframe] = useState<boolean>(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const mouseTimeoutRef = useRef<any>(null);
 
+  // Monitor loading timeout for external non-srcDoc games
+  useEffect(() => {
+    setIframeError(false);
+    if (!selectedGame.srcDoc) {
+      setIsLoadingIframe(true);
+      const timer = setTimeout(() => {
+        setIsLoadingIframe(false);
+      }, 4000);
+      return () => clearTimeout(timer);
+    } else {
+      setIsLoadingIframe(false);
+    }
+  }, [selectedGame.id, gameKey]);
+
   // Update initial game if prop changes
   useEffect(() => {
     if (initialGameId) {
       const match = GAMES_CATALOG.find((g) => g.id === initialGameId);
-      if (match) setSelectedGame(match);
+      if (match) {
+        setSelectedGame(match);
+        setPreviewGame(match);
+        setIsCatalogDrawerOpen(false);
+      }
+    } else {
+      setIsCatalogDrawerOpen(true);
     }
   }, [initialGameId]);
 
@@ -90,6 +122,11 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
 
       if (trackedKeys.includes(key)) {
         setActiveKeys((prev) => ({ ...prev, [key]: true }));
+        // Forward key event to game iframe
+        iframeRef.current?.contentWindow?.postMessage(
+          { type: 'miki:game-input', action: 'down', key: e.key, code: e.code },
+          '*'
+        );
         // Stop propagation so media player doesn't seek or pause
         e.stopPropagation();
       }
@@ -102,10 +139,32 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
       if (!isOpen) return;
       const key = e.code;
       setActiveKeys((prev) => ({ ...prev, [key]: false }));
+      iframeRef.current?.contentWindow?.postMessage(
+        { type: 'miki:game-input', action: 'up', key: e.key, code: e.code },
+        '*'
+      );
       e.stopPropagation();
     },
     [isOpen]
   );
+
+  // Auto-focus game iframe on mount and game switch
+  useEffect(() => {
+    if (isOpen && iframeRef.current) {
+      iframeRef.current?.focus();
+    }
+  }, [isOpen, selectedGame.id, gameKey]);
+
+  // Synchronize bi-directional key activity reported from inside game iframe
+  useEffect(() => {
+    const handleMessage = (e: MessageEvent) => {
+      if (e.data?.type === 'miki:key-activity') {
+        setActiveKeys((prev) => ({ ...prev, [e.data.code]: Boolean(e.data.isDown) }));
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
 
   const handleMouseMove = useCallback(() => {
     if (!isOpen) return;
@@ -312,17 +371,93 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
       {/* MAIN VIEWPORT BODY */}
       <div className="relative flex-1 w-full h-full bg-[#03060a] overflow-hidden">
         {/* GAME IFRAME VIEWPORT */}
-        <div className="w-full h-full flex items-center justify-center bg-black">
+        <div className="w-full h-full flex items-center justify-center bg-black relative">
           <iframe
             key={`${selectedGame.id}-${gameKey}`}
             ref={iframeRef}
             srcDoc={selectedGame.srcDoc}
             src={!selectedGame.srcDoc ? selectedGame.url : undefined}
             title={selectedGame.title}
-            sandbox="allow-scripts allow-same-origin allow-pointer-lock allow-forms allow-popups"
-            allow="fullscreen; autoplay"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-pointer-lock allow-popups"
+            allow="fullscreen; autoplay; gamepad; focus-without-user-activation *"
             className="w-full h-full border-0 bg-black"
+            onLoad={() => setIsLoadingIframe(false)}
+            onError={() => {
+              setIsLoadingIframe(false);
+              setIframeError(true);
+            }}
           />
+
+          {/* Loading Indicator for Remote Games */}
+          {isLoadingIframe && !selectedGame.srcDoc && (
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/75 backdrop-blur-sm gap-3 pointer-events-none">
+              <div className="w-8 h-8 rounded-full border-2 border-purple-500 border-t-transparent animate-spin" />
+              <span className="text-xs text-white/70 font-mono">Loading {selectedGame.title}...</span>
+            </div>
+          )}
+
+          {/* Graceful Fallback Card when embedding is restricted or fails */}
+          {iframeError && !selectedGame.srcDoc && (
+            <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/90 backdrop-blur-md p-6">
+              <div className="max-w-md w-full p-6 rounded-3xl bg-slate-900 border border-purple-500/30 flex flex-col items-center text-center gap-4 shadow-2xl">
+                <div className="p-3 rounded-2xl bg-purple-500/20 text-purple-400">
+                  <AlertCircle className="w-8 h-8" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">
+                    {selectedGame.title} Embedding Restricted
+                  </h3>
+                  <p className="text-xs text-white/60 mt-1.5 leading-relaxed">
+                    This game server restricts third-party iframe embedding or is temporarily unreachable. You can launch it directly in the ad-shielded browser or enjoy an instant offline inbuilt title.
+                  </p>
+                </div>
+                <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full mt-2">
+                  <button
+                    onClick={() => {
+                      const fallback = GAMES_CATALOG.find((g) => g.isInbuilt && g.id === 'pacman') || GAMES_CATALOG[0];
+                      setSelectedGame(fallback);
+                      setPreviewGame(fallback);
+                      setIframeError(false);
+                      setGameKey((k) => k + 1);
+                    }}
+                    className="flex-1 w-full py-2.5 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs transition-all shadow-lg shadow-purple-600/30 flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    <span>Play Inbuilt Alternative</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (
+                        typeof window !== 'undefined' &&
+                        (window as unknown as { webkit?: { messageHandlers?: { browserViewAction?: { postMessage: (msg: unknown) => void } } } }).webkit?.messageHandlers?.browserViewAction
+                      ) {
+                        (window as unknown as { webkit: { messageHandlers: { browserViewAction: { postMessage: (msg: unknown) => void } } } }).webkit.messageHandlers.browserViewAction.postMessage({
+                          action: 'open',
+                          url: selectedGame.url,
+                        });
+                        onClose();
+                      } else {
+                        window.open(selectedGame.url, '_blank');
+                      }
+                    }}
+                    className="flex-1 w-full py-2.5 px-4 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs border border-white/10 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <ExternalLink className="w-4 h-4 text-cyan-400" />
+                    <span>Launch in Web Browser</span>
+                  </button>
+                </div>
+                <button
+                  onClick={() => {
+                    setIframeError(false);
+                    setGameKey((k) => k + 1);
+                  }}
+                  className="text-[11px] text-white/40 hover:text-white transition-colors cursor-pointer mt-1"
+                >
+                  Retry Loading
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* 50+ GAMES DRAWER / SELECTOR OVERLAY */}
@@ -387,73 +522,143 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
               </div>
             </div>
 
-            {/* Games Grid */}
-            <div className="flex-1 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3.5 pr-1 scrollbar-thin">
-              {filteredGames.map((game) => {
-                const isCurrent = game.id === selectedGame.id;
-                return (
-                  <div
-                    key={game.id}
-                    onClick={() => {
-                      setSelectedGame(game);
-                      setIsCatalogDrawerOpen(false);
-                      setGameKey((k) => k + 1);
-                    }}
-                    className={`group relative flex flex-col rounded-2xl overflow-hidden border cursor-pointer transition-all duration-200 transform hover:-translate-y-1 hover:shadow-xl ${
-                      isCurrent
-                        ? 'bg-purple-900/30 border-purple-500 shadow-lg shadow-purple-500/20 ring-1 ring-purple-500'
-                        : 'bg-white/5 border-white/10 hover:border-cyan-500/50 hover:bg-white/10'
-                    }`}
-                  >
-                    {/* Game Thumbnail */}
-                    <div className="relative h-28 w-full overflow-hidden bg-black/40">
-                      <img
-                        src={game.thumbnail}
-                        alt={game.title}
-                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                        loading="lazy"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30" />
-                      <div className="absolute top-2 left-2 flex items-center gap-1">
-                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-black/70 backdrop-blur-md border border-white/10 text-cyan-300">
-                          {game.category}
-                        </span>
-                        {game.isInbuilt && (
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/80 text-black">
-                            INBUILT
+            {/* Main Drawer Layout: Games Catalog Grid + Live Interactive Preview Inspector */}
+            <div className="flex-1 overflow-hidden flex flex-col lg:flex-row gap-4">
+              {/* Games Grid (Left) */}
+              <div className="flex-1 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 pr-1 scrollbar-thin">
+                {filteredGames.map((game) => {
+                  const isCurrent = game.id === selectedGame.id;
+                  const isPreview = game.id === previewGame.id;
+                  return (
+                    <div
+                      key={game.id}
+                      onClick={() => setPreviewGame(game)}
+                      onDoubleClick={() => {
+                        setSelectedGame(game);
+                        setPreviewGame(game);
+                        setIsCatalogDrawerOpen(false);
+                        setGameKey((k) => k + 1);
+                      }}
+                      className={`group relative flex flex-col rounded-2xl overflow-hidden border cursor-pointer transition-all duration-200 transform hover:-translate-y-1 hover:shadow-xl ${
+                        isPreview
+                          ? 'bg-cyan-950/40 border-cyan-400 shadow-lg shadow-cyan-500/20 ring-1 ring-cyan-400'
+                          : isCurrent
+                          ? 'bg-purple-900/30 border-purple-500 shadow-md ring-1 ring-purple-500'
+                          : 'bg-white/5 border-white/10 hover:border-cyan-500/50 hover:bg-white/10'
+                      }`}
+                    >
+                      {/* Game Thumbnail */}
+                      <div className="relative h-28 w-full overflow-hidden bg-black/40">
+                        <img
+                          src={game.thumbnail}
+                          alt={game.title}
+                          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          loading="lazy"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30" />
+                        <div className="absolute top-2 left-2 flex items-center gap-1">
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-black/70 backdrop-blur-md border border-white/10 text-cyan-300">
+                            {game.category}
                           </span>
-                        )}
+                          {game.isInbuilt && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/80 text-black">
+                              INBUILT
+                            </span>
+                          )}
+                        </div>
+                        <div className="absolute bottom-2 right-2 p-1.5 rounded-lg bg-black/60 backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity text-cyan-400">
+                          <Play className="w-3.5 h-3.5 fill-current" />
+                        </div>
                       </div>
-                      <div className="absolute bottom-2 right-2 p-1.5 rounded-lg bg-black/60 backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity text-cyan-400">
-                        <Play className="w-3.5 h-3.5 fill-current" />
+
+                      {/* Game Info */}
+                      <div className="p-3 flex flex-col flex-1 justify-between gap-2">
+                        <div>
+                          <h3 className="text-xs font-bold text-white line-clamp-1 group-hover:text-cyan-300 transition-colors">
+                            {game.title}
+                          </h3>
+                          <p className="text-[11px] text-white/50 line-clamp-2 mt-1 leading-snug">
+                            {game.description}
+                          </p>
+                        </div>
+
+                        <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[10px] text-white/40">
+                          <span className="truncate max-w-[120px]">{game.controlsHint}</span>
+                          {isCurrent ? (
+                            <span className="text-purple-400 font-bold">PLAYING</span>
+                          ) : isPreview ? (
+                            <span className="text-cyan-300 font-bold">PREVIEWING</span>
+                          ) : (
+                            <span className="text-white/60 font-semibold group-hover:text-cyan-400 group-hover:underline">
+                              Preview →
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
+                  );
+                })}
+              </div>
 
-                    {/* Game Info */}
-                    <div className="p-3 flex flex-col flex-1 justify-between gap-2">
+              {/* Game Live Preview Inspector Panel (Right) */}
+              <div className="w-full lg:w-80 shrink-0 bg-slate-900/90 border border-white/10 rounded-2xl p-4 flex flex-col justify-between gap-4 backdrop-blur-xl shadow-2xl">
+                <div className="flex flex-col gap-3">
+                  <div className="relative aspect-video w-full rounded-xl overflow-hidden border border-white/15 bg-black/80 shadow-md">
+                    <img
+                      src={previewGame.thumbnail}
+                      alt={previewGame.title}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent flex items-end p-3">
                       <div>
-                        <h3 className="text-xs font-bold text-white line-clamp-1 group-hover:text-cyan-300 transition-colors">
-                          {game.title}
-                        </h3>
-                        <p className="text-[11px] text-white/50 line-clamp-2 mt-1 leading-snug">
-                          {game.description}
-                        </p>
-                      </div>
-
-                      <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[10px] text-white/40">
-                        <span className="truncate max-w-[120px]">{game.controlsHint}</span>
-                        {isCurrent ? (
-                          <span className="text-purple-400 font-bold">PLAYING</span>
-                        ) : (
-                          <span className="text-cyan-400 font-semibold group-hover:underline">
-                            Launch →
-                          </span>
-                        )}
+                        <span className="text-[9px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-md bg-purple-600/90 text-white font-bold">
+                          {previewGame.badge}
+                        </span>
+                        <h3 className="text-sm font-bold text-white mt-1">{previewGame.title}</h3>
                       </div>
                     </div>
                   </div>
-                );
-              })}
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-cyan-500/20 text-cyan-300 border border-cyan-400/30">
+                      {previewGame.category}
+                    </span>
+                    {previewGame.isInbuilt && (
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                        Zero-Latency Offline Canvas
+                      </span>
+                    )}
+                  </div>
+
+                  <p className="text-xs text-white/70 leading-relaxed max-h-24 overflow-y-auto">
+                    {previewGame.description}
+                  </p>
+
+                  {/* Controller & Keyboard Keymap Guide */}
+                  <div className="p-2.5 rounded-xl bg-black/60 border border-white/10 flex flex-col gap-1.5">
+                    <span className="text-[10px] font-bold text-white/50 uppercase tracking-wider flex items-center gap-1.5">
+                      <Sliders className="w-3 h-3 text-cyan-400" />
+                      Keymap & Input Controls
+                    </span>
+                    <span className="text-xs text-cyan-300 font-mono font-medium">
+                      {previewGame.controlsHint}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Launch Action Button */}
+                <button
+                  onClick={() => {
+                    setSelectedGame(previewGame);
+                    setIsCatalogDrawerOpen(false);
+                    setGameKey((k) => k + 1);
+                  }}
+                  className="w-full py-2.5 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-cyan-500 hover:brightness-110 active:scale-98 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-purple-600/30 transition-all"
+                >
+                  <Play className="w-4 h-4 fill-white" />
+                  <span>Launch Game in Viewport</span>
+                </button>
+              </div>
             </div>
           </div>
         )}

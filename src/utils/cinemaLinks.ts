@@ -15,6 +15,8 @@ export interface CinemaSiteItem {
   id: string;
   name: string;
   url: string;
+  browseUrl?: string;
+  canonicalUrl?: string;
   logoUrl?: string;
   category: CinemaCategory;
   description: string;
@@ -29,6 +31,8 @@ export const CINEMA_LINKS: CinemaSiteItem[] = [
     id: 'cinesubz',
     name: 'CineSubz Movies & Series',
     url: 'https://cinesubz.co',
+    browseUrl: 'https://cinesubz.lk',
+    canonicalUrl: 'https://cinesubz.lk',
     logoUrl: 'https://www.google.com/s2/favicons?domain=cinesubz.lk&sz=128',
     category: 'Subtitles',
     description: 'Premier Sinhala subtitle movie portal with international HD blockbusters & TV series.',

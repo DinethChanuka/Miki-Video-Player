@@ -21,19 +21,21 @@ import {
   ExternalLink,
   Star,
   Sliders,
+  Tv,
 } from 'lucide-react';
 import { parseYouTubeId } from '../../App';
 import { formatPathForOS } from '../../utils/pathUtils';
 import { CINEMA_LINKS, filterCinemaLinks, CinemaCategory } from '../../utils/cinemaLinks';
 import { getWebsiteFaviconUrl } from '../../utils/faviconService';
 import { SOCIAL_LINKS } from '../../utils/socialLinks';
+import { CURATED_CHANNELS } from '../../utils/channelCatalog';
 import { GamesSection } from '../games/GamesSection';
 import { MusicPlayerView } from '../music/MusicPlayerView';
 
 interface FileBrowserModalProps {
   isOpen: boolean;
   onClose: () => void;
-  initialTab?: 'youtube' | 'tiktok' | 'instagram' | 'demos' | 'recent' | 'bookmarks' | 'cinema' | 'social' | 'games' | 'music' | 'history' | 'saved';
+  initialTab?: 'youtube' | 'tiktok' | 'instagram' | 'demos' | 'recent' | 'bookmarks' | 'cinema' | 'social' | 'games' | 'music' | 'history' | 'saved' | 'channels';
   onOpenGames?: (gameId?: string) => void;
 }
 
@@ -120,17 +122,17 @@ export interface DemoStreamItem {
 const DEMO_STREAMS: DemoStreamItem[] = [
   {
     id: 'demo-bbb',
-    title: 'Big Buck Bunny (1080p 60fps MP4)',
-    uri: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+    title: 'Big Buck Bunny (1080p Surround Cinema)',
+    uri: 'https://archive.org/download/BigBuckBunny_124/Content/big_buck_bunny_720p_surround.mp4',
     category: 'Animation & Movies',
-    badge: '1080p 60fps',
+    badge: '1080p Surround',
     duration: '9:56',
     thumbnail: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=400&q=80',
   },
   {
     id: 'demo-sintel',
-    title: 'Sintel Animated Film (Hi-Fi Master)',
-    uri: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4',
+    title: 'Sintel Animated Film (2K Master)',
+    uri: 'https://archive.org/download/Sintel/sintel-2048-surround.mp4',
     category: 'Animation & Movies',
     badge: 'Blender CGI',
     duration: '14:48',
@@ -138,8 +140,8 @@ const DEMO_STREAMS: DemoStreamItem[] = [
   },
   {
     id: 'demo-tears',
-    title: 'Tears of Steel (1080p Sci-Fi VFX)',
-    uri: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
+    title: 'Tears of Steel (1080p Sci-Fi VFX Master)',
+    uri: 'https://archive.org/download/Tears-of-Steel/tears_of_steel_720p.mp4',
     category: 'Sci-Fi & VFX',
     badge: 'Sci-Fi VFX',
     duration: '12:14',
@@ -148,7 +150,7 @@ const DEMO_STREAMS: DemoStreamItem[] = [
   {
     id: 'demo-elephants',
     title: 'Elephants Dream (Classic Open Movie)',
-    uri: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
+    uri: 'https://archive.org/download/ElephantsDream/ed_1024_512kb.mp4',
     category: 'Animation & Movies',
     badge: 'Stereo Hi-Fi',
     duration: '10:53',
@@ -156,12 +158,12 @@ const DEMO_STREAMS: DemoStreamItem[] = [
   },
   {
     id: 'demo-cosmos',
-    title: 'Cosmos Laundromat (Aesthetic Fantasy)',
-    uri: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
-    category: '4K & Nature',
-    badge: 'HDR Master',
-    duration: '0:15',
-    thumbnail: 'https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?auto=format&fit=crop&w=400&q=80',
+    title: 'France 24 English HD Live Stream',
+    uri: 'https://live.france24.com/hls/live/2037218/F24_EN_HI_HLS/master_2300.m3u8',
+    category: 'Adaptive HLS',
+    badge: 'Live 1080p',
+    duration: '24/7 Live',
+    thumbnail: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=400&q=80',
   },
   {
     id: 'demo-mux',
@@ -218,6 +220,7 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({
   const loadSubtitleFromFile = usePlayerStore((s) => s.loadSubtitleFromFile);
 
   type TabType =
+    | 'channels'
     | 'cinema'
     | 'social'
     | 'music'
@@ -231,13 +234,26 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({
     | 'recent'
     | 'bookmarks';
 
-  const [activeTab, setActiveTab] = useState<TabType>('cinema');
+  const [activeTab, setActiveTab] = useState<TabType>('channels');
   const [selectedCategory, setSelectedCategory] = useState<DemoCategory>('All');
   const [cinemaCategory, setCinemaCategory] = useState<CinemaCategory>('All');
+  const [channelCategory, setChannelCategory] = useState<string>('All');
   const [customUrl, setCustomUrl] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<SortCriteria>('recent');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+
+  const filteredChannels = useMemo(() => {
+    return CURATED_CHANNELS.filter((ch) => {
+      const matchesCat = channelCategory === 'All' || ch.category.toLowerCase() === channelCategory.toLowerCase();
+      const matchesSearch =
+        searchTerm.trim() === '' ||
+        ch.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        ch.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        ch.country.toLowerCase().includes(searchTerm.toLowerCase());
+      return matchesCat && matchesSearch;
+    });
+  }, [channelCategory, searchTerm]);
 
   const filteredCinemaLinks = useMemo(() => {
     return filterCinemaLinks(CINEMA_LINKS, searchTerm, cinemaCategory);
@@ -263,11 +279,13 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({
         setActiveTab('history');
       } else if (initialTab === 'bookmarks') {
         setActiveTab('saved');
+      } else if (initialTab === 'games') {
+        setActiveTab('games');
       } else {
         setActiveTab(initialTab);
       }
     }
-  }, [isOpen, initialTab]);
+  }, [isOpen, initialTab, onOpenGames, onClose]);
 
   const handleOpenLocalFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -460,6 +478,18 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({
         {/* Navigation Tabs - Minimal One-Word Names */}
         <div className="flex items-center gap-1.5 border-b border-white/10 pb-2 overflow-x-auto">
           <button
+            onClick={() => setActiveTab('channels')}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-2xl text-xs font-semibold transition-all whitespace-nowrap ${
+              activeTab === 'channels'
+                ? 'bg-rose-500/20 text-rose-300 border border-rose-400/30 shadow-sm'
+                : 'text-white/70 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <Tv className="w-3.5 h-3.5 text-rose-400" />
+            <span>Channels ({CURATED_CHANNELS.length})</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('cinema')}
             className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-2xl text-xs font-semibold transition-all whitespace-nowrap ${
               activeTab === 'cinema'
@@ -496,14 +526,7 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({
           </button>
 
           <button
-            onClick={() => {
-              if (onOpenGames) {
-                onClose();
-                onOpenGames();
-              } else {
-                setActiveTab('games');
-              }
-            }}
+            onClick={() => setActiveTab('games')}
             className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-2xl text-xs font-semibold transition-all whitespace-nowrap ${
               activeTab === 'games'
                 ? 'bg-purple-500/20 text-purple-300 border border-purple-400/30 shadow-sm'
@@ -592,6 +615,80 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({
 
         {/* Tab Content */}
         <div className="flex-1 overflow-y-auto pr-1">
+          {/* TAB: CHANNELS */}
+          {activeTab === 'channels' && (
+            <div className="flex flex-col gap-4 py-1">
+              {/* Category Filter Pills */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+                {['All', 'News', 'Movies', 'Music', 'Sports', 'Tech', 'Nature', 'Entertainment'].map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setChannelCategory(cat)}
+                    className={`px-3 py-1.5 rounded-xl font-semibold transition-all shrink-0 border ${
+                      channelCategory === cat
+                        ? 'bg-rose-500/25 text-rose-300 border-rose-400/50 shadow-sm'
+                        : 'bg-white/5 text-slate-400 border-white/10 hover:bg-white/10 hover:text-white'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+
+              {/* Grid of Verified Channels */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                {filteredChannels.map((ch) => (
+                  <div
+                    key={ch.id}
+                    onClick={() => {
+                      openMedia(ch.streamUrl, ch.name);
+                      onClose();
+                    }}
+                    className="p-3 rounded-2xl bg-white/5 border border-white/10 hover:border-rose-400/50 hover:bg-white/10 cursor-pointer transition-all flex flex-col justify-between gap-2.5 group shadow-md"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-10 h-10 rounded-xl bg-black/60 border border-white/15 overflow-hidden shrink-0 flex items-center justify-center">
+                        <img
+                          src={ch.logo}
+                          alt={ch.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLElement).style.display = 'none';
+                          }}
+                        />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <h4 className="text-xs font-bold text-white group-hover:text-rose-300 transition-colors truncate">
+                            {ch.name}
+                          </h4>
+                        </div>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-400/30">
+                            {ch.country}
+                          </span>
+                          <span className="text-[10px] text-white/50">{ch.quality}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-slate-300 line-clamp-2 leading-relaxed">
+                      {ch.description}
+                    </p>
+                    <div className="flex items-center justify-between pt-2 border-t border-white/10 text-[10px]">
+                      <span className="text-emerald-400 font-semibold flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        24/7 Verified
+                      </span>
+                      <span className="text-rose-400 font-bold group-hover:translate-x-0.5 transition-transform flex items-center gap-1">
+                        Stream Now →
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {activeTab === 'demos' && (
             <div className="flex flex-col gap-3">
               {/* Category Filter Pills */}
@@ -682,7 +779,7 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({
                   </button>
                 </div>
               )}
-              <GamesSection onClose={onClose} />
+              <GamesSection onClose={onClose} onOpenGames={onOpenGames} searchTerm={searchTerm} />
             </div>
           )}
 
@@ -1428,7 +1525,7 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({
                           onClick={() => {
                             window.dispatchEvent(
                               new CustomEvent('miki:open-web-browser', {
-                                detail: { url: item.url },
+                                detail: { url: item.browseUrl || item.canonicalUrl || item.url },
                               })
                             );
                             onClose();

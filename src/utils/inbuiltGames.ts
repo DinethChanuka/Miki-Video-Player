@@ -4,7 +4,48 @@
  * Includes Web Audio API retro sound synthesis and full responsive canvas.
  */
 
+const UNIVERSAL_INPUT_BRIDGE_SCRIPT = `
+<script>
+(function() {
+  window.addEventListener('message', function(ev) {
+    if (ev.data && ev.data.type === 'miki:game-input') {
+      try {
+        var synthetic = new KeyboardEvent(ev.data.action === 'down' ? 'keydown' : 'keyup', {
+          key: ev.data.key,
+          code: ev.data.code,
+          bubbles: true,
+          cancelable: true
+        });
+        window.dispatchEvent(synthetic);
+      } catch(err) {}
+    }
+  });
+
+  window.addEventListener('keydown', function(e) {
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code)) {
+      e.preventDefault();
+    }
+    try {
+      window.parent.postMessage({ type: 'miki:key-activity', code: e.code, isDown: true }, '*');
+    } catch(err) {}
+  }, true);
+
+  window.addEventListener('keyup', function(e) {
+    try {
+      window.parent.postMessage({ type: 'miki:key-activity', code: e.code, isDown: false }, '*');
+    } catch(err) {}
+  }, true);
+})();
+</script>
+`;
+
 export function getInbuiltGameSrcDoc(id: string): string {
+  const rawDoc = getRawInbuiltGameSrcDoc(id);
+  if (!rawDoc) return '';
+  return rawDoc.replace('</body>', `${UNIVERSAL_INPUT_BRIDGE_SCRIPT}</body>`);
+}
+
+function getRawInbuiltGameSrcDoc(id: string): string {
   switch (id) {
     case '2048':
       return `<!DOCTYPE html>
@@ -579,6 +620,7 @@ export function getInbuiltGameSrcDoc(id: string): string {
 </html>`;
 
     case 'tic-tac-toe':
+    case 'tictactoe':
       return `<!DOCTYPE html>
 <html>
 <head>
@@ -766,6 +808,942 @@ export function getInbuiltGameSrcDoc(id: string): string {
     ctx.fillStyle = '#38bdf8'; ctx.beginPath(); ctx.arc(p.x*tile+tile/2, p.y*tile+tile/2, tile/2 - 2, 0, Math.PI*2); ctx.fill();
   }
   render();
+</script>
+</body>
+</html>`;
+
+    case 'pacman':
+      return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin:0; background:#05070d; color:#fff; font-family:sans-serif; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; overflow:hidden; user-select:none; }
+  h2 { margin:0 0 8px; font-size:16px; color:#facc15; }
+  canvas { background:#000; border:2px solid #3b82f6; border-radius:12px; box-shadow:0 0 20px rgba(59,130,246,0.3); }
+  .hud { margin-top:8px; font-size:12px; color:#94a3b8; font-family:monospace; }
+</style>
+</head>
+<body>
+  <h2>PAC-MAN 1980 <span style="color:#38bdf8">SCORE: <span id="s">0</span> | LIVES: <span id="l">3</span></span></h2>
+  <canvas id="c" width="400" height="400"></canvas>
+  <div class="hud">Use Arrow Keys or WASD to navigate Pac-Man</div>
+<script>
+  const canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
+  const cols = 20, rows = 20, sz = 20;
+  let score = 0, lives = 3, mouth = 0.2, mouthDir = 0.03;
+  let pac = { x: 1, y: 1, dx: 1, dy: 0, nextDx: 1, nextDy: 0 };
+  let ghost = { x: 10, y: 10, dx: 1, dy: 0 };
+  let grid = [
+    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+    [1,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,1],
+    [1,0,1,1,0,1,1,1,0,1,1,0,1,1,1,0,1,1,0,1],
+    [1,0,1,1,0,1,1,1,0,1,1,0,1,1,1,0,1,1,0,1],
+    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+    [1,0,1,1,0,1,0,1,1,1,1,1,1,0,1,0,1,1,0,1],
+    [1,0,0,0,0,1,0,0,0,1,1,0,0,0,1,0,0,0,0,1],
+    [1,1,1,1,0,1,1,1,2,1,1,2,1,1,1,0,1,1,1,1],
+    [2,2,2,1,0,1,2,2,2,2,2,2,2,2,1,0,1,2,2,2],
+    [1,1,1,1,0,1,2,1,1,2,2,1,1,2,1,0,1,1,1,1],
+    [2,2,2,2,0,2,2,1,2,2,2,2,1,2,2,0,2,2,2,2],
+    [1,1,1,1,0,1,2,1,1,1,1,1,1,2,1,0,1,1,1,1],
+    [2,2,2,1,0,1,2,2,2,2,2,2,2,2,1,0,1,2,2,2],
+    [1,1,1,1,0,1,2,1,1,1,1,1,1,2,1,0,1,1,1,1],
+    [1,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,1],
+    [1,0,1,1,0,1,1,1,0,1,1,0,1,1,1,0,1,1,0,1],
+    [1,0,0,1,0,0,0,0,0,2,2,0,0,0,0,0,1,0,0,1],
+    [1,1,0,1,0,1,0,1,1,1,1,1,1,0,1,0,1,0,1,1],
+    [1,0,0,0,0,1,0,0,0,1,1,0,0,0,1,0,0,0,0,1],
+    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+  ];
+  window.addEventListener('keydown', e => {
+    if (e.code === 'ArrowUp' || e.code === 'KeyW') { pac.nextDx = 0; pac.nextDy = -1; }
+    if (e.code === 'ArrowDown' || e.code === 'KeyS') { pac.nextDx = 0; pac.nextDy = 1; }
+    if (e.code === 'ArrowLeft' || e.code === 'KeyA') { pac.nextDx = -1; pac.nextDy = 0; }
+    if (e.code === 'ArrowRight' || e.code === 'KeyD') { pac.nextDx = 1; pac.nextDy = 0; }
+  });
+  function canMove(x, y) {
+    if (x < 0 || x >= cols || y < 0 || y >= rows) return true;
+    return grid[y][x] !== 1;
+  }
+  let step = 0;
+  function update() {
+    step++;
+    if (step % 8 === 0) {
+      if (canMove(pac.x + pac.nextDx, pac.y + pac.nextDy)) {
+        pac.dx = pac.nextDx; pac.dy = pac.nextDy;
+      }
+      if (canMove(pac.x + pac.dx, pac.y + pac.dy)) {
+        pac.x += pac.dx; pac.y += pac.dy;
+        if (pac.x < 0) pac.x = cols - 1;
+        if (pac.x >= cols) pac.x = 0;
+      }
+      if (grid[pac.y] && grid[pac.y][pac.x] === 0) {
+        grid[pac.y][pac.x] = 2;
+        score += 10;
+        document.getElementById('s').innerText = score;
+      }
+      const gdirs = [{dx:1,dy:0},{dx:-1,dy:0},{dx:0,dy:1},{dx:0,dy:-1}].filter(d => canMove(ghost.x+d.dx, ghost.y+d.dy));
+      if (gdirs.length > 0) {
+        const best = gdirs.sort((a,b) => (Math.hypot(ghost.x+a.dx-pac.x, ghost.y+a.dy-pac.y) - Math.hypot(ghost.x+b.dx-pac.x, ghost.y+b.dy-pac.y)))[0];
+        ghost.x += best.dx; ghost.y += best.dy;
+      }
+      if (Math.hypot(ghost.x - pac.x, ghost.y - pac.y) < 1) {
+        lives--;
+        document.getElementById('l').innerText = lives;
+        pac.x = 1; pac.y = 1; pac.dx = 1; pac.dy = 0;
+        if (lives <= 0) { alert('Game Over! Final Score: ' + score); lives = 3; score = 0; location.reload(); }
+      }
+    }
+    mouth += mouthDir;
+    if (mouth > 0.4 || mouth < 0.05) mouthDir = -mouthDir;
+    render();
+    requestAnimationFrame(update);
+  }
+  function render() {
+    ctx.clearRect(0,0,400,400);
+    for (let r=0; r<rows; r++) {
+      for (let c=0; c<cols; c++) {
+        if (grid[r][c] === 1) {
+          ctx.fillStyle = '#1e3a8a';
+          ctx.fillRect(c*sz, r*sz, sz, sz);
+        } else if (grid[r][c] === 0) {
+          ctx.fillStyle = '#fde047';
+          ctx.beginPath(); ctx.arc(c*sz+sz/2, r*sz+sz/2, 2.5, 0, Math.PI*2); ctx.fill();
+        }
+      }
+    }
+    const angle = pac.dx === 1 ? 0 : pac.dx === -1 ? Math.PI : pac.dy === 1 ? Math.PI/2 : -Math.PI/2;
+    ctx.fillStyle = '#facc15';
+    ctx.beginPath();
+    ctx.arc(pac.x*sz+sz/2, pac.y*sz+sz/2, sz/2 - 1, angle + mouth * Math.PI, angle + (2 - mouth) * Math.PI);
+    ctx.lineTo(pac.x*sz+sz/2, pac.y*sz+sz/2);
+    ctx.fill();
+    ctx.fillStyle = '#ef4444';
+    ctx.beginPath();
+    ctx.arc(ghost.x*sz+sz/2, ghost.y*sz+sz/2 - 2, sz/2 - 2, Math.PI, 0, false);
+    ctx.lineTo(ghost.x*sz+sz - 2, ghost.y*sz+sz - 2);
+    ctx.lineTo(ghost.x*sz+2, ghost.y*sz+sz - 2);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(ghost.x*sz+4, ghost.y*sz+4, 4, 4);
+    ctx.fillRect(ghost.x*sz+12, ghost.y*sz+4, 4, 4);
+  }
+  update();
+</script>
+</body>
+</html>`;
+
+    case 'space-invaders':
+      return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin:0; background:#020617; color:#fff; font-family:sans-serif; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; overflow:hidden; user-select:none; }
+  h2 { margin:0 0 8px; font-size:16px; color:#22c55e; }
+  canvas { background:#000; border:2px solid #22c55e; border-radius:12px; box-shadow:0 0 20px rgba(34,197,94,0.3); }
+  .hud { margin-top:8px; font-size:12px; color:#94a3b8; font-family:monospace; }
+</style>
+</head>
+<body>
+  <h2>SPACE INVADERS 1978 <span style="color:#38bdf8">SCORE: <span id="s">0</span> | LEVEL: <span id="lvl">1</span></span></h2>
+  <canvas id="c" width="400" height="420"></canvas>
+  <div class="hud">Left / Right Arrow to steer | Spacebar to shoot lasers</div>
+<script>
+  const canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
+  let player = { x: 180, y: 390, w: 28, h: 14, speed: 4 };
+  let lasers = [], invaders = [], invaderSpeed = 1, invaderDir = 1, score = 0, level = 1;
+  let keys = {};
+  window.addEventListener('keydown', e => { keys[e.code] = true; if (e.code === 'Space') shoot(); });
+  window.addEventListener('keyup', e => { keys[e.code] = false; });
+  function shoot() {
+    if (lasers.length < 4) { lasers.push({ x: player.x + player.w/2 - 2, y: player.y - 6, w: 4, h: 10 }); }
+  }
+  function spawnInvaders() {
+    invaders = [];
+    for (let r=0; r<4; r++) {
+      for (let c=0; c<8; c++) {
+        invaders.push({ x: 40 + c*40, y: 40 + r*30, w: 24, h: 18, color: r===0?'#ef4444':r===1?'#eab308':'#22c55e' });
+      }
+    }
+  }
+  spawnInvaders();
+  function update() {
+    if (keys['ArrowLeft'] || keys['KeyA']) player.x = Math.max(10, player.x - player.speed);
+    if (keys['ArrowRight'] || keys['KeyD']) player.x = Math.min(canvas.width - player.w - 10, player.x + player.speed);
+    for (let i = lasers.length - 1; i >= 0; i--) {
+      lasers[i].y -= 7;
+      if (lasers[i].y < 0) { lasers.splice(i, 1); continue; }
+      for (let j = invaders.length - 1; j >= 0; j--) {
+        const inv = invaders[j], l = lasers[i];
+        if (l && l.x > inv.x && l.x < inv.x + inv.w && l.y > inv.y && l.y < inv.y + inv.h) {
+          invaders.splice(j, 1);
+          lasers.splice(i, 1);
+          score += 20;
+          document.getElementById('s').innerText = score;
+          break;
+        }
+      }
+    }
+    let hitEdge = false;
+    for (const inv of invaders) {
+      inv.x += invaderSpeed * invaderDir;
+      if (inv.x <= 10 || inv.x + inv.w >= canvas.width - 10) hitEdge = true;
+    }
+    if (hitEdge) {
+      invaderDir = -invaderDir;
+      for (const inv of invaders) {
+        inv.y += 12;
+        if (inv.y + inv.h >= player.y) {
+          alert('Earth has fallen! Score: ' + score);
+          score = 0; level = 1; spawnInvaders(); return;
+        }
+      }
+    }
+    if (invaders.length === 0) {
+      level++;
+      document.getElementById('lvl').innerText = level;
+      invaderSpeed += 0.4;
+      spawnInvaders();
+    }
+    render();
+    requestAnimationFrame(update);
+  }
+  function render() {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle = '#38bdf8';
+    ctx.fillRect(player.x, player.y + 4, player.w, player.h - 4);
+    ctx.fillRect(player.x + player.w/2 - 3, player.y, 6, 6);
+    ctx.fillStyle = '#fde047';
+    for (const l of lasers) ctx.fillRect(l.x, l.y, l.w, l.h);
+    for (const inv of invaders) {
+      ctx.fillStyle = inv.color;
+      ctx.fillRect(inv.x+2, inv.y, inv.w-4, inv.h-4);
+      ctx.fillRect(inv.x, inv.y+4, inv.w-8, inv.h-8);
+      ctx.fillStyle = '#000';
+      ctx.fillRect(inv.x+4, inv.y+4, 4, 4);
+      ctx.fillRect(inv.x+inv.w-8, inv.y+4, 4, 4);
+    }
+  }
+  update();
+</script>
+</body>
+</html>`;
+
+    case 'solitaire':
+      return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin:0; background:#064e3b; color:#fff; font-family:sans-serif; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; overflow:hidden; user-select:none; }
+  h2 { margin:0 0 8px; font-size:16px; color:#fde047; }
+  canvas { background:#047857; border:3px solid #065f46; border-radius:12px; box-shadow:0 0 25px rgba(0,0,0,0.5); cursor:pointer; }
+  .hud { margin-top:8px; font-size:12px; color:#a7f3d0; font-family:monospace; }
+</style>
+</head>
+<body>
+  <h2>KLONDIKE SOLITAIRE <span style="color:#fde047">MOVES: <span id="m">0</span> | SCORE: <span id="s">100</span></span></h2>
+  <canvas id="c" width="460" height="380"></canvas>
+  <div class="hud">Click Stockpile to deal | Click cards to auto-play to Foundations</div>
+<script>
+  const canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
+  let moves = 0, score = 100;
+  const suits = ['♠','♥','♦','♣'];
+  const values = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+  let deck = [];
+  for (let s of suits) for (let v of values) deck.push({ suit: s, val: v, red: (s==='♥'||s==='♦') });
+  deck.sort(() => Math.random() - 0.5);
+  let piles = Array(7).fill(0).map((_, i) => deck.splice(0, i + 1));
+  let stock = deck, waste = [], foundations = [[],[],[],[]];
+  
+  canvas.addEventListener('click', e => {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left, y = e.clientY - rect.top;
+    moves++; document.getElementById('m').innerText = moves;
+    if (x >= 20 && x <= 65 && y >= 20 && y <= 85) {
+      if (stock.length > 0) waste.push(stock.pop());
+      else { stock = waste.reverse(); waste = []; }
+      render(); return;
+    }
+    for (let c=0; c<7; c++) {
+      const colX = 20 + c * 62;
+      if (x >= colX && x <= colX + 45 && piles[c].length > 0) {
+        const card = piles[c][piles[c].length - 1];
+        for (let f=0; f<4; f++) {
+          if (foundations[f].length === 0 && card.val === 'A') {
+            foundations[f].push(piles[c].pop()); score += 15;
+            document.getElementById('s').innerText = score;
+            render(); return;
+          }
+        }
+      }
+    }
+    render();
+  });
+
+  function render() {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle = stock.length > 0 ? '#1e40af' : '#065f46';
+    ctx.fillRect(20, 20, 45, 65);
+    ctx.strokeStyle = '#fff'; ctx.strokeRect(20, 20, 45, 65);
+    if (waste.length > 0) {
+      drawCard(waste[waste.length-1], 80, 20);
+    }
+    for (let i=0; i<4; i++) {
+      ctx.strokeStyle = '#10b981'; ctx.strokeRect(200 + i*65, 20, 45, 65);
+      if (foundations[i].length > 0) {
+        drawCard(foundations[i][foundations[i].length-1], 200 + i*65, 20);
+      }
+    }
+    for (let c=0; c<7; c++) {
+      const colX = 20 + c*62;
+      ctx.strokeStyle = '#065f46'; ctx.strokeRect(colX, 110, 45, 65);
+      piles[c].forEach((card, idx) => {
+        drawCard(card, colX, 110 + idx*20);
+      });
+    }
+  }
+  function drawCard(c, x, y) {
+    ctx.fillStyle = '#fff'; ctx.fillRect(x, y, 45, 65);
+    ctx.strokeStyle = '#333'; ctx.strokeRect(x, y, 45, 65);
+    ctx.fillStyle = c.red ? '#dc2626' : '#000';
+    ctx.font = 'bold 12px sans-serif';
+    ctx.fillText(c.val + c.suit, x+4, y+16);
+  }
+  render();
+</script>
+</body>
+</html>`;
+
+    case 'sudoku':
+      return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin:0; background:#0f172a; color:#fff; font-family:sans-serif; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; overflow:hidden; user-select:none; }
+  h2 { margin:0 0 8px; font-size:16px; color:#38bdf8; }
+  canvas { background:#fff; border:3px solid #0284c7; border-radius:12px; box-shadow:0 0 20px rgba(56,189,248,0.25); cursor:pointer; }
+  .hud { margin-top:8px; font-size:12px; color:#94a3b8; font-family:monospace; }
+</style>
+</head>
+<body>
+  <h2>SUDOKU PUZZLE <span style="color:#fde047">CLICK CELL & PRESS 1-9</span></h2>
+  <canvas id="c" width="360" height="360"></canvas>
+  <div class="hud">Use number keys (1-9) or Backspace to solve</div>
+<script>
+  const canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
+  let selected = { r: 0, c: 0 };
+  let initial = [
+    [5,3,0,0,7,0,0,0,0],
+    [6,0,0,1,9,5,0,0,0],
+    [0,9,8,0,0,0,0,6,0],
+    [8,0,0,0,6,0,0,0,3],
+    [4,0,0,8,0,3,0,0,1],
+    [7,0,0,0,2,0,0,0,6],
+    [0,6,0,0,0,0,2,8,0],
+    [0,0,0,4,1,9,0,0,5],
+    [0,0,0,0,8,0,0,7,9]
+  ];
+  let board = initial.map(r => [...r]);
+  canvas.addEventListener('click', e => {
+    const rect = canvas.getBoundingClientRect();
+    selected.c = Math.floor((e.clientX - rect.left) / 40);
+    selected.r = Math.floor((e.clientY - rect.top) / 40);
+    render();
+  });
+  window.addEventListener('keydown', e => {
+    const num = parseInt(e.key);
+    if (initial[selected.r][selected.c] === 0) {
+      if (num >= 1 && num <= 9) board[selected.r][selected.c] = num;
+      if (e.code === 'Backspace' || e.code === 'Delete' || e.key === '0') board[selected.r][selected.c] = 0;
+      render();
+    }
+  });
+  function render() {
+    ctx.clearRect(0,0,360,360);
+    ctx.fillStyle = '#bae6fd';
+    ctx.fillRect(selected.c*40, selected.r*40, 40, 40);
+    for (let i=0; i<=9; i++) {
+      ctx.beginPath();
+      ctx.lineWidth = i%3===0 ? 3 : 1;
+      ctx.strokeStyle = i%3===0 ? '#0f172a' : '#cbd5e1';
+      ctx.moveTo(i*40, 0); ctx.lineTo(i*40, 360);
+      ctx.moveTo(0, i*40); ctx.lineTo(360, i*40);
+      ctx.stroke();
+    }
+    ctx.font = 'bold 20px sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (let r=0; r<9; r++) {
+      for (let c=0; c<9; c++) {
+        const val = board[r][c];
+        if (val !== 0) {
+          ctx.fillStyle = initial[r][c] !== 0 ? '#0f172a' : '#0284c7';
+          ctx.fillText(val, c*40+20, r*40+20);
+        }
+      }
+    }
+  }
+  render();
+</script>
+</body>
+</html>`;
+
+    case 'simon-says':
+      return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin:0; background:#09090b; color:#fff; font-family:sans-serif; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; overflow:hidden; user-select:none; }
+  h2 { margin:0 0 8px; font-size:16px; color:#ec4899; }
+  canvas { border-radius:50%; box-shadow:0 0 30px rgba(236,72,153,0.3); cursor:pointer; }
+  .hud { margin-top:8px; font-size:12px; color:#94a3b8; font-family:monospace; }
+</style>
+</head>
+<body>
+  <h2>SIMON SAYS <span style="color:#38bdf8">ROUND: <span id="rnd">1</span></span></h2>
+  <canvas id="c" width="340" height="340"></canvas>
+  <div class="hud">Repeat the audio-visual color sequence!</div>
+<script>
+  const canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
+  const colors = ['#22c55e', '#ef4444', '#eab308', '#3b82f6'];
+  const bright = ['#86efac', '#fca5a5', '#fef08a', '#93c5fd'];
+  let sequence = [Math.floor(Math.random()*4)], playerStep = 0, active = -1;
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  function beep(freq) {
+    try {
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.frequency.value = freq; g.gain.setValueAtTime(0.1, audioCtx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+      o.connect(g); g.connect(audioCtx.destination);
+      o.start(); o.stop(audioCtx.currentTime + 0.3);
+    } catch(e) {}
+  }
+  function playSequence() {
+    let i = 0;
+    const timer = setInterval(() => {
+      active = sequence[i];
+      beep([300, 400, 500, 600][active]);
+      render();
+      setTimeout(() => { active = -1; render(); }, 350);
+      i++;
+      if (i >= sequence.length) clearInterval(timer);
+    }, 650);
+  }
+  setTimeout(playSequence, 500);
+  canvas.addEventListener('click', e => {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left - 170, y = e.clientY - rect.top - 170;
+    let clicked = -1;
+    if (x < 0 && y < 0) clicked = 0;
+    if (x >= 0 && y < 0) clicked = 1;
+    if (x < 0 && y >= 0) clicked = 2;
+    if (x >= 0 && y >= 0) clicked = 3;
+    if (clicked === sequence[playerStep]) {
+      beep([300, 400, 500, 600][clicked]);
+      playerStep++;
+      if (playerStep >= sequence.length) {
+        sequence.push(Math.floor(Math.random()*4));
+        playerStep = 0;
+        document.getElementById('rnd').innerText = sequence.length;
+        setTimeout(playSequence, 800);
+      }
+    } else {
+      beep(150);
+      alert('Wrong sequence! Replaying...');
+      playerStep = 0; playSequence();
+    }
+  });
+  function render() {
+    ctx.clearRect(0,0,340,340);
+    const rad = 160;
+    const quadrants = [
+      { start: Math.PI, end: Math.PI*1.5, c: active===0?bright[0]:colors[0] },
+      { start: Math.PI*1.5, end: Math.PI*2, c: active===1?bright[1]:colors[1] },
+      { start: Math.PI*0.5, end: Math.PI, c: active===2?bright[2]:colors[2] },
+      { start: 0, end: Math.PI*0.5, c: active===3?bright[3]:colors[3] }
+    ];
+    for (let q of quadrants) {
+      ctx.beginPath(); ctx.moveTo(170, 170); ctx.arc(170, 170, rad, q.start, q.end);
+      ctx.closePath(); ctx.fillStyle = q.c; ctx.fill();
+    }
+    ctx.beginPath(); ctx.arc(170, 170, 55, 0, Math.PI*2); ctx.fillStyle = '#09090b'; ctx.fill();
+  }
+  render();
+</script>
+</body>
+</html>`;
+
+    case 'space-defender':
+      return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin:0; background:#020617; color:#fff; font-family:sans-serif; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; overflow:hidden; user-select:none; }
+  h2 { margin:0 0 8px; font-size:16px; color:#38bdf8; }
+  canvas { background:#030712; border:2px solid #0284c7; border-radius:12px; box-shadow:0 0 25px rgba(2,132,199,0.3); }
+  .hud { margin-top:8px; font-size:12px; color:#94a3b8; font-family:monospace; }
+</style>
+</head>
+<body>
+  <h2>SPACE DEFENDER <span style="color:#fde047">SCORE: <span id="s">0</span> | HULL: <span id="h">100</span>%</span></h2>
+  <canvas id="c" width="460" height="340"></canvas>
+  <div class="hud">W/S or Up/Down to fly | Spacebar to shoot lasers</div>
+<script>
+  const canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
+  let ship = { x: 30, y: 150, vy: 0, speed: 4 };
+  let lasers = [], enemies = [], stars = [], score = 0, hull = 100;
+  for (let i=0; i<40; i++) stars.push({ x: Math.random()*460, y: Math.random()*340, speed: 1 + Math.random()*3 });
+  let keys = {};
+  window.addEventListener('keydown', e => { keys[e.code] = true; if (e.code === 'Space') lasers.push({ x: ship.x + 24, y: ship.y + 8, w: 10, h: 4 }); });
+  window.addEventListener('keyup', e => { keys[e.code] = false; });
+  function update() {
+    if (keys['ArrowUp'] || keys['KeyW']) ship.y = Math.max(10, ship.y - ship.speed);
+    if (keys['ArrowDown'] || keys['KeyS']) ship.y = Math.min(canvas.height - 30, ship.y + ship.speed);
+    for (let st of stars) { st.x -= st.speed; if (st.x < 0) st.x = 460; }
+    if (Math.random() < 0.03) enemies.push({ x: 460, y: Math.random()*300, w: 20, h: 20, speed: 2.5 + Math.random()*2 });
+    for (let i = lasers.length - 1; i >= 0; i--) {
+      lasers[i].x += 8;
+      if (lasers[i].x > 460) { lasers.splice(i, 1); continue; }
+      for (let j = enemies.length - 1; j >= 0; j--) {
+        const en = enemies[j], l = lasers[i];
+        if (l && l.x > en.x && l.x < en.x + en.w && l.y > en.y && l.y < en.y + en.h) {
+          enemies.splice(j, 1); lasers.splice(i, 1);
+          score += 50; document.getElementById('s').innerText = score;
+          break;
+        }
+      }
+    }
+    for (let i = enemies.length - 1; i >= 0; i--) {
+      enemies[i].x -= enemies[i].speed;
+      if (enemies[i].x < -20) { enemies.splice(i, 1); continue; }
+      if (Math.hypot(enemies[i].x - ship.x, enemies[i].y - ship.y) < 22) {
+        enemies.splice(i, 1); hull -= 20;
+        document.getElementById('h').innerText = hull;
+        if (hull <= 0) { alert('Ship Destroyed! Score: ' + score); score = 0; hull = 100; ship.y = 150; }
+      }
+    }
+    render();
+    requestAnimationFrame(update);
+  }
+  function render() {
+    ctx.clearRect(0,0,460,340);
+    ctx.fillStyle = '#fff';
+    for (let st of stars) ctx.fillRect(st.x, st.y, st.speed>2?2:1, st.speed>2?2:1);
+    ctx.fillStyle = '#38bdf8';
+    ctx.beginPath(); ctx.moveTo(ship.x, ship.y); ctx.lineTo(ship.x+24, ship.y+10); ctx.lineTo(ship.x, ship.y+20); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#fde047';
+    for (const l of lasers) ctx.fillRect(l.x, l.y, l.w, l.h);
+    ctx.fillStyle = '#ef4444';
+    for (const en of enemies) {
+      ctx.fillRect(en.x, en.y+4, en.w, en.h-8);
+      ctx.fillRect(en.x+4, en.y, en.w-8, en.h);
+    }
+  }
+  update();
+</script>
+</body>
+</html>`;
+
+    case 'whack-a-mole':
+      return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin:0; background:#1c1917; color:#fff; font-family:sans-serif; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; overflow:hidden; user-select:none; }
+  h2 { margin:0 0 8px; font-size:16px; color:#f97316; }
+  canvas { background:#451a03; border:3px solid #78350f; border-radius:16px; box-shadow:0 0 25px rgba(249,115,22,0.25); cursor:crosshair; }
+  .hud { margin-top:8px; font-size:12px; color:#d6d3d1; font-family:monospace; }
+</style>
+</head>
+<body>
+  <h2>WHACK-A-MOLE <span style="color:#fde047">WHACKS: <span id="s">0</span> | TIME: <span id="t">30</span>s</span></h2>
+  <canvas id="c" width="360" height="360"></canvas>
+  <div class="hud">Click the popping moles before they burrow down!</div>
+<script>
+  const canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
+  let score = 0, timeLeft = 30, activeHole = -1;
+  const holes = [
+    {x:60,y:60},{x:180,y:60},{x:300,y:60},
+    {x:60,y:180},{x:180,y:180},{x:300,y:180},
+    {x:60,y:300},{x:180,y:300},{x:300,y:300}
+  ];
+  setInterval(() => {
+    activeHole = Math.floor(Math.random() * 9);
+    render();
+  }, 750);
+  setInterval(() => {
+    if (timeLeft > 0) {
+      timeLeft--;
+      document.getElementById('t').innerText = timeLeft;
+      if (timeLeft === 0) alert('Time Up! Total Whacks: ' + score);
+    }
+  }, 1000);
+  canvas.addEventListener('click', e => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    if (activeHole >= 0) {
+      const h = holes[activeHole];
+      if (Math.hypot(mx - h.x, my - h.y) < 35) {
+        score++;
+        document.getElementById('s').innerText = score;
+        activeHole = -1;
+        render();
+      }
+    }
+  });
+  function render() {
+    ctx.clearRect(0,0,360,360);
+    for (let i=0; i<9; i++) {
+      const h = holes[i];
+      ctx.fillStyle = '#1c1917';
+      ctx.beginPath(); ctx.ellipse(h.x, h.y+10, 36, 18, 0, 0, Math.PI*2); ctx.fill();
+      if (activeHole === i) {
+        ctx.fillStyle = '#b45309';
+        ctx.beginPath(); ctx.arc(h.x, h.y-10, 24, Math.PI, 0, false); ctx.fill();
+        ctx.fillStyle = '#000';
+        ctx.beginPath(); ctx.arc(h.x-8, h.y-14, 3, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(h.x+8, h.y-14, 3, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#f43f5e';
+        ctx.beginPath(); ctx.arc(h.x, h.y-8, 4, 0, Math.PI*2); ctx.fill();
+      }
+    }
+  }
+  render();
+</script>
+</body>
+</html>`;
+
+    case 'tron':
+    case 'tron-light-cycles':
+      return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; background: #030712; color: #fff; font-family: monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; user-select: none; }
+  h2 { margin: 0 0 10px; color: #06b6d4; font-size: 20px; letter-spacing: 2px; }
+  canvas { background: #020617; border: 2px solid #06b6d4; box-shadow: 0 0 20px rgba(6,182,212,0.4); border-radius: 8px; }
+  .hud { margin-top: 10px; font-size: 12px; color: #94a3b8; display: flex; gap: 20px; }
+</style>
+</head>
+<body>
+  <h2>TRON LIGHT CYCLES</h2>
+  <canvas id="c" width="480" height="360"></canvas>
+  <div class="hud">
+    <span>YOU: <b id="s1" style="color:#06b6d4">0</b></span>
+    <span>AI: <b id="s2" style="color:#f43f5e">0</b></span>
+    <span>Arrows / WASD to Steer</span>
+  </div>
+<script>
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  const GRID_W = 120, GRID_H = 90, CELL = 4;
+  let grid = new Uint8Array(GRID_W * GRID_H);
+  let p1, p2, score1 = 0, score2 = 0, running = true;
+
+  function reset() {
+    grid.fill(0);
+    p1 = { x: 30, y: 45, dx: 1, dy: 0, dead: false };
+    p2 = { x: 90, y: 45, dx: -1, dy: 0, dead: false };
+    running = true;
+  }
+
+  function step() {
+    if (!running) return;
+    p1.x += p1.dx; p1.y += p1.dy;
+    if (p1.x < 0 || p1.x >= GRID_W || p1.y < 0 || p1.y >= GRID_H || grid[p1.y * GRID_W + p1.x]) {
+      p1.dead = true;
+    } else {
+      grid[p1.y * GRID_W + p1.x] = 1;
+    }
+
+    const dirs = [{dx: 0, dy: -1}, {dx: 1, dy: 0}, {dx: 0, dy: 1}, {dx: -1, dy: 0}];
+    const safe = dirs.filter(d => {
+      if (d.dx === -p2.dx && d.dy === -p2.dy) return false;
+      const nx = p2.x + d.dx, ny = p2.y + d.dy;
+      return nx >= 0 && nx < GRID_W && ny >= 0 && ny < GRID_H && !grid[ny * GRID_W + nx];
+    });
+    if (safe.length) {
+      const forward = safe.find(d => d.dx === p2.dx && d.dy === p2.dy);
+      if (!forward || Math.random() < 0.1) {
+        const choice = safe[Math.floor(Math.random() * safe.length)];
+        p2.dx = choice.dx; p2.dy = choice.dy;
+      }
+    }
+    p2.x += p2.dx; p2.y += p2.dy;
+    if (p2.x < 0 || p2.x >= GRID_W || p2.y < 0 || p2.y >= GRID_H || grid[p2.y * GRID_W + p2.x]) {
+      p2.dead = true;
+    } else {
+      grid[p2.y * GRID_W + p2.x] = 2;
+    }
+
+    if (p1.dead || p2.dead) {
+      running = false;
+      if (p1.dead && !p2.dead) score2++;
+      else if (p2.dead && !p1.dead) score1++;
+      document.getElementById('s1').innerText = score1;
+      document.getElementById('s2').innerText = score2;
+      setTimeout(reset, 1200);
+    }
+    draw();
+  }
+
+  function draw() {
+    ctx.fillStyle = '#020617';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    for (let y = 0; y < GRID_H; y++) {
+      for (let x = 0; x < GRID_W; x++) {
+        const val = grid[y * GRID_W + x];
+        if (val === 1) { ctx.fillStyle = '#06b6d4'; ctx.fillRect(x * CELL, y * CELL, CELL, CELL); }
+        else if (val === 2) { ctx.fillStyle = '#f43f5e'; ctx.fillRect(x * CELL, y * CELL, CELL, CELL); }
+      }
+    }
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(p1.x * CELL, p1.y * CELL, CELL, CELL);
+    ctx.fillRect(p2.x * CELL, p2.y * CELL, CELL, CELL);
+  }
+
+  window.addEventListener('keydown', e => {
+    if ((e.code === 'ArrowUp' || e.code === 'KeyW') && p1.dy === 0) { p1.dx = 0; p1.dy = -1; }
+    else if ((e.code === 'ArrowDown' || e.code === 'KeyS') && p1.dy === 0) { p1.dx = 0; p1.dy = 1; }
+    else if ((e.code === 'ArrowLeft' || e.code === 'KeyA') && p1.dx === 0) { p1.dx = -1; p1.dy = 0; }
+    else if ((e.code === 'ArrowRight' || e.code === 'KeyD') && p1.dx === 0) { p1.dx = 1; p1.dy = 0; }
+  });
+
+  reset();
+  setInterval(step, 45);
+</script>
+</body>
+</html>`;
+
+    case 'lunar-lander':
+      return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; background: #030712; color: #fff; font-family: monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; user-select: none; }
+  h2 { margin: 0 0 10px; color: #fbbf24; font-size: 18px; letter-spacing: 2px; }
+  canvas { background: #020617; border: 2px solid #334155; border-radius: 8px; }
+  .hud { margin-top: 10px; font-size: 12px; color: #94a3b8; display: flex; gap: 20px; }
+</style>
+</head>
+<body>
+  <h2>APOLLO LUNAR LANDER</h2>
+  <canvas id="c" width="480" height="360"></canvas>
+  <div class="hud">
+    <span>FUEL: <b id="fuel" style="color:#22c55e">100%</b></span>
+    <span>ALT: <b id="alt" style="color:#38bdf8">0</b></span>
+    <span>SPEED: <b id="spd" style="color:#fbbf24">0.0</b></span>
+    <span>[SPACE/W] Thrust [A/D] Rotate</span>
+  </div>
+<script>
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  let x = 240, y = 50, vx = 0, vy = 0, angle = 0, fuel = 1000, landed = false, crashed = false;
+  let keys = {};
+
+  const terrain = [
+    {x: 0, y: 320}, {x: 80, y: 300}, {x: 150, y: 330},
+    {x: 200, y: 320}, {x: 280, y: 320},
+    {x: 350, y: 300}, {x: 480, y: 330}
+  ];
+
+  function reset() {
+    x = 100 + Math.random() * 280; y = 40; vx = (Math.random() - 0.5) * 1.5; vy = 0; angle = 0; fuel = 1000;
+    landed = false; crashed = false;
+  }
+
+  window.addEventListener('keydown', e => { keys[e.code] = true; if ((landed || crashed) && e.code === 'Space') reset(); });
+  window.addEventListener('keyup', e => { keys[e.code] = false; });
+
+  function step() {
+    if (!landed && !crashed) {
+      vy += 0.03;
+      if ((keys['Space'] || keys['ArrowUp'] || keys['KeyW']) && fuel > 0) {
+        vx += Math.sin(angle) * 0.08;
+        vy -= Math.cos(angle) * 0.08;
+        fuel -= 2;
+      }
+      if (keys['ArrowLeft'] || keys['KeyA']) angle -= 0.05;
+      if (keys['ArrowRight'] || keys['KeyD']) angle += 0.05;
+
+      x += vx; y += vy;
+      if (y >= 310) {
+        const onPad = x >= 195 && x <= 275;
+        const safeSpd = Math.hypot(vx, vy) < 1.4 && Math.abs(angle) < 0.2;
+        if (onPad && safeSpd) { landed = true; } else { crashed = true; }
+      }
+    }
+    draw();
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, 480, 360);
+    ctx.fillStyle = '#1e293b'; ctx.strokeStyle = '#64748b';
+    ctx.beginPath();
+    ctx.moveTo(terrain[0].x, terrain[0].y);
+    for (let p of terrain) ctx.lineTo(p.x, p.y);
+    ctx.lineTo(480, 360); ctx.lineTo(0, 360); ctx.fill(); ctx.stroke();
+
+    ctx.strokeStyle = '#22c55e'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(200, 320); ctx.lineTo(280, 320); ctx.stroke();
+    ctx.lineWidth = 1;
+
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+    ctx.fillStyle = '#f8fafc'; ctx.fillRect(-8, -8, 16, 14);
+    ctx.fillStyle = '#38bdf8'; ctx.fillRect(-4, -4, 8, 5);
+    ctx.strokeStyle = '#94a3b8';
+    ctx.beginPath();
+    ctx.moveTo(-8, 6); ctx.lineTo(-12, 12);
+    ctx.moveTo(8, 6); ctx.lineTo(12, 12);
+    ctx.stroke();
+
+    if ((keys['Space'] || keys['ArrowUp'] || keys['KeyW']) && fuel > 0 && !landed && !crashed) {
+      ctx.fillStyle = '#f59e0b';
+      ctx.beginPath();
+      ctx.moveTo(-5, 6); ctx.lineTo(5, 6); ctx.lineTo(0, 16 + Math.random() * 8);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    if (landed) {
+      ctx.fillStyle = '#22c55e'; ctx.font = 'bold 20px monospace';
+      ctx.fillText('THE EAGLE HAS LANDED!', 110, 160);
+      ctx.font = '12px monospace'; ctx.fillText('Press SPACE to Restart', 160, 190);
+    } else if (crashed) {
+      ctx.fillStyle = '#ef4444'; ctx.font = 'bold 20px monospace';
+      ctx.fillText('LANDER DESTROYED!', 140, 160);
+      ctx.font = '12px monospace'; ctx.fillText('Press SPACE to Restart', 160, 190);
+    }
+
+    document.getElementById('fuel').innerText = Math.max(0, Math.round(fuel / 10)) + '%';
+    document.getElementById('alt').innerText = Math.max(0, Math.round(320 - y));
+    document.getElementById('spd').innerText = Math.hypot(vx, vy).toFixed(1) + ' m/s';
+  }
+
+  setInterval(step, 30);
+</script>
+</body>
+</html>`;
+
+    case 'wordle':
+      return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; background: #0b0f19; color: #fff; font-family: -apple-system, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; user-select: none; }
+  h2 { margin: 0 0 10px; color: #38bdf8; letter-spacing: 3px; }
+  #grid { display: grid; grid-template-rows: repeat(6, 44px); gap: 6px; margin-bottom: 12px; }
+  .row { display: grid; grid-template-columns: repeat(5, 44px); gap: 6px; }
+  .tile { width: 44px; height: 44px; border: 2px solid #334155; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: bold; background: #1e293b; text-transform: uppercase; }
+  .tile.correct { background: #22c55e; border-color: #22c55e; color: #000; }
+  .tile.present { background: #eab308; border-color: #eab308; color: #000; }
+  .tile.absent { background: #475569; border-color: #475569; }
+  #kb { display: flex; flex-direction: column; gap: 4px; align-items: center; }
+  .kb-row { display: flex; gap: 4px; }
+  .key { padding: 8px 10px; border-radius: 6px; background: #334155; font-size: 11px; font-weight: bold; cursor: pointer; }
+  .msg { font-size: 13px; color: #38bdf8; height: 18px; margin-top: 6px; }
+</style>
+</head>
+<body>
+  <h2>WORDLE 5-LETTER</h2>
+  <div id="grid"></div>
+  <div id="kb"></div>
+  <div class="msg" id="msg">Type or click letters, ENTER to submit</div>
+<script>
+  const WORDS = ['AUDIO','REACT','LIGHT','SPACE','MUSIC','VIDEO','ROBOT','CABLE','SPEED','LASER','STORM','EARTH','SMART','POWER','MAGIC'];
+  const target = WORDS[Math.floor(Math.random() * WORDS.length)];
+  let row = 0, col = 0, current = '', over = false;
+
+  const gridEl = document.getElementById('grid');
+  for (let r = 0; r < 6; r++) {
+    const rowEl = document.createElement('div');
+    rowEl.className = 'row';
+    for (let c = 0; c < 5; c++) {
+      const tile = document.createElement('div');
+      tile.className = 'tile';
+      tile.id = 't-' + r + '-' + c;
+      rowEl.appendChild(tile);
+    }
+    gridEl.appendChild(rowEl);
+  }
+
+  function handleInput(key) {
+    if (over) return;
+    if (key === 'ENTER') {
+      if (current.length === 5) {
+        checkWord();
+      } else {
+        document.getElementById('msg').innerText = 'Not enough letters!';
+      }
+    } else if (key === 'BACKSPACE' || key === 'DEL') {
+      if (current.length > 0) {
+        current = current.slice(0, -1);
+        col--;
+        document.getElementById('t-' + row + '-' + col).innerText = '';
+      }
+    } else if (/^[A-Z]$/.test(key) && current.length < 5) {
+      document.getElementById('t-' + row + '-' + col).innerText = key;
+      current += key;
+      col++;
+    }
+  }
+
+  function checkWord() {
+    for (let i = 0; i < 5; i++) {
+      const tile = document.getElementById('t-' + row + '-' + i);
+      const ch = current[i];
+      if (ch === target[i]) tile.className = 'tile correct';
+      else if (target.includes(ch)) tile.className = 'tile present';
+      else tile.className = 'tile absent';
+    }
+    if (current === target) {
+      over = true;
+      document.getElementById('msg').innerText = 'Splendid! You guessed the word!';
+      return;
+    }
+    row++; col = 0; current = '';
+    if (row >= 6) {
+      over = true;
+      document.getElementById('msg').innerText = 'Game Over! The word was: ' + target;
+    }
+  }
+
+  window.addEventListener('keydown', e => {
+    if (e.key === 'Enter') handleInput('ENTER');
+    else if (e.key === 'Backspace') handleInput('BACKSPACE');
+    else if (/^[a-zA-Z]$/.test(e.key)) handleInput(e.key.toUpperCase());
+  });
+
+  const KB_LAYOUT = ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'];
+  const kbEl = document.getElementById('kb');
+  KB_LAYOUT.forEach((str, i) => {
+    const kRow = document.createElement('div');
+    kRow.className = 'kb-row';
+    if (i === 2) {
+      const ent = document.createElement('div'); ent.className = 'key'; ent.innerText = 'ENTER';
+      ent.onclick = () => handleInput('ENTER'); kRow.appendChild(ent);
+    }
+    str.split('').forEach(ch => {
+      const key = document.createElement('div'); key.className = 'key'; key.innerText = ch;
+      key.onclick = () => handleInput(ch); kRow.appendChild(key);
+    });
+    if (i === 2) {
+      const del = document.createElement('div'); del.className = 'key'; del.innerText = 'DEL';
+      del.onclick = () => handleInput('BACKSPACE'); kRow.appendChild(del);
+    }
+    kbEl.appendChild(kRow);
+  });
 </script>
 </body>
 </html>`;

@@ -5,8 +5,10 @@
  */
 
 import { getInbuiltGameSrcDoc } from './inbuiltGames.ts';
+import { getGameThumbnailUrl } from './gameThumbnails.ts';
 
 export { getInbuiltGameSrcDoc } from './inbuiltGames.ts';
+export { getGameThumbnailUrl, getGamePreviewSvg } from './gameThumbnails.ts';
 
 export type GameCategory =
   | 'Arcade'
@@ -31,7 +33,7 @@ export interface GameItem {
   isInbuilt?: boolean;
 }
 
-export const GAMES_CATALOG: GameItem[] = [
+const RAW_GAMES_CATALOG: GameItem[] = [
   // --- INBUILT ZERO-LATENCY CANVAS GAMES ---
   {
     id: '2048',
@@ -196,20 +198,24 @@ export const GAMES_CATALOG: GameItem[] = [
     title: 'Pac-Man Classic 1980',
     category: 'Arcade',
     url: 'https://freepacman.org',
-    badge: 'Arcade Legend',
+    badge: 'Inbuilt Engine',
     description: 'Eat pellets across the maze while evading Blinky, Pinky, Inky, and Clyde. Grab power pellets to counter-attack.',
     thumbnail: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=400&q=80',
     controlsHint: 'Arrow Keys or WASD to steer Pac-Man',
+    srcDoc: getInbuiltGameSrcDoc('pacman'),
+    isInbuilt: true,
   },
   {
     id: 'space-invaders',
     title: 'Space Invaders 1978',
     category: 'Retro',
     url: 'https://freeinvaders.org',
-    badge: 'Taito Classic',
+    badge: 'Inbuilt Engine',
     description: 'Defend planet Earth against waves of descending alien armadas behind destructible defense bunkers.',
     thumbnail: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=400&q=80',
     controlsHint: 'Left/Right to slide, Space to shoot',
+    srcDoc: getInbuiltGameSrcDoc('space-invaders'),
+    isInbuilt: true,
   },
   {
     id: 'galaga',
@@ -380,10 +386,12 @@ export const GAMES_CATALOG: GameItem[] = [
     title: 'Klondike Solitaire Classic',
     category: 'Cards',
     url: 'https://worldofsolitaire.com',
-    badge: 'Patience Card',
+    badge: 'Inbuilt Engine',
     description: 'The definitive Klondike card game. Build foundations from Ace to King across seven tableau columns.',
     thumbnail: 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=400&q=80',
     controlsHint: 'Click or Drag cards between tableau columns',
+    srcDoc: getInbuiltGameSrcDoc('solitaire'),
+    isInbuilt: true,
   },
   {
     id: 'spider-solitaire',
@@ -552,10 +560,12 @@ export const GAMES_CATALOG: GameItem[] = [
     title: 'Lunar Lander Apollo',
     category: 'Retro',
     url: 'https://moonlander.seb.ly',
-    badge: 'Gravity Physics',
+    badge: 'Inbuilt Engine',
     description: 'Manage thruster fuel and terminal descent velocity to touch down softly on rocky lunar craters.',
     thumbnail: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=400&q=80',
     controlsHint: 'Up Arrow to burn thruster, Left/Right to tilt',
+    srcDoc: getInbuiltGameSrcDoc('lunar-lander'),
+    isInbuilt: true,
   },
   {
     id: 'missile-command',
@@ -568,14 +578,28 @@ export const GAMES_CATALOG: GameItem[] = [
     controlsHint: 'Click to detonate anti-missile flak burst',
   },
   {
-    id: 'tron-light-cycles',
+    id: 'tron',
     title: 'Tron Light Cycles 3D',
     category: 'Arcade',
     url: 'https://lightcycles.org',
-    badge: 'Grid Arcade',
+    badge: 'Inbuilt Engine',
     description: 'Leave solid light trails at 200 mph. Trap AI racers into your light wall without crashing into theirs.',
     thumbnail: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=400&q=80',
     controlsHint: 'WASD or Arrow Keys for instant 90° turns',
+    srcDoc: getInbuiltGameSrcDoc('tron'),
+    isInbuilt: true,
+  },
+  {
+    id: 'tron-light-cycles',
+    title: 'Tron Light Cycles 3D Classic',
+    category: 'Arcade',
+    url: 'https://lightcycles.org',
+    badge: 'Inbuilt Engine',
+    description: 'Leave solid light trails at 200 mph. Trap AI racers into your light wall without crashing into theirs.',
+    thumbnail: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=400&q=80',
+    controlsHint: 'WASD or Arrow Keys for instant 90° turns',
+    srcDoc: getInbuiltGameSrcDoc('tron'),
+    isInbuilt: true,
   },
 
   // --- PUZZLE & WORD LOGIC ---
@@ -584,20 +608,72 @@ export const GAMES_CATALOG: GameItem[] = [
     title: 'Sudoku Daily Master',
     category: 'Puzzle',
     url: 'https://sudoku.com',
-    badge: 'Logic Puzzle',
+    badge: 'Inbuilt Engine',
     description: 'Fill the 9x9 grid so every row, column, and 3x3 box contains digits 1 through 9 without repeating.',
     thumbnail: 'https://images.unsplash.com/photo-1606167664584-cf291859f77e?auto=format&fit=crop&w=400&q=80',
     controlsHint: 'Click cell and press 1-9 to input digit',
+    srcDoc: getInbuiltGameSrcDoc('sudoku'),
+    isInbuilt: true,
+  },
+  {
+    id: 'simon-says',
+    title: 'Simon Says Audio Memory',
+    category: 'Puzzle',
+    url: 'https://simonsays.io',
+    badge: 'Inbuilt Engine',
+    description: 'Listen to the synthesized audio tones and repeat the expanding color sequence.',
+    thumbnail: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=400&q=80',
+    controlsHint: 'Click quadrants to repeat sequence',
+    srcDoc: getInbuiltGameSrcDoc('simon-says'),
+    isInbuilt: true,
+  },
+  {
+    id: 'space-defender',
+    title: 'Space Defender Starship',
+    category: 'Action',
+    url: 'https://spacedefender.io',
+    badge: 'Inbuilt Engine',
+    description: 'Side-scrolling space defense battle! Dodge hazards and fire laser cannons at invading swarms.',
+    thumbnail: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=80',
+    controlsHint: 'W/S or Up/Down to fly, Space to shoot',
+    srcDoc: getInbuiltGameSrcDoc('space-defender'),
+    isInbuilt: true,
+  },
+  {
+    id: 'whack-a-mole',
+    title: 'Whack-a-Mole Arcade',
+    category: 'Arcade',
+    url: 'https://whackamole.io',
+    badge: 'Inbuilt Engine',
+    description: 'Fast-paced reflex challenge. Whack the popping moles before they burrow down into their holes.',
+    thumbnail: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=400&q=80',
+    controlsHint: 'Click moles to whack',
+    srcDoc: getInbuiltGameSrcDoc('whack-a-mole'),
+    isInbuilt: true,
   },
   {
     id: 'wordle',
     title: 'Wordle Guess Game',
     category: 'Puzzle',
     url: 'https://wordlegame.org',
-    badge: 'Word Logic',
+    badge: 'Inbuilt Engine',
     description: 'Deduce hidden 5-letter target words in 6 attempts using green, yellow, and gray tile feedback clues.',
     thumbnail: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=400&q=80',
     controlsHint: 'Keyboard to type letters, Enter to submit',
+    srcDoc: getInbuiltGameSrcDoc('wordle'),
+    isInbuilt: true,
+  },
+  {
+    id: 'tictactoe',
+    title: 'Tic-Tac-Toe Minimax AI',
+    category: 'Strategy',
+    url: 'https://playtictactoe.org',
+    badge: 'Inbuilt Engine',
+    description: 'Challenge an unbeatable AI programmed with minimax algorithm or play local 2-player grid turns.',
+    thumbnail: 'https://images.unsplash.com/photo-1668901382969-8c73e450a1f5?auto=format&fit=crop&w=400&q=80',
+    controlsHint: 'Mouse Click to place X or O',
+    srcDoc: getInbuiltGameSrcDoc('tictactoe'),
+    isInbuilt: true,
   },
   {
     id: 'crossword',
@@ -610,3 +686,8 @@ export const GAMES_CATALOG: GameItem[] = [
     controlsHint: 'Click square & type letters with keyboard',
   },
 ];
+
+export const GAMES_CATALOG: GameItem[] = RAW_GAMES_CATALOG.map((g) => ({
+  ...g,
+  thumbnail: getGameThumbnailUrl(g.id),
+}));

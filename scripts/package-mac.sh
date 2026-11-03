@@ -85,6 +85,9 @@ echo "[Miki Player] Installing native executable binary..."
 cp MikiPlayer "Miki Player.app/Contents/MacOS/Miki Player"
 chmod +x "Miki Player.app/Contents/MacOS/Miki Player"
 
+echo "[Miki Player] Codesigning macOS bundle ad-hoc..."
+codesign --force --deep --sign - "Miki Player.app"
+
 echo "[Miki Player] Syncing to Build/MacOs..."
 mkdir -p "Build/windows" "Build/MacOs" "Build/Android" "Build/ios" "Build/Linux"
 touch "Build/windows/.gitkeep" "Build/Android/.gitkeep" "Build/ios/.gitkeep" "Build/Linux/.gitkeep"

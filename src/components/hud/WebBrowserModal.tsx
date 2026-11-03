@@ -15,7 +15,6 @@ import {
   Sliders,
 } from 'lucide-react';
 import { getCleanUrl, isBlockedUrl } from '../../utils/adBlockFilter';
-import { parseYouTubeId } from '../../App';
 import { getWebsiteFaviconUrl } from '../../utils/faviconService';
 import { usePlayerStore } from '../../store/playerStore';
 
@@ -83,8 +82,11 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
   onOpenEq,
 }) => {
   const [currentUrl, setCurrentUrl] = useState<string>(initialUrl);
+  const [isQuickUrlOpen, setIsQuickUrlOpen] = useState<boolean>(false);
+  const [quickUrlInput, setQuickUrlInput] = useState<string>('');
   const [isAdShieldActive, setIsAdShieldActive] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [frameBlocked, setFrameBlocked] = useState<boolean>(false);
   const [blockedCount, setBlockedCount] = useState<number>(18);
   const [detectedMediaUrl, setDetectedMediaUrl] = useState<string | null>(null);
   const [detectedMediaTitle, setDetectedMediaTitle] = useState<string | null>(null);
@@ -109,9 +111,10 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
   // Synchronize with native top-level WKWebView when browser modal is opened
   useEffect(() => {
     if (isOpen) {
-      const clean = getCleanUrl(initialUrl || 'https://cinesubz.co');
+      const clean = getCleanUrl(initialUrl || 'https://cinesubz.lk');
       setCurrentUrl(clean);
       setIsLoading(true);
+      setFrameBlocked(false);
       setDetectedMediaUrl(null);
 
       const handlers = getWebkitHandlers();
@@ -123,6 +126,19 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
       }
     }
   }, [isOpen, initialUrl]);
+
+  // Fallback detection for iframe X-Frame-Options SAMEORIGIN blocking
+  useEffect(() => {
+    if (!isNativeBrowserSupported && isOpen) {
+      const timer = setTimeout(() => {
+        if (isLoading) {
+          setIsLoading(false);
+          setFrameBlocked(true);
+        }
+      }, 6000);
+      return () => clearTimeout(timer);
+    }
+  }, [isNativeBrowserSupported, isOpen, currentUrl, isLoading]);
 
   // Listen for native browser loading & navigation events
   useEffect(() => {
@@ -192,8 +208,6 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
     };
   }, [isAdShieldActive]);
 
-  if (!isOpen) return null;
-
   const handleClose = () => {
     const handlers = getWebkitHandlers();
     if (handlers?.browserViewAction) {
@@ -212,6 +226,74 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
     }
   };
 
+  const handleGoBack = () => {
+    const handlers = getWebkitHandlers();
+    if (handlers?.browserViewAction) {
+      handlers.browserViewAction.postMessage({ action: 'goBack' });
+    } else if (iframeRef.current?.contentWindow) {
+      try {
+        iframeRef.current.contentWindow.history.back();
+      } catch {}
+    }
+  };
+
+  const handleGoForward = () => {
+    const handlers = getWebkitHandlers();
+    if (handlers?.browserViewAction) {
+      handlers.browserViewAction.postMessage({ action: 'goForward' });
+    } else if (iframeRef.current?.contentWindow) {
+      try {
+        iframeRef.current.contentWindow.history.forward();
+      } catch {}
+    }
+  };
+
+  // Keyboard navigation shortcuts: <Esc>, <Cmd/Ctrl+R>, <Cmd/Ctrl+L>, <Alt+Arrows>
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (isQuickUrlOpen) {
+          setIsQuickUrlOpen(false);
+        } else {
+          handleClose();
+        }
+        e.preventDefault();
+        return;
+      }
+
+      const isCmdOrCtrl = e.metaKey || e.ctrlKey;
+
+      if ((isCmdOrCtrl && e.code === 'KeyR') || e.key === 'F5') {
+        handleReload();
+        e.preventDefault();
+        return;
+      }
+
+      if (isCmdOrCtrl && e.code === 'KeyL') {
+        setQuickUrlInput(currentUrl);
+        setIsQuickUrlOpen((prev) => !prev);
+        e.preventDefault();
+        return;
+      }
+
+      if (e.altKey && e.code === 'ArrowLeft') {
+        handleGoBack();
+        e.preventDefault();
+        return;
+      }
+
+      if (e.altKey && e.code === 'ArrowRight') {
+        handleGoForward();
+        e.preventDefault();
+        return;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, isQuickUrlOpen, currentUrl]);
+
   const handleToggleShield = () => {
     const nextState = !isAdShieldActive;
     setIsAdShieldActive(nextState);
@@ -229,10 +311,8 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
 
   const isPlayableInPlayer = () => {
     if (detectedMediaUrl) return true;
-    if (!currentUrl) return false;
-    if (parseYouTubeId(currentUrl)) return true;
-    if (/\.(mp4|m3u8|webm|mov|mkv)(\?.*)?$/i.test(currentUrl)) return true;
-    return false;
+    if (!currentUrl || currentUrl === 'about:blank') return false;
+    return true;
   };
 
   const handlePlayInPlayer = () => {
@@ -245,9 +325,13 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
   const resolvedFrameUrl = resolveBrowserFrameUrl(currentUrl);
   const siteHostname = extractHostname(currentUrl);
 
+  if (!isOpen) return null;
+
   return (
     <div
-      className="fixed inset-0 z-50 w-full h-full bg-[#06080d] flex flex-col select-none animate-in fade-in duration-150"
+      className={`fixed inset-0 z-50 w-full h-full ${
+        isNativeBrowserSupported ? 'bg-transparent' : 'bg-[#06080d]'
+      } flex flex-col select-none animate-in fade-in duration-150`}
       style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
     >
       {/* Sleek, Minimal Top Bar - Back, Shield Status, Window Drag & Controls */}
@@ -447,10 +531,50 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
         </div>
       </div>
 
+      {/* Quick Keyboard URL Input Popover Bar (<Cmd/Ctrl+L>) */}
+      {isQuickUrlOpen && (
+        <div className="absolute top-12 left-4 right-4 max-w-xl mx-auto z-40 bg-slate-900/95 border border-cyan-500/40 rounded-2xl p-2.5 shadow-2xl backdrop-blur-2xl flex items-center gap-2 animate-in fade-in zoom-in-95 duration-100">
+          <Globe className="w-4 h-4 text-cyan-400 shrink-0 ml-1.5" />
+          <input
+            type="text"
+            autoFocus
+            value={quickUrlInput}
+            onChange={(e) => setQuickUrlInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                let dest = quickUrlInput.trim();
+                if (dest && !dest.startsWith('http://') && !dest.startsWith('https://')) {
+                  dest = 'https://' + dest;
+                }
+                setCurrentUrl(dest);
+                setIsLoading(true);
+                setIsQuickUrlOpen(false);
+                const handlers = getWebkitHandlers();
+                if (handlers?.browserViewAction) {
+                  handlers.browserViewAction.postMessage({ action: 'navigate', url: dest });
+                }
+              }
+            }}
+            placeholder="Jump to address (e.g. cinesubz.co) or search..."
+            className="flex-1 bg-transparent border-0 text-xs text-white placeholder-white/40 focus:outline-none"
+          />
+          <button
+            onClick={() => setIsQuickUrlOpen(false)}
+            className="px-2 py-0.5 rounded-lg text-white/50 hover:text-white hover:bg-white/10 text-xs font-mono"
+          >
+            Esc
+          </button>
+        </div>
+      )}
+
       {/* Main Full-Window Viewport: Loading Indicator + Edge-to-Edge Website Frame */}
-      <div className="relative flex-1 w-full h-full bg-transparent overflow-hidden flex flex-col items-center justify-center">
+      <div
+        className={`relative flex-1 w-full h-full bg-transparent overflow-hidden flex flex-col items-center justify-center ${
+          isNativeBrowserSupported ? 'pointer-events-none' : ''
+        }`}
+      >
         {isLoading && (
-          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/85 backdrop-blur-md">
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/85 backdrop-blur-md pointer-events-auto">
             <div className="w-12 h-12 rounded-full border-3 border-transparent border-t-cyan-400 border-r-emerald-400 animate-spin shadow-lg shadow-cyan-500/20" />
             <span className="text-sm font-semibold text-white/90 mt-4 flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-cyan-400 animate-pulse" />
@@ -471,10 +595,55 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
             sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation allow-downloads allow-modals"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
             allowFullScreen
-            onLoad={() => setIsLoading(false)}
-            onError={() => setIsLoading(false)}
-            className="w-full h-full border-0 bg-slate-950"
+            onLoad={() => {
+              setIsLoading(false);
+              setFrameBlocked(false);
+            }}
+            onError={() => {
+              setIsLoading(false);
+              setFrameBlocked(true);
+            }}
+            className="w-full h-full border-0 bg-slate-950 pointer-events-auto"
           />
+        )}
+
+        {/* Framing Protection & Black Screen Prevention Card */}
+        {!isNativeBrowserSupported && frameBlocked && (
+          <div className="absolute inset-0 z-30 flex flex-col items-center justify-center p-6 bg-slate-950/95 text-center pointer-events-auto animate-in fade-in duration-200">
+            <div className="w-14 h-14 rounded-2xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-4 shadow-lg shadow-amber-500/10">
+              <ShieldAlert className="w-7 h-7" />
+            </div>
+            <h3 className="text-base font-bold text-white mb-1.5">Website Embed Protected</h3>
+            <p className="text-xs text-slate-300 max-w-md mb-6 leading-relaxed">
+              This cinema portal (<span className="text-cyan-400 font-mono font-semibold">{siteHostname}</span>) enforces strict frame security (<span className="font-mono text-amber-300">X-Frame-Options: SAMEORIGIN</span>).
+              You can play streams directly in the native player engine or open the website in your browser.
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <button
+                onClick={handlePlayInPlayer}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:brightness-110 active:scale-95 text-white font-bold text-xs shadow-lg transition-all"
+              >
+                <Play className="w-4 h-4 fill-white" />
+                <span>Play in Native Player</span>
+              </button>
+              <a
+                href={currentUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-white font-semibold text-xs transition-all border border-white/10"
+              >
+                <ExternalLink className="w-4 h-4 text-cyan-400" />
+                <span>Open in External Browser</span>
+              </a>
+              <button
+                onClick={handleReload}
+                className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/70 hover:text-white text-xs font-semibold transition-all"
+              >
+                <RotateCw className="w-3.5 h-3.5" />
+                <span>Retry</span>
+              </button>
+            </div>
+          </div>
         )}
       </div>
     </div>

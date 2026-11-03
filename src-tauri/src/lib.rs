@@ -24,7 +24,23 @@ pub fn run() {
             let media_id = parts.next().unwrap_or("unknown");
             let timestamp_ms: i64 = parts.next().and_then(|s| s.parse().ok()).unwrap_or(0);
 
-            let jpeg_bytes = match extractor_for_protocol.get_or_extract_thumbnail("", media_id, timestamp_ms) {
+            // Extract file path from query parameter (?path=...) or fallback to media_id
+            let query = request.uri().query().unwrap_or("");
+            let query_path = query
+                .split('&')
+                .find(|pair| pair.starts_with("path="))
+                .and_then(|pair| pair.strip_prefix("path="))
+                .map(|p| p.to_string());
+
+            let media_path = query_path.unwrap_or_else(|| {
+                if media_id.starts_with('/') || media_id.contains(':') {
+                    media_id.to_string()
+                } else {
+                    String::new()
+                }
+            });
+
+            let jpeg_bytes = match extractor_for_protocol.get_or_extract_thumbnail(&media_path, media_id, timestamp_ms) {
                 Ok(bytes) => bytes,
                 Err(_) => vec![],
             };

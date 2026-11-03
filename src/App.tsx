@@ -20,7 +20,7 @@ import { WebEmbedPlayer } from './components/player/WebEmbedPlayer';
 import { SubtitleOverlay } from './components/player/SubtitleOverlay';
 import { ApplicationMenu } from './components/hud/ApplicationMenu';
 import { GmailSignInModal } from './components/hud/GmailSignInModal';
-import { parseWebStream } from './utils/webStreamUtils';
+import { parseWebStream, WebPlatform } from './utils/webStreamUtils';
 import { getWebsiteFaviconUrl } from './utils/faviconService';
 import {
   FolderOpen,
@@ -104,6 +104,7 @@ export const App: React.FC = () => {
   const customBgBrightness = usePlayerStore((s) => s.customBgBrightness);
   const customBgTint = usePlayerStore((s) => s.customBgTint);
   const isBuffering = usePlayerStore((s) => s.isBuffering);
+  const lastError = usePlayerStore((s) => s.lastError);
   const positionMs = usePlayerStore((s) => s.positionMs);
   const activeSubtitleTrack = usePlayerStore((s) => s.activeSubtitleTrack);
   const isSubtitlesVisible = usePlayerStore((s) => s.isSubtitlesVisible);
@@ -248,8 +249,33 @@ export const App: React.FC = () => {
 
   const { handleTouchStart, handleTouchEnd } = usePlayerGestures(containerRef);
 
+  const [fallbackWebEmbed, setFallbackWebEmbed] = useState<{
+    platform: WebPlatform;
+    embedUrl: string;
+    originalUrl: string;
+  } | null>(null);
+
   const webStream = useMemo(() => (currentUri ? parseWebStream(currentUri) : null), [currentUri]);
-  const youtubeId = webStream?.platform === 'youtube' ? webStream.id : null;
+  const activeWebStream = webStream || fallbackWebEmbed;
+  const youtubeId = activeWebStream?.platform === 'youtube' ? (webStream?.id || null) : null;
+
+  useEffect(() => {
+    setFallbackWebEmbed(null);
+  }, [currentUri]);
+
+  const fallbackToWebStream = useCallback((uri: string) => {
+    if (uri && (uri.startsWith('http://') || uri.startsWith('https://'))) {
+      const isCinema = /cinesubz|fmovies|123movies|bflix|vidsrc|streamtape/i.test(uri);
+      setFallbackWebEmbed({
+        platform: isCinema ? 'cinema' : 'web',
+        embedUrl: uri,
+        originalUrl: uri,
+      });
+      usePlayerStore.setState({ lastError: null, isBuffering: false });
+      return true;
+    }
+    return false;
+  }, []);
 
   // Listen for native / global triggers for Gmail signin, web streams, browser, settings & EQ
   useEffect(() => {
@@ -699,19 +725,19 @@ export const App: React.FC = () => {
       {/* Main Viewport Area */}
       <div className="relative flex-1 w-full h-full overflow-hidden flex items-center justify-center">
         {/* Ambient Lighting Canvas Layer */}
-        {!youtubeId && !webStream && <AmbientCanvas videoRef={videoRef} />}
+        {!youtubeId && !activeWebStream && <AmbientCanvas videoRef={videoRef} />}
 
-        {/* Web Stream (YouTube, TikTok, Instagram) or Standard Video */}
+        {/* Web Stream (YouTube, TikTok, Instagram, Cinema, Vimeo, Twitch) or Standard Video */}
         {youtubeId ? (
           <YouTubePlayer
             youtubeId={youtubeId}
             initialPositionMs={usePlayerStore.getState().positionMs}
           />
-        ) : webStream ? (
+        ) : activeWebStream ? (
           <WebEmbedPlayer
-            platform={webStream.platform}
-            embedUrl={webStream.embedUrl}
-            originalUrl={webStream.originalUrl}
+            platform={activeWebStream.platform}
+            embedUrl={activeWebStream.embedUrl}
+            originalUrl={activeWebStream.originalUrl}
             title={currentTitle}
             onOpenEq={() => setIsEqOpen(true)}
           />
@@ -729,6 +755,12 @@ export const App: React.FC = () => {
               onLoadedData={() => usePlayerStore.setState({ isBuffering: false })}
               onLoadStart={() => usePlayerStore.setState({ isBuffering: true })}
               onError={(e) => {
+                // Auto-fallback to resilient WebEmbedPlayer if remote web stream fails in <video>
+                if (currentUri && (currentUri.startsWith('http://') || currentUri.startsWith('https://'))) {
+                  const recovered = fallbackToWebStream(currentUri);
+                  if (recovered) return;
+                }
+
                 const err = e.currentTarget.error;
                 let code: 'STREAM_ERROR' | 'MEDIA_NOT_FOUND' | 'CODEC_UNSUPPORTED' | 'STREAM_TIMEOUT' = 'STREAM_ERROR';
                 let message = 'Failed to load video stream or file.';
@@ -796,7 +828,7 @@ export const App: React.FC = () => {
             />
 
             {/* High-Performance Loading / Buffering HUD Animation Indicator */}
-            {isBuffering && currentUri && (
+            {isBuffering && !lastError && currentUri && (
               <div className="absolute inset-0 pointer-events-none z-20 flex flex-col items-center justify-center bg-black/45 backdrop-blur-sm animate-in fade-in duration-200">
                 <div className="relative flex items-center justify-center">
                   {/* Outer Pulsing Aura */}
@@ -1207,7 +1239,7 @@ export const App: React.FC = () => {
         )}
 
         {/* Glassmorphic Controls Overlay (for native/local/HLS video & streams) */}
-        {currentUri && !webStream && (
+        {currentUri && !activeWebStream && (
           <ControlsOverlay
             onOpenEq={() => setIsEqOpen(true)}
             onOpenSettings={() => setIsSettingsOpen(true)}
