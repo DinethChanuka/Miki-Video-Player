@@ -308,6 +308,7 @@ export class WebMediaEngine implements IPlayerEngine {
     this.videoEl = el;
     this.videoEl.playsInline = true;
     this.videoEl.preload = 'auto';
+    this.videoEl.crossOrigin = 'anonymous';
     this.setupWebAudioGraph();
 
     // Hook critical HTML5 video events
