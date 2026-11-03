@@ -532,6 +532,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         let initialFrame = NSRect(x: 0, y: 0, width: contentBounds.width, height: max(100, contentBounds.height - 44))
         let bView = WKWebView(frame: initialFrame, configuration: config)
         bView.autoresizingMask = [.width, .height]
+        bView.customUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15"
         bView.uiDelegate = self
         bView.navigationDelegate = self
         bView.isHidden = true
@@ -763,8 +764,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
                     case "open":
                         let targetUrl = dict["url"] as? String ?? "https://cinesubz.co"
                         let bView = self.setupBrowserWebView()
-                        self.updateBrowserViewLayout()
                         bView.isHidden = false
+                        bView.alphaValue = 1.0
+                        if let wView = self.webView {
+                            self.window.contentView?.addSubview(bView, positioned: .above, relativeTo: self.webView)
+                        }
+                        self.updateBrowserViewLayout()
                         if let url = URL(string: targetUrl) {
                             bView.load(URLRequest(url: url))
                         }
