@@ -22,17 +22,13 @@ import { ApplicationMenu } from './components/hud/ApplicationMenu';
 import { GmailSignInModal } from './components/hud/GmailSignInModal';
 import { FullWindowMusicPlayer } from './components/music/FullWindowMusicPlayer';
 import { FullWindowDashboard } from './components/dashboard/FullWindowDashboard';
-import { parseWebStream, WebPlatform } from './utils/webStreamUtils';
-import { getWebsiteFaviconUrl } from './utils/faviconService';
+import { HomeDashboardView } from './components/home/HomeDashboardView';
+import { parseWebStream, isDirectMediaUrl, WebPlatform } from './utils/webStreamUtils';
+import { HlsStreamController } from './core/HlsStreamController';
 import {
   FolderOpen,
-  Sparkles,
   Settings,
   ArrowLeft,
-  Play,
-  Trash2,
-  Film,
-  Plus,
   Camera,
   RefreshCw,
 } from 'lucide-react';
@@ -90,8 +86,6 @@ export const App: React.FC = () => {
   const bootEngine = usePlayerStore((s) => s.bootEngine);
   const openMedia = usePlayerStore((s) => s.openMedia);
   const closeMedia = usePlayerStore((s) => s.closeMedia);
-  const recentMedia = usePlayerStore((s) => s.recentMedia);
-  const removeRecentMedia = usePlayerStore((s) => s.removeRecentMedia);
   const resumeBannerPositionMs = usePlayerStore((s) => s.resumeBannerPositionMs);
   const seek = usePlayerStore((s) => s.seek);
   const themeId = usePlayerStore((s) => s.themeId);
@@ -174,15 +168,6 @@ export const App: React.FC = () => {
       window.removeEventListener('mouseup', handleMouseUp);
     };
   }, []);
-
-  const handleCardClick = (item: MediaHistoryItem) => {
-    if (item.lastPositionMs && item.lastPositionMs > 1000) {
-      setPendingResumeItem(item);
-      setIsResumeChoiceOpen(true);
-    } else {
-      openMedia(item.uri, item.title, false, 0);
-    }
-  };
 
   const handleConfirmResume = (item: MediaHistoryItem) => {
     setIsResumeChoiceOpen(false);
@@ -759,8 +744,13 @@ export const App: React.FC = () => {
               onLoadedData={() => usePlayerStore.setState({ isBuffering: false })}
               onLoadStart={() => usePlayerStore.setState({ isBuffering: true })}
               onError={(e) => {
-                // Auto-fallback to resilient WebEmbedPlayer if remote web stream fails in <video>
-                if (currentUri && (currentUri.startsWith('http://') || currentUri.startsWith('https://'))) {
+                // Auto-fallback to resilient WebEmbedPlayer only for web sites, never for direct media/HLS streams
+                if (
+                  currentUri &&
+                  (currentUri.startsWith('http://') || currentUri.startsWith('https://')) &&
+                  !isDirectMediaUrl(currentUri) &&
+                  !HlsStreamController.isHlsUrl(currentUri)
+                ) {
                   const recovered = fallbackToWebStream(currentUri);
                   if (recovered) return;
                 }
@@ -931,263 +921,35 @@ export const App: React.FC = () => {
           <div className="w-full h-full pointer-events-none z-10" />
         )}
 
-        {/* Home View / Top-Aligned Jump Back In & Card Previews */}
+        {/* Complete Home Streaming Dashboard (Netflix + Adze.DESIGN + Apple Cover Flow 3D) */}
         {!currentUri && (
-          <div
-            className={`absolute inset-0 z-30 flex flex-col items-center justify-start pt-6 sm:pt-8 pb-12 px-6 sm:px-10 pointer-events-auto animate-in fade-in duration-300 overflow-y-auto ${
-              customBgImage ? 'bg-black/30' : 'bg-black/20'
-            }`}
-          >
-            {recentMedia.length > 0 ? (
-              /* Rich Card Grid: Stopped-Point Video Preview Thumbnail, No Paths/URLs */
-              <div className="w-full max-w-6xl flex flex-col gap-6">
-                {/* Header Action Bar */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/10">
-                  <div className="flex items-center gap-3.5">
-                    <div
-                      className={`p-3 rounded-2xl bg-gradient-to-r ${theme.accentGradient} text-white shadow-lg`}
-                      style={{ boxShadow: `0 0 18px ${theme.haloGlow}` }}
-                    >
-                      <Film className="w-6 h-6 fill-white" />
-                    </div>
-                    <div>
-                      <h2 className="text-2xl font-extrabold text-white tracking-tight">
-                        Resume
-                      </h2>
-                      <p className="text-xs text-slate-300">
-                        Pick up right where you left off with stopped-point frame previews
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2.5">
-                    <button
-                      onClick={handleOpenLocalFileDialog}
-                      className={`px-4 py-2.5 rounded-2xl bg-gradient-to-r ${theme.accentGradient} text-white font-bold text-xs cursor-pointer transition-all shadow-lg active:scale-95 flex items-center gap-1.5`}
-                      style={{ boxShadow: `0 4px 15px ${theme.haloGlow}` }}
-                    >
-                      <Plus className="w-4 h-4" />
-                      <span>Open</span>
-                      <input
-                        id="miki-main-file-input"
-                        type="file"
-                        className="hidden"
-                        accept="video/*,audio/*,.mkv,.mp4,.avi,.mov,.webm,.m3u8"
-                        onChange={handleNativeFileSelect}
-                      />
-                    </button>
-
-                    <button
-                      onClick={() => setIsDashboardOpen(true)}
-                      className="px-4 py-2.5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-semibold text-xs transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <Sparkles className="w-4 h-4 text-cyan-400" />
-                      <span>Library</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Cards Grid: Preview Image of Stopped Point, No Path/URL shown */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                  {recentMedia.map((item) => {
-                    const percent = Math.min(100, Math.max(0, item.progressPercent || 0));
-
-                    return (
-                      <div
-                        key={item.mediaId}
-                        onClick={() => handleCardClick(item)}
-                        className={`group relative rounded-3xl p-4 border transition-all duration-300 flex flex-col gap-3.5 bg-white/5 hover:bg-white/10 ${theme.glassBorder} shadow-xl hover:shadow-2xl hover:scale-[1.015] cursor-pointer`}
-                        style={{
-                          boxShadow: `0 12px 35px rgba(0, 0, 0, 0.55)`,
-                        }}
-                      >
-                        {/* 16:9 Stopped-Point Video Preview Thumbnail / YouTube Placeholder */}
-                        <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-black/60 border border-white/10 group-hover:border-cyan-400/40 transition-colors">
-                          {item.isYouTube ? (
-                            <div className="absolute top-2.5 left-2.5 z-20 px-2.5 py-0.5 rounded-lg bg-red-600 text-white font-extrabold text-[10px] tracking-wide flex items-center gap-1 shadow-lg shadow-red-900/40">
-                              <Play className="w-2.5 h-2.5 fill-white" />
-                              <span>YouTube</span>
-                            </div>
-                          ) : item.faviconUrl || (item.uri && item.uri.startsWith('http') && item.webPlatform) ? (
-                            <div className="absolute top-2.5 left-2.5 z-20 px-2.5 py-1 rounded-lg bg-black/85 backdrop-blur-md border border-white/20 text-white font-semibold text-[10px] tracking-wide flex items-center gap-1.5 shadow-lg">
-                              <img
-                                src={item.faviconUrl || getWebsiteFaviconUrl(item.uri, 32)}
-                                alt="site logo"
-                                className="w-3.5 h-3.5 object-contain rounded-sm"
-                                onError={(e) => {
-                                  (e.currentTarget as HTMLElement).style.display = 'none';
-                                }}
-                              />
-                              <span className="capitalize">{item.webDomain || 'Web Video'}</span>
-                            </div>
-                          ) : null}
-
-                          {item.thumbnailUri ? (
-                            <img
-                              src={item.thumbnailUri}
-                              alt={item.title}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                              onError={(e) => {
-                                (e.currentTarget as HTMLElement).style.display = 'none';
-                              }}
-                            />
-                          ) : item.isYouTube ? (
-                            <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-red-950/60 via-slate-900 to-black text-white/50 gap-2">
-                              <div className="p-3 rounded-2xl bg-red-600/20 border border-red-500/30 text-red-400">
-                                <Play className="w-6 h-6 fill-red-500" />
-                              </div>
-                              <span className="text-[11px] font-mono text-white/70 font-semibold">YouTube Stream</span>
-                            </div>
-                          ) : item.webPlatform || item.faviconUrl || (item.uri && item.uri.startsWith('http')) ? (
-                            <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-indigo-950/40 via-slate-900 to-black text-white/70 gap-2.5 p-4">
-                              <div className="p-3 rounded-2xl bg-black/50 border border-white/15 backdrop-blur-md shadow-lg flex items-center justify-center">
-                                <img
-                                  src={item.faviconUrl || getWebsiteFaviconUrl(item.uri, 64)}
-                                  alt="site"
-                                  className="w-8 h-8 object-contain"
-                                  onError={(e) => {
-                                    (e.currentTarget as HTMLElement).style.display = 'none';
-                                  }}
-                                />
-                              </div>
-                              <span className="text-[11px] font-mono text-cyan-300 font-semibold">{item.webDomain || 'Web Stream Video'}</span>
-                            </div>
-                          ) : (
-                            <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 to-black text-white/30 gap-2">
-                              <Film className="w-8 h-8 opacity-40 text-cyan-400" />
-                              <span className="text-[10px] font-mono">Video Preview</span>
-                            </div>
-                          )}
-
-                          {/* Hover Play Glow Overlay */}
-                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                            <div className={`p-3.5 rounded-2xl ${item.isYouTube ? 'bg-red-600 text-white shadow-xl shadow-red-600/40' : 'bg-cyan-500/90 text-white shadow-xl shadow-cyan-500/40'} scale-95 group-hover:scale-105 transition-transform`}>
-                              <Play className="w-6 h-6 fill-white translate-x-0.5" />
-                            </div>
-                          </div>
-
-                          {/* Stopped Position & Duration Badge */}
-                          <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded-lg bg-black/80 backdrop-blur-md text-[10px] font-mono font-bold text-white/90 border border-white/15">
-                            {item.isYouTube && !item.lastPositionMs ? 'YouTube Stream' : `${formatTime(item.lastPositionMs)} / ${item.durationMs > 0 ? formatTime(item.durationMs) : (item.isYouTube ? 'YouTube' : '0:00')}`}
-                          </div>
-                        </div>
-
-                        {/* Title & Watched Percentage Badge (NO Path or URL shown) */}
-                        <div className="flex flex-col gap-2">
-                          <div className="flex items-start justify-between gap-2">
-                            <h3 className="text-sm font-bold text-white group-hover:text-cyan-300 transition-colors line-clamp-2 leading-snug">
-                              {item.title}
-                            </h3>
-                            <span
-                              className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg shrink-0 ${
-                                item.isYouTube && (!item.lastPositionMs || percent === 0)
-                                  ? 'bg-red-500/20 text-red-300 border border-red-400/30'
-                                  : item.webPlatform
-                                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/30'
-                                    : percent > 80
-                                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/30'
-                                      : `${theme.badgeClass}`
-                              }`}
-                            >
-                              {item.isYouTube && (!item.lastPositionMs || percent === 0)
-                                ? 'YouTube'
-                                : item.webPlatform
-                                  ? (item.webDomain || 'Web')
-                                  : `${percent.toFixed(0)}% watched`}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Theme-Gradient Progress Bar */}
-                        <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden p-0.5 border border-white/5">
-                          <div
-                            className={`h-full rounded-full bg-gradient-to-r ${item.isYouTube ? 'from-red-500 to-rose-600' : theme.timelineTrack} transition-all duration-300`}
-                            style={{ width: `${item.isYouTube && (!item.lastPositionMs || percent === 0) ? 100 : percent}%` }}
-                          />
-                        </div>
-
-                        {/* Card Actions: Resume & Remove */}
-                        <div className="flex items-center justify-between pt-2 border-t border-white/10">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleCardClick(item);
-                            }}
-                            className={`px-4 py-2 rounded-2xl bg-gradient-to-r ${item.isYouTube ? 'from-red-600 to-rose-600' : theme.accentGradient} text-white font-bold text-xs flex items-center gap-1.5 shadow-md hover:brightness-110 active:scale-95 transition-all`}
-                          >
-                            <Play className="w-3.5 h-3.5 fill-white" />
-                            <span>{item.lastPositionMs > 1000 ? 'Resume Playback' : item.isYouTube ? 'Play Stream' : 'Play Now'}</span>
-                          </button>
-
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              removeRecentMedia(item.uri);
-                            }}
-                            className="p-2 rounded-xl hover:bg-rose-500/20 text-white/40 hover:text-rose-300 transition-colors"
-                            title="Remove from history"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : (
-              /* Welcome Screen when History is Empty */
-              <div
-                className={`p-10 rounded-3xl backdrop-blur-2xl flex flex-col items-center gap-6 text-center max-w-lg border shadow-2xl mt-12 ${theme.glassBg} ${theme.glassBorder}`}
-                style={{
-                  boxShadow: `0 20px 50px rgba(0, 0, 0, 0.7), 0 0 35px ${theme.haloGlow}`,
-                }}
-              >
-                <div className="p-4 rounded-3xl bg-white/5 border border-white/15 shadow-2xl">
-                  <img
-                    src="/logo.png"
-                    alt="Miki Player"
-                    className="w-20 h-20 rounded-2xl object-contain shadow-md"
-                  />
-                </div>
-                <div>
-                  <h1 className="text-3xl font-extrabold tracking-tight text-white">Miki Player</h1>
-                  <p className="text-sm text-white/60 mt-2 leading-relaxed">
-                    Ultra-modern, cross-platform multimedia player with 3D Spatial Audio, 200% VLC overdrive, Anime4K Super-Resolution, and YouTube stream optimizer.
-                  </p>
-                </div>
-
-                <div className="flex flex-col sm:flex-row items-center gap-3 w-full mt-2">
-                  <button
-                    onClick={() => {
-                      handleOpenLocalFileDialog();
-                      const input = document.getElementById('miki-main-file-input') as HTMLInputElement | null;
-                      input?.click();
-                    }}
-                    className={`flex-1 w-full flex items-center justify-center gap-2 px-5 py-3.5 rounded-2xl bg-gradient-to-r ${theme.accentGradient} text-white font-bold text-xs cursor-pointer transition-all shadow-xl active:scale-95`}
-                    style={{ boxShadow: `0 4px 20px ${theme.haloGlow}` }}
-                  >
-                    <FolderOpen className="w-4 h-4" />
-                    <span>Browse Local Files</span>
-                    <input
-                      id="miki-main-file-input"
-                      type="file"
-                      className="hidden"
-                      accept="video/*,audio/*,.mkv,.mp4,.avi,.mov,.webm,.m3u8"
-                      onChange={handleNativeFileSelect}
-                    />
-                  </button>
-
-                  <button
-                    onClick={() => setIsDashboardOpen(true)}
-                    className="flex-1 w-full flex items-center justify-center gap-2 px-5 py-3.5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 font-bold text-xs text-white/90 hover:text-white transition-all shadow-lg active:scale-95 cursor-pointer"
-                  >
-                    <Sparkles className="w-4 h-4 text-cyan-400" />
-                    <span>Explore Library</span>
-                  </button>
-                </div>
-              </div>
-            )}
+          <div className="absolute inset-0 z-30 pointer-events-auto animate-in fade-in duration-300 overflow-hidden">
+            <HomeDashboardView
+              onOpenGames={(gameId) => {
+                if (gameId) setSelectedGameId(gameId);
+                setIsGamesOpen(true);
+              }}
+              onOpenMusic={() => setIsMusicPlayerOpen(true)}
+              onOpenWebBrowser={(url) => {
+                if (url) setWebBrowserUrl(url);
+                setIsWebBrowserOpen(true);
+              }}
+              onOpenSettings={() => setIsSettingsOpen(true)}
+              onOpenEq={() => setIsEqOpen(true)}
+              onOpenLocalFile={() => {
+                handleOpenLocalFileDialog();
+                const input = document.getElementById("miki-main-file-input");
+                input?.click();
+              }}
+            />
+            {/* Hidden file input for native file select dialog */}
+            <input
+              id="miki-main-file-input"
+              type="file"
+              className="hidden"
+              accept="video/*,audio/*,.mkv,.mp4,.avi,.mov,.webm,.m3u8"
+              onChange={handleNativeFileSelect}
+            />
           </div>
         )}
 

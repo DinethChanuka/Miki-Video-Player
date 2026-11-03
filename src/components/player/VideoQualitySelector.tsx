@@ -88,3 +88,4 @@ export const VideoQualitySelector: React.FC = () => {
     </div>
   );
 };
+

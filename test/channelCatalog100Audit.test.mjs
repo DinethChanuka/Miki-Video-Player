@@ -51,3 +51,4 @@ describe('Task 3: 100+ Curated Live Channels & Unique Logos Audit', () => {
     assert.ok(categories.has('Nature'), 'Must include Nature');
   });
 });
+

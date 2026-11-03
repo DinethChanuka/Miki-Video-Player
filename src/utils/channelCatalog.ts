@@ -176,7 +176,7 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     category: 'Movies',
     streamUrl: 'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
     backupUrls: [
-      'https://d1j2u714xk898n.cloudfront.net/scheduler/scheduleMaster/145.m3u8',
+      'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8',
       'https://30a-tv.com/feeds/pzaz/30atvmovies.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=200&q=80',
@@ -190,7 +190,7 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     category: 'Movies',
     streamUrl: 'https://30a-tv.com/feeds/pzaz/30atvmovies.m3u8',
     backupUrls: [
-      'https://d1j2u714xk898n.cloudfront.net/scheduler/scheduleMaster/145.m3u8',
+      'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8',
       'https://30a-tv.com/feeds/xodglobal/30atv.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?auto=format&fit=crop&w=200&q=80',
@@ -216,7 +216,7 @@ export const CURATED_CHANNELS: LiveChannel[] = [
   { id: 'sci-fi-cinema',
     name: 'Sci-Fi Universe Cinema Network',
     category: 'Movies',
-    streamUrl: 'https://d1j2u714xk898n.cloudfront.net/scheduler/scheduleMaster/145.m3u8',
+    streamUrl: 'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8',
     backupUrls: [
       'https://30a-tv.com/feeds/pzaz/30atvmovies.m3u8',
       'https://30a-tv.com/feeds/xodglobal/30atv.m3u8'
@@ -230,7 +230,7 @@ export const CURATED_CHANNELS: LiveChannel[] = [
   { id: 'open-cinema-4k',
     name: 'Public Domain Cinema Showcase',
     category: 'Movies',
-    streamUrl: 'https://d1j2u714xk898n.cloudfront.net/scheduler/scheduleMaster/145.m3u8',
+    streamUrl: 'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8',
     backupUrls: [
       'https://30a-tv.com/feeds/pzaz/30atvmovies.m3u8',
       'https://30a-tv.com/feeds/xodglobal/30atv.m3u8'
@@ -263,7 +263,7 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     streamUrl: 'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8',
     backupUrls: [
       'https://cdn-euronews.akamaized.net/live/eds/euronews-en/25002/index.m3u8',
-      'https://ftvinfo-hls.akamaized.net/live/eds/franceinfo/franceinfo.isml/franceinfo.m3u8'
+      'https://cdn-euronews.akamaized.net/live/eds/euronews-en/25002/index.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=200&q=80',
     country: 'US',
@@ -565,7 +565,7 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     streamUrl: 'https://cdn.freevisiontv.co.za/sttv/smil:1kzn.stream.smil/playlist.m3u8',
     backupUrls: [
       'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
-      'https://d1j2u714xk898n.cloudfront.net/scheduler/scheduleMaster/145.m3u8'
+      'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1522869635100-9f4c5e86aa37?auto=format&fit=crop&w=200&q=80',
     country: 'ZA',
@@ -593,7 +593,7 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     streamUrl: 'https://30a-tv.com/gh.m3u8',
     backupUrls: [
       'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
-      'https://d1j2u714xk898n.cloudfront.net/scheduler/scheduleMaster/145.m3u8'
+      'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?auto=format&fit=crop&w=200&q=80',
     country: 'US',
@@ -607,7 +607,7 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     streamUrl: 'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
     backupUrls: [
       'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
-      'https://d1j2u714xk898n.cloudfront.net/scheduler/scheduleMaster/145.m3u8'
+      'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1514306191717-452ec28c7814?auto=format&fit=crop&w=200&q=80',
     country: 'US',
@@ -621,7 +621,7 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     streamUrl: 'https://30a-tv.com/gh.m3u8',
     backupUrls: [
       'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
-      'https://d1j2u714xk898n.cloudfront.net/scheduler/scheduleMaster/145.m3u8'
+      'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1527224857830-43a7acc85260?auto=format&fit=crop&w=200&q=80',
     country: 'US',
@@ -635,7 +635,7 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     streamUrl: 'https://live-us1.thaimomo.com/live-as/ch3hd-3/playlist.m3u8',
     backupUrls: [
       'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
-      'https://d1j2u714xk898n.cloudfront.net/scheduler/scheduleMaster/145.m3u8'
+      'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1593784991095-a205069470b6?auto=format&fit=crop&w=200&q=80',
     country: 'TH',
@@ -649,7 +649,7 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     streamUrl: 'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
     backupUrls: [
       'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
-      'https://d1j2u714xk898n.cloudfront.net/scheduler/scheduleMaster/145.m3u8'
+      'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1586899028174-e7098604235b?auto=format&fit=crop&w=200&q=80',
     country: 'GLOBAL',
@@ -663,7 +663,7 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     streamUrl: 'https://30a-tv.com/gh.m3u8',
     backupUrls: [
       'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
-      'https://d1j2u714xk898n.cloudfront.net/scheduler/scheduleMaster/145.m3u8'
+      'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1478720568477-152d9b164e26?auto=format&fit=crop&w=200&q=80',
     country: 'US',
@@ -676,7 +676,7 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     category: 'Entertainment',
     streamUrl: 'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
     backupUrls: [
-      'https://d1j2u714xk898n.cloudfront.net/scheduler/scheduleMaster/145.m3u8',
+      'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8',
       'https://30a-tv.com/feeds/xodglobal/30atv.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1566492031773-4f4e44671857?auto=format&fit=crop&w=200&q=80',
@@ -691,7 +691,7 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     streamUrl: 'https://3abn.bozztv.com/3abn2/Kids_live/smil:Kids_live.smil/playlist.m3u8',
     backupUrls: [
       'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
-      'https://d1j2u714xk898n.cloudfront.net/scheduler/scheduleMaster/145.m3u8'
+      'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?auto=format&fit=crop&w=200&q=80&sig=ch_47',
     country: 'US',
@@ -702,7 +702,7 @@ export const CURATED_CHANNELS: LiveChannel[] = [
   { id: 'retro-cartoons',
     name: '3ABN Family & Kids Entertainment',
     category: 'Entertainment',
-    streamUrl: 'https://d1j2u714xk898n.cloudfront.net/scheduler/scheduleMaster/145.m3u8',
+    streamUrl: 'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8',
     backupUrls: [
       'https://30a-tv.com/feeds/pzaz/30atvmovies.m3u8',
       'https://30a-tv.com/feeds/xodglobal/30atv.m3u8'
@@ -718,7 +718,7 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     category: 'Entertainment',
     streamUrl: 'https://30a-tv.com/feeds/pzaz/30atvmovies.m3u8',
     backupUrls: [
-      'https://d1j2u714xk898n.cloudfront.net/scheduler/scheduleMaster/145.m3u8',
+      'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8',
       'https://30a-tv.com/feeds/xodglobal/30atv.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=200&q=80&sig=ch_49',
@@ -730,9 +730,9 @@ export const CURATED_CHANNELS: LiveChannel[] = [
   { id: 'cosmic-open-film',
     name: 'Hollywood Action Cinema Network',
     category: 'Entertainment',
-    streamUrl: 'https://d1j2u714xk898n.cloudfront.net/scheduler/scheduleMaster/145.m3u8',
+    streamUrl: 'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8',
     backupUrls: [
-      'https://d1j2u714xk898n.cloudfront.net/scheduler/scheduleMaster/145.m3u8',
+      'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8',
       'https://30a-tv.com/feeds/xodglobal/30atv.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=200&q=80&sig=ch_50',
@@ -775,7 +775,7 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     streamUrl: 'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
     backupUrls: [
       'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
-      'https://d1j2u714xk898n.cloudfront.net/scheduler/scheduleMaster/145.m3u8'
+      'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1514306191717-452ec28c7814?auto=format&fit=crop&w=200&q=80&sig=ch_53',
     country: 'AU',
@@ -788,7 +788,7 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     category: 'Movies',
     streamUrl: 'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
     backupUrls: [
-      'https://d1j2u714xk898n.cloudfront.net/scheduler/scheduleMaster/145.m3u8',
+      'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8',
       'https://30a-tv.com/feeds/xodglobal/30atv.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=200&q=80&sig=ch_54',
@@ -927,10 +927,10 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     id: 'france-24-fr',
     name: 'France 24 Français',
     category: 'News',
-    streamUrl: 'https://live.france24.com/hls/live/2037217/F24_FR_HI_HLS/master_2300.m3u8',
+    streamUrl: 'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8',
     backupUrls: [
-      'https://cdn-euronews.akamaized.net/live/eds/euronews-fr/25002/index.m3u8',
-      'https://ftvinfo-hls.akamaized.net/live/eds/franceinfo/franceinfo.isml/franceinfo.m3u8'
+      'https://cdn-euronews.akamaized.net/live/eds/euronews-en/25002/index.m3u8',
+      'https://cdn-euronews.akamaized.net/live/eds/euronews-en/25002/index.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=200&q=80&sig=f24_fr',
     country: 'FR',
@@ -942,10 +942,10 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     id: 'france-24-es',
     name: 'France 24 Español',
     category: 'News',
-    streamUrl: 'https://live.france24.com/hls/live/2037219/F24_ES_HI_HLS/master_2300.m3u8',
+    streamUrl: 'https://dwamdstream105.akamaized.net/hls/live/2015531/dwstream105/index.m3u8',
     backupUrls: [
-      'https://cdn-euronews.akamaized.net/live/eds/euronews-es/25002/index.m3u8',
-      'https://rtvelivestream.akamaized.net/rtvesec/24h/24h_main.m3u8'
+      'https://dwamdstream105.akamaized.net/hls/live/2015531/dwstream105/index.m3u8',
+      'https://dwamdstream105.akamaized.net/hls/live/2015531/dwstream105/index.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=200&q=80&sig=f24_es',
     country: 'FR',
@@ -957,10 +957,10 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     id: 'france-24-ar',
     name: 'France 24 Arabic',
     category: 'News',
-    streamUrl: 'https://live.france24.com/hls/live/2037220/F24_AR_HI_HLS/master_2300.m3u8',
+    streamUrl: 'https://cdn-euronews.akamaized.net/live/eds/euronews-en/25002/index.m3u8',
     backupUrls: [
-      'https://live-hls-web-aja.thehlive.com/AJA/index.m3u8',
-      'https://live-hls-web-ajm.thehlive.com/AJM/index.m3u8'
+      'https://tv-trtworld.medya.trt.com.tr/master.m3u8',
+      'https://tv-trtworld.medya.trt.com.tr/master.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&w=200&q=80&sig=f24_ar',
     country: 'FR',
@@ -975,7 +975,7 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     streamUrl: 'https://dwamdstream104.akamaized.net/hls/live/2015530/dwstream104/index.m3u8',
     backupUrls: [
       'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8',
-      'https://cdn-euronews.akamaized.net/live/eds/euronews-de/25002/index.m3u8'
+      'https://dwamdstream104.akamaized.net/hls/live/2015530/dwstream104/index.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1467269204594-9661b134dd2b?auto=format&fit=crop&w=200&q=80&sig=dw_de',
     country: 'DE',
@@ -989,7 +989,7 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     category: 'News',
     streamUrl: 'https://dwamdstream105.akamaized.net/hls/live/2015531/dwstream105/index.m3u8',
     backupUrls: [
-      'https://cdn-euronews.akamaized.net/live/eds/euronews-es/25002/index.m3u8',
+      'https://dwamdstream105.akamaized.net/hls/live/2015531/dwstream105/index.m3u8',
       'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1543783207-ec64e4d95325?auto=format&fit=crop&w=200&q=80&sig=dw_es',
@@ -1002,9 +1002,9 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     id: 'euronews-fr',
     name: 'Euronews Français HD',
     category: 'News',
-    streamUrl: 'https://cdn-euronews.akamaized.net/live/eds/euronews-fr/25002/index.m3u8',
+    streamUrl: 'https://cdn-euronews.akamaized.net/live/eds/euronews-en/25002/index.m3u8',
     backupUrls: [
-      'https://live.france24.com/hls/live/2037217/F24_FR_HI_HLS/master_2300.m3u8',
+      'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8',
       'https://cdn-euronews.akamaized.net/live/eds/euronews-en/25002/index.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1499856871958-5b9627545d1a?auto=format&fit=crop&w=200&q=80&sig=en_fr',
@@ -1017,7 +1017,7 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     id: 'euronews-de',
     name: 'Euronews Deutsch HD',
     category: 'News',
-    streamUrl: 'https://cdn-euronews.akamaized.net/live/eds/euronews-de/25002/index.m3u8',
+    streamUrl: 'https://dwamdstream104.akamaized.net/hls/live/2015530/dwstream104/index.m3u8',
     backupUrls: [
       'https://dwamdstream104.akamaized.net/hls/live/2015530/dwstream104/index.m3u8',
       'https://cdn-euronews.akamaized.net/live/eds/euronews-en/25002/index.m3u8'
@@ -1032,10 +1032,10 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     id: 'euronews-es',
     name: 'Euronews Español HD',
     category: 'News',
-    streamUrl: 'https://cdn-euronews.akamaized.net/live/eds/euronews-es/25002/index.m3u8',
+    streamUrl: 'https://dwamdstream105.akamaized.net/hls/live/2015531/dwstream105/index.m3u8',
     backupUrls: [
-      'https://live.france24.com/hls/live/2037219/F24_ES_HI_HLS/master_2300.m3u8',
-      'https://rtvelivestream.akamaized.net/rtvesec/24h/24h_main.m3u8'
+      'https://dwamdstream105.akamaized.net/hls/live/2015531/dwstream105/index.m3u8',
+      'https://dwamdstream105.akamaized.net/hls/live/2015531/dwstream105/index.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1539037116277-4db20889f2d4?auto=format&fit=crop&w=200&q=80&sig=en_es',
     country: 'ES',
@@ -1047,7 +1047,7 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     id: 'euronews-it',
     name: 'Euronews Italiano HD',
     category: 'News',
-    streamUrl: 'https://cdn-euronews.akamaized.net/live/eds/euronews-it/25002/index.m3u8',
+    streamUrl: 'https://cdn-euronews.akamaized.net/live/eds/euronews-en/25002/index.m3u8',
     backupUrls: [
       'https://cdn-euronews.akamaized.net/live/eds/euronews-en/25002/index.m3u8',
       'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8'
@@ -1062,9 +1062,9 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     id: 'euronews-pt',
     name: 'Euronews Português HD',
     category: 'News',
-    streamUrl: 'https://cdn-euronews.akamaized.net/live/eds/euronews-pt/25002/index.m3u8',
+    streamUrl: 'https://cdn-euronews.akamaized.net/live/eds/euronews-en/25002/index.m3u8',
     backupUrls: [
-      'https://cdn-euronews.akamaized.net/live/eds/euronews-es/25002/index.m3u8',
+      'https://dwamdstream105.akamaized.net/hls/live/2015531/dwstream105/index.m3u8',
       'https://cdn-euronews.akamaized.net/live/eds/euronews-en/25002/index.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1509356843151-3e7d96241e11?auto=format&fit=crop&w=200&q=80&sig=en_pt',
@@ -1077,9 +1077,9 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     id: 'aljazeera-arabic',
     name: 'Al Jazeera Arabic HD',
     category: 'News',
-    streamUrl: 'https://live-hls-web-aja.thehlive.com/AJA/index.m3u8',
+    streamUrl: 'https://tv-trtworld.medya.trt.com.tr/master.m3u8',
     backupUrls: [
-      'https://live-hls-web-ajm.thehlive.com/AJM/index.m3u8',
+      'https://tv-trtworld.medya.trt.com.tr/master.m3u8',
       'https://live-hls-web-aje-fa.thehlive.com/AJE/index.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=200&q=80&sig=aja_ar',
@@ -1092,9 +1092,9 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     id: 'aljazeera-mubasher',
     name: 'Al Jazeera Mubasher Live',
     category: 'News',
-    streamUrl: 'https://live-hls-web-ajm.thehlive.com/AJM/index.m3u8',
+    streamUrl: 'https://tv-trtworld.medya.trt.com.tr/master.m3u8',
     backupUrls: [
-      'https://live-hls-web-aja.thehlive.com/AJA/index.m3u8',
+      'https://tv-trtworld.medya.trt.com.tr/master.m3u8',
       'https://live-hls-web-aje-fa.thehlive.com/AJE/index.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?auto=format&fit=crop&w=200&q=80&sig=aj_mub',
@@ -1107,9 +1107,9 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     id: 'rtve-24h',
     name: 'RTVE Canal 24 Horas Spain',
     category: 'News',
-    streamUrl: 'https://rtvelivestream.akamaized.net/rtvesec/24h/24h_main.m3u8',
+    streamUrl: 'https://dwamdstream105.akamaized.net/hls/live/2015531/dwstream105/index.m3u8',
     backupUrls: [
-      'https://cdn-euronews.akamaized.net/live/eds/euronews-es/25002/index.m3u8',
+      'https://dwamdstream105.akamaized.net/hls/live/2015531/dwstream105/index.m3u8',
       'https://dwamdstream105.akamaized.net/hls/live/2015531/dwstream105/index.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=200&q=80&sig=rtve_24h',
@@ -1124,8 +1124,8 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     category: 'News',
     streamUrl: 'https://ott.tv5monde.com/Content/HLS/Live/channel(info)/index.m3u8',
     backupUrls: [
-      'https://live.france24.com/hls/live/2037217/F24_FR_HI_HLS/master_2300.m3u8',
-      'https://cdn-euronews.akamaized.net/live/eds/euronews-fr/25002/index.m3u8'
+      'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8',
+      'https://cdn-euronews.akamaized.net/live/eds/euronews-en/25002/index.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=200&q=80&sig=tv5_info',
     country: 'FR',
@@ -1137,10 +1137,10 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     id: 'franceinfo-live',
     name: 'France Info TV 24/7',
     category: 'News',
-    streamUrl: 'https://ftvinfo-hls.akamaized.net/live/eds/franceinfo/franceinfo.isml/franceinfo.m3u8',
+    streamUrl: 'https://cdn-euronews.akamaized.net/live/eds/euronews-en/25002/index.m3u8',
     backupUrls: [
-      'https://live.france24.com/hls/live/2037217/F24_FR_HI_HLS/master_2300.m3u8',
-      'https://cdn-euronews.akamaized.net/live/eds/euronews-fr/25002/index.m3u8'
+      'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8',
+      'https://cdn-euronews.akamaized.net/live/eds/euronews-en/25002/index.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1526778548025-fa2f459cd5c1?auto=format&fit=crop&w=200&q=80&sig=fr_info',
     country: 'FR',
@@ -1167,7 +1167,7 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     id: 'skynews-live-uk',
     name: 'Sky News UK Live',
     category: 'News',
-    streamUrl: 'https://skynews-live.akamaized.net/hls/live/2002824/skynews_hd/master.m3u8',
+    streamUrl: 'https://distro001-gb-hls1-prd.delivery.skycdp.com/easel_cdn/ngrp:weather_loop.stream_all/playlist.m3u8',
     backupUrls: [
       'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8',
       'https://live-hls-web-aje-fa.thehlive.com/AJE/index.m3u8'
@@ -1182,7 +1182,7 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     id: 'bloomberg-global',
     name: 'Bloomberg Television Global',
     category: 'News',
-    streamUrl: 'https://liveprodupmx.akamaized.net/us/hls/live/2000000/us-ch1/master.m3u8',
+    streamUrl: 'https://bloomberg.com/media-manifest/streams/us.m3u8',
     backupUrls: [
       'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8',
       'https://cdn-euronews.akamaized.net/live/eds/euronews-en/25002/index.m3u8'
@@ -1197,7 +1197,7 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     id: 'abc-news-australia',
     name: 'ABC News Australia Live',
     category: 'News',
-    streamUrl: 'https://abclivestream.akamaized.net/hls/live/2002824/abcnews_hd/master.m3u8',
+    streamUrl: 'https://bloomberg.com/media-manifest/streams/us.m3u8',
     backupUrls: [
       'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8',
       'https://cdn-euronews.akamaized.net/live/eds/euronews-en/25002/index.m3u8'
@@ -1212,7 +1212,7 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     id: 'nhk-world-japan',
     name: 'NHK World Japan Live',
     category: 'News',
-    streamUrl: 'https://nhkworld.webcdn.stream.ne.jp/www11/nhkworld-tv/global/2003458/live.m3u8',
+    streamUrl: 'https://tv-trtworld.medya.trt.com.tr/master.m3u8',
     backupUrls: [
       'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8',
       'https://cdn-euronews.akamaized.net/live/eds/euronews-en/25002/index.m3u8'
@@ -1227,7 +1227,7 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     id: 'cgtn-news-live',
     name: 'CGTN Global Television Network',
     category: 'News',
-    streamUrl: 'https://live.cgtn.com/1000/prog_index.m3u8',
+    streamUrl: 'https://tv-trtworld.medya.trt.com.tr/master.m3u8',
     backupUrls: [
       'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8',
       'https://live-hls-web-aje-fa.thehlive.com/AJE/index.m3u8'
@@ -1242,7 +1242,7 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     id: 'cgtn-documentary',
     name: 'CGTN Documentary Channel',
     category: 'Nature',
-    streamUrl: 'https://live.cgtn.com/1000d/prog_index.m3u8',
+    streamUrl: 'https://tv-trtworld.medya.trt.com.tr/master.m3u8',
     backupUrls: [
       'https://dwamdstream104.akamaized.net/hls/live/2015530/dwstream104/index.m3u8',
       'https://cdn-euronews.akamaized.net/live/eds/euronews-en/25002/index.m3u8'
@@ -1257,7 +1257,7 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     id: 'kbs-world-korea',
     name: 'KBS World Korea HD',
     category: 'Entertainment',
-    streamUrl: 'https://kbs-wlive.akamaized.net/hls/live/2004391/kbs_world/master.m3u8',
+    streamUrl: 'https://live-us1.thaimomo.com/live-as/ch3hd-3/playlist.m3u8',
     backupUrls: [
       'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8',
       'https://cdn-euronews.akamaized.net/live/eds/euronews-en/25002/index.m3u8'
@@ -1290,7 +1290,7 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     streamUrl: 'https://rbmn-live.akamaized.net/hls/live/590964/BoRB-AT/master.m3u8',
     backupUrls: [
       'https://dwamdstream104.akamaized.net/hls/live/2015530/dwstream104/index.m3u8',
-      'https://cdn-euronews.akamaized.net/live/eds/euronews-de/25002/index.m3u8'
+      'https://dwamdstream104.akamaized.net/hls/live/2015530/dwstream104/index.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1482867996988-29ec3a0f1aac?auto=format&fit=crop&w=200&q=80&sig=rb_snow',
     country: 'AT',
@@ -1317,7 +1317,7 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     id: 'weathernation-live',
     name: 'WeatherNation HD Radar',
     category: 'Nature',
-    streamUrl: 'https://weathernation.akamaized.net/hls/live/2001550/wnhd/master.m3u8',
+    streamUrl: 'https://distro001-gb-hls1-prd.delivery.skycdp.com/easel_cdn/ngrp:weather_loop.stream_all/playlist.m3u8',
     backupUrls: [
       'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8',
       'https://cdn-euronews.akamaized.net/live/eds/euronews-en/25002/index.m3u8'
@@ -1362,7 +1362,7 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     id: 'retro-synth-channel',
     name: 'Synthwave & Retrowave 80s TV',
     category: 'Music',
-    streamUrl: 'https://cdn-euronews.akamaized.net/live/eds/euronews-de/25002/index.m3u8',
+    streamUrl: 'https://dwamdstream104.akamaized.net/hls/live/2015530/dwstream104/index.m3u8',
     backupUrls: [
       'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8',
       'https://live-hls-web-aje-fa.thehlive.com/AJE/index.m3u8'
@@ -1425,7 +1425,7 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     streamUrl: 'https://dwamdstream104.akamaized.net/hls/live/2015530/dwstream104/index.m3u8',
     backupUrls: [
       'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8',
-      'https://cdn-euronews.akamaized.net/live/eds/euronews-de/25002/index.m3u8'
+      'https://dwamdstream104.akamaized.net/hls/live/2015530/dwstream104/index.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1558441719-8b489c63f7d1?auto=format&fit=crop&w=200&q=80&sig=fut_mob',
     country: 'GLOBAL',
@@ -1467,9 +1467,9 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     id: 'world-cinema-spotlight',
     name: 'World Cinema Arthouse Spotlight',
     category: 'Movies',
-    streamUrl: 'https://cdn-euronews.akamaized.net/live/eds/euronews-fr/25002/index.m3u8',
+    streamUrl: 'https://cdn-euronews.akamaized.net/live/eds/euronews-en/25002/index.m3u8',
     backupUrls: [
-      'https://live.france24.com/hls/live/2037217/F24_FR_HI_HLS/master_2300.m3u8',
+      'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8',
       'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?auto=format&fit=crop&w=200&q=80&sig=world_cinema',
@@ -1497,7 +1497,7 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     id: 'tokyo-anime-screen',
     name: 'Tokyo Anime & Manga Spotlight',
     category: 'Entertainment',
-    streamUrl: 'https://nhkworld.webcdn.stream.ne.jp/www11/nhkworld-tv/global/2003458/live.m3u8',
+    streamUrl: 'https://tv-trtworld.medya.trt.com.tr/master.m3u8',
     backupUrls: [
       'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8',
       'https://cdn-euronews.akamaized.net/live/eds/euronews-en/25002/index.m3u8'
@@ -1512,7 +1512,7 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     id: 'kpop-music-television',
     name: 'K-Pop Top Hits World',
     category: 'Music',
-    streamUrl: 'https://kbs-wlive.akamaized.net/hls/live/2004391/kbs_world/master.m3u8',
+    streamUrl: 'https://live-us1.thaimomo.com/live-as/ch3hd-3/playlist.m3u8',
     backupUrls: [
       'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8',
       'https://cdn-euronews.akamaized.net/live/eds/euronews-en/25002/index.m3u8'
@@ -1544,7 +1544,7 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     category: 'Music',
     streamUrl: 'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8',
     backupUrls: [
-      'https://cdn-euronews.akamaized.net/live/eds/euronews-de/25002/index.m3u8',
+      'https://dwamdstream104.akamaized.net/hls/live/2015530/dwstream104/index.m3u8',
       'https://dwamdstream104.akamaized.net/hls/live/2015530/dwstream104/index.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=200&q=80&sig=berlin_elec',
@@ -1575,7 +1575,7 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     streamUrl: 'https://playertest.longtailvideo.com/adaptive/oceans_aes/oceans_aes.m3u8',
     backupUrls: [
       'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8',
-      'https://cdn-euronews.akamaized.net/live/eds/euronews-fr/25002/index.m3u8'
+      'https://cdn-euronews.akamaized.net/live/eds/euronews-en/25002/index.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1516026672322-bc52d61a55d5?auto=format&fit=crop&w=200&q=80&sig=amazon_canopy',
     country: 'BR',
@@ -1587,7 +1587,7 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     id: 'mountain-climb-alps',
     name: 'Matterhorn & Alpine Summits',
     category: 'Nature',
-    streamUrl: 'https://cdn-euronews.akamaized.net/live/eds/euronews-de/25002/index.m3u8',
+    streamUrl: 'https://dwamdstream104.akamaized.net/hls/live/2015530/dwstream104/index.m3u8',
     backupUrls: [
       'https://dwamdstream104.akamaized.net/hls/live/2015530/dwstream104/index.m3u8',
       'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8'
