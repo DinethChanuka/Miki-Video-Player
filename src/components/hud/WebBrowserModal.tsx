@@ -538,7 +538,7 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
                 }
               }
             }}
-            placeholder="Enter website URL (e.g. cinesubz.co, youtube.com) and press Enter..."
+            placeholder="Jump to address (e.g. cinesubz.co) or search..."
             className="flex-1 bg-transparent border-0 text-xs text-white placeholder-white/40 focus:outline-none"
           />
           <button
