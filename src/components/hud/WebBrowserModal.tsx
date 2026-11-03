@@ -208,8 +208,6 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
     };
   }, [isAdShieldActive]);
 
-  if (!isOpen) return null;
-
   const handleClose = () => {
     const handlers = getWebkitHandlers();
     if (handlers?.browserViewAction) {
@@ -326,6 +324,8 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
 
   const resolvedFrameUrl = resolveBrowserFrameUrl(currentUrl);
   const siteHostname = extractHostname(currentUrl);
+
+  if (!isOpen) return null;
 
   return (
     <div

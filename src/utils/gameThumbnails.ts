@@ -472,3 +472,4 @@ export function getGameThumbnailUrl(gameId: string): string {
   const svg = getGamePreviewSvg(gameId);
   return encodeSvg(svg);
 }
+

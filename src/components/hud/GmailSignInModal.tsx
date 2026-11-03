@@ -122,6 +122,8 @@ export const GmailSignInModal: React.FC<GmailSignInModalProps> = ({ isOpen, onCl
     } catch {}
   };
 
+  if (!isOpen) return null;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200 select-none">
       <div className="glass-panel w-full max-w-md p-6 sm:p-7 rounded-3xl flex flex-col gap-5 border border-white/20 shadow-2xl bg-slate-950/98 overflow-hidden">

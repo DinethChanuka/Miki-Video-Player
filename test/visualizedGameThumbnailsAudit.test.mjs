@@ -32,3 +32,4 @@ describe('Task 2: Real Visualized Preview Images for Games Audit', () => {
     }
   });
 });
+
