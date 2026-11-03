@@ -263,11 +263,18 @@ export const FileBrowserModal: React.FC<FileBrowserModalProps> = ({
         setActiveTab('history');
       } else if (initialTab === 'bookmarks') {
         setActiveTab('saved');
+      } else if (initialTab === 'games') {
+        if (onOpenGames) {
+          onClose();
+          onOpenGames();
+        } else {
+          setActiveTab('games');
+        }
       } else {
         setActiveTab(initialTab);
       }
     }
-  }, [isOpen, initialTab]);
+  }, [isOpen, initialTab, onOpenGames, onClose]);
 
   const handleOpenLocalFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
