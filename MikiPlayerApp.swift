@@ -766,7 +766,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
                         let bView = self.setupBrowserWebView()
                         bView.isHidden = false
                         bView.alphaValue = 1.0
-                        if let wView = self.webView {
+                        if self.webView != nil {
                             self.window.contentView?.addSubview(bView, positioned: .above, relativeTo: self.webView)
                         }
                         self.updateBrowserViewLayout()
