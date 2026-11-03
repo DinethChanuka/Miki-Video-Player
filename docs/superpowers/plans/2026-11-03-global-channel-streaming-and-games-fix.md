@@ -157,3 +157,4 @@
 - [ ] **Step 1: Run full test suite (`npm test`) and TypeScript checks**
 - [ ] **Step 2: Package macOS app and verify bundle**
 - [ ] **Step 3: Commit all changes and push to GitHub**
+

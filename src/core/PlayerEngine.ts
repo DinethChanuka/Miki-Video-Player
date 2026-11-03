@@ -483,6 +483,17 @@ export class WebMediaEngine implements IPlayerEngine {
         }
 
         if (data.fatal) {
+          // Native AVPlayer Fallback for WebKit / Safari when HLS.js cannot load CORS-restricted manifests or network streams
+          if (el.canPlayType('application/vnd.apple.mpegurl')) {
+            logWarn(`[PlayerEngine] HLS.js failed with ${data.details}. Seamlessly falling back to native WebKit AVPlayer.`);
+            this.hls?.destroy();
+            this.hls = null;
+            el.src = resolvedUri;
+            el.load();
+            this.play().catch(() => {});
+            return;
+          }
+
           // Attempt built-in HLS.js automated recoveries before escalating to fatal error
           switch (data.type) {
             case Hls.ErrorTypes.NETWORK_ERROR:
@@ -495,17 +506,6 @@ export class WebMediaEngine implements IPlayerEngine {
               return;
             default:
               break;
-          }
-
-          // Native AVPlayer Fallback for WebKit / Safari when HLS.js cannot load CORS-restricted manifests
-          if (el.canPlayType('application/vnd.apple.mpegurl')) {
-            logWarn(`[PlayerEngine] HLS.js failed with ${data.details}. Seamlessly falling back to native WebKit AVPlayer.`);
-            this.hls?.destroy();
-            this.hls = null;
-            el.src = resolvedUri;
-            el.load();
-            this.play().catch(() => {});
-            return;
           }
 
           this.hls?.destroy();

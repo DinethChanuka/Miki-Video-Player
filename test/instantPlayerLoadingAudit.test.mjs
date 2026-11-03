@@ -12,19 +12,19 @@ describe('Task 1: Instant Media Player Loading & Zero Black Screen Audit', () =>
   const splashCode = fs.readFileSync(splashPath, 'utf-8');
   const swiftCode = fs.readFileSync(swiftPath, 'utf-8');
 
-  it('verifies App.tsx mounts media player directly without blocking black splash video', () => {
+  it('verifies App.tsx mounts player startup intro with showSplash', () => {
     assert.match(
       appCode,
-      /showSplash\s*,\s*setShowSplash\s*\]\s*=\s*useState\s*\(\s*false\s*\)/,
-      'App.tsx showSplash state must default to false so media player loads instantly'
+      /showSplash\s*,\s*setShowSplash\s*\]\s*=\s*useState\s*\(\s*true\s*\)/,
+      'App.tsx showSplash state must default to true so startup intro video plays'
     );
   });
 
-  it('verifies SplashScreen has immediate failsafe and short safeguard timeout', () => {
+  it('verifies SplashScreen has safeguard timeout allowing 10s video to play', () => {
     assert.match(
       splashCode,
-      /safeguardTimer\s*=\s*setTimeout\([\s\S]*?,\s*(?:1000|1500|2000)\)/,
-      'SplashScreen safeguard timer must be <= 2000ms instead of 12000ms'
+      /safeguardTimer\s*=\s*setTimeout\([\s\S]*?,\s*(?:10000|12000)\)/,
+      'SplashScreen safeguard timer must be at least 10000ms for 10s intro'
     );
   });
 

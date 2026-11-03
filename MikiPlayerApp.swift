@@ -202,18 +202,61 @@ class AppAssetSchemeHandler: NSObject, WKURLSchemeHandler {
         else if ext == "ico" { mimeType = "image/x-icon" }
         else if ext == "mp4" { mimeType = "video/mp4" }
 
-        let headers: [String: String] = [
-            "Content-Type": mimeType,
-            "Content-Length": "\(data.count)",
-            "Accept-Ranges": "bytes",
-            "Access-Control-Allow-Origin": "*",
-            "Cache-Control": "no-cache"
-        ]
+        let rangeHeader = urlSchemeTask.request.value(forHTTPHeaderField: "Range")
+        if let range = rangeHeader, range.starts(with: "bytes=") {
+            let fileSize = Int64(data.count)
+            let cleanRange = String(range.dropFirst(6))
+            let parts = cleanRange.components(separatedBy: "-")
+            var start: Int64 = 0
+            var end: Int64 = fileSize - 1
 
-        let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: headers)!
-        urlSchemeTask.didReceive(response)
-        urlSchemeTask.didReceive(data)
-        urlSchemeTask.didFinish()
+            if let p0 = Int64(parts[0]) {
+                start = p0
+            }
+            if parts.count > 1, let p1 = Int64(parts[1]) {
+                end = p1
+            }
+
+            if start >= fileSize || start > end {
+                let headers: [String: String] = [
+                    "Content-Range": "bytes */\(fileSize)",
+                    "Accept-Ranges": "bytes"
+                ]
+                let response = HTTPURLResponse(url: url, statusCode: 416, httpVersion: "HTTP/1.1", headerFields: headers)!
+                urlSchemeTask.didReceive(response)
+                urlSchemeTask.didFinish()
+                return
+            }
+
+            let length = end - start + 1
+            let headers: [String: String] = [
+                "Content-Type": mimeType,
+                "Content-Range": "bytes \(start)-\(end)/\(fileSize)",
+                "Content-Length": "\(length)",
+                "Accept-Ranges": "bytes",
+                "Access-Control-Allow-Origin": "*",
+                "Cache-Control": "no-cache"
+            ]
+
+            let response = HTTPURLResponse(url: url, statusCode: 206, httpVersion: "HTTP/1.1", headerFields: headers)!
+            urlSchemeTask.didReceive(response)
+            let subData = data.subdata(in: Int(start)..<Int(end + 1))
+            urlSchemeTask.didReceive(subData)
+            urlSchemeTask.didFinish()
+        } else {
+            let headers: [String: String] = [
+                "Content-Type": mimeType,
+                "Content-Length": "\(data.count)",
+                "Accept-Ranges": "bytes",
+                "Access-Control-Allow-Origin": "*",
+                "Cache-Control": "no-cache"
+            ]
+
+            let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: headers)!
+            urlSchemeTask.didReceive(response)
+            urlSchemeTask.didReceive(data)
+            urlSchemeTask.didFinish()
+        }
     }
 
     func webView(_ webView: WKWebView, stop urlSchemeTask: WKURLSchemeTask) {}

@@ -38,3 +38,4 @@ describe('Game Iframe Sandbox & Fallback Resilience Audit', () => {
     );
   });
 });
+

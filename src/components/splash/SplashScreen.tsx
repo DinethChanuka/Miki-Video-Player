@@ -29,10 +29,10 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete }) => {
     };
     window.addEventListener('keydown', handleKeyDown);
 
-    // Safeguard timeout: automatically transition after 1.5 seconds maximum if video stalls
+    // Safeguard timeout: automatically transition after 12 seconds maximum (intro video is ~10s)
     const safeguardTimer = setTimeout(() => {
       handleFinish();
-    }, 1500);
+    }, 12000);
 
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
@@ -74,6 +74,19 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete }) => {
         onError={handleFinish}
         className="w-full h-full object-contain pointer-events-none"
       />
+
+      {/* Top Right Skip Button */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          handleFinish();
+        }}
+        className="absolute top-6 right-6 z-10 px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white/80 hover:text-white text-xs font-semibold backdrop-blur-md border border-white/10 transition-all shadow-lg flex items-center gap-1.5 cursor-pointer"
+        title="Skip Intro (Space / Esc)"
+      >
+        <span>Skip Intro</span>
+        <span className="text-[10px] text-white/40">ESC</span>
+      </button>
 
       {/* Subtle Bottom Loading Progress Bar */}
       <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/5 overflow-hidden">

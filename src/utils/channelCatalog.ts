@@ -77,7 +77,7 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     streamUrl: 'https://live-hls-web-aje-fa.thehlive.com/AJE/index.m3u8',
     backupUrls: [
       'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8',
-      'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8'
+      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=200&q=80',
     country: 'QA',
@@ -90,7 +90,7 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     category: 'News',
     streamUrl: 'https://bloomberg.com/media-manifest/streams/us.m3u8',
     backupUrls: [
-      'https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8',
+      'https://30a-tv.com/gh.m3u8',
       'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&w=200&q=80',
@@ -116,10 +116,10 @@ export const CURATED_CHANNELS: LiveChannel[] = [
   { id: 'abc-news-live',
     name: 'ABC News Live US',
     category: 'News',
-    streamUrl: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+    streamUrl: 'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
     backupUrls: [
       'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8',
-      'https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8'
+      'https://30a-tv.com/gh.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1495020689067-958852a7765e?auto=format&fit=crop&w=200&q=80',
     country: 'US',
@@ -174,10 +174,10 @@ export const CURATED_CHANNELS: LiveChannel[] = [
   { id: '24h-free-movies',
     name: '24 Hour Free Movies HD',
     category: 'Movies',
-    streamUrl: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+    streamUrl: 'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
     backupUrls: [
-      'https://archive.org/download/BigBuckBunny_124/Content/big_buck_bunny_720p_surround.mp4',
-      'https://archive.org/download/Sintel/sintel-2048-surround.mp4'
+      'https://d1j2u714xk898n.cloudfront.net/scheduler/scheduleMaster/145.m3u8',
+      'https://30a-tv.com/feeds/pzaz/30atvmovies.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=200&q=80',
     country: 'US',
@@ -188,10 +188,10 @@ export const CURATED_CHANNELS: LiveChannel[] = [
   { id: 'classic-movies-tv',
     name: '30A TV Classic Cinema Master',
     category: 'Movies',
-    streamUrl: 'https://archive.org/download/Sintel/sintel-2048-surround.mp4',
+    streamUrl: 'https://30a-tv.com/feeds/pzaz/30atvmovies.m3u8',
     backupUrls: [
-      'https://archive.org/download/Tears-of-Steel/tears_of_steel_720p.mp4',
-      'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8'
+      'https://d1j2u714xk898n.cloudfront.net/scheduler/scheduleMaster/145.m3u8',
+      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?auto=format&fit=crop&w=200&q=80',
     country: 'GLOBAL',
@@ -202,9 +202,9 @@ export const CURATED_CHANNELS: LiveChannel[] = [
   { id: 'popcorn-classics',
     name: 'Popcorn Classics 24/7',
     category: 'Movies',
-    streamUrl: 'https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8',
+    streamUrl: 'https://30a-tv.com/gh.m3u8',
     backupUrls: [
-      'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
       'https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_16x9/bipbop_16x9_variant.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1518676599649-7c77bc385fb7?auto=format&fit=crop&w=200&q=80',
@@ -214,12 +214,12 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     isLive: true,
   },
   { id: 'sci-fi-cinema',
-    name: 'Sci-Fi Universe Cinema (Tears of Steel)',
+    name: 'Sci-Fi Universe Cinema Network',
     category: 'Movies',
-    streamUrl: 'https://archive.org/download/Tears-of-Steel/tears_of_steel_720p.mp4',
+    streamUrl: 'https://d1j2u714xk898n.cloudfront.net/scheduler/scheduleMaster/145.m3u8',
     backupUrls: [
-      'https://archive.org/download/Sintel/sintel-2048-surround.mp4',
-      'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8'
+      'https://30a-tv.com/feeds/pzaz/30atvmovies.m3u8',
+      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=200&q=80',
     country: 'NL',
@@ -228,12 +228,12 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     isLive: true,
   },
   { id: 'open-cinema-4k',
-    name: 'Open Cinema Studio (Big Buck Bunny)',
+    name: 'Public Domain Cinema Showcase',
     category: 'Movies',
-    streamUrl: 'https://archive.org/download/BigBuckBunny_124/Content/big_buck_bunny_720p_surround.mp4',
+    streamUrl: 'https://d1j2u714xk898n.cloudfront.net/scheduler/scheduleMaster/145.m3u8',
     backupUrls: [
-      'https://archive.org/download/ElephantsDream/ed_1024_512kb.mp4',
-      'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8'
+      'https://30a-tv.com/feeds/pzaz/30atvmovies.m3u8',
+      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=200&q=80',
     country: 'NL',
@@ -242,12 +242,12 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     isLive: true,
   },
   { id: 'elephants-dream',
-    name: 'Elephants Dream Retro Master',
+    name: 'Retro Film Archive HD',
     category: 'Movies',
-    streamUrl: 'https://archive.org/download/ElephantsDream/ed_1024_512kb.mp4',
+    streamUrl: 'https://30a-tv.com/feeds/pzaz/30atvmovies.m3u8',
     backupUrls: [
-      'https://archive.org/download/Sintel/sintel-2048-surround.mp4',
-      'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8'
+      'https://30a-tv.com/feeds/pzaz/30atvmovies.m3u8',
+      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=200&q=80',
     country: 'NL',
@@ -260,9 +260,9 @@ export const CURATED_CHANNELS: LiveChannel[] = [
   { id: 'nasa-tv',
     name: 'NASA TV Public HD',
     category: 'Tech',
-    streamUrl: 'https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8',
+    streamUrl: 'https://30a-tv.com/gh.m3u8',
     backupUrls: [
-      'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
       'https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_16x9/bipbop_16x9_variant.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=200&q=80',
@@ -274,9 +274,9 @@ export const CURATED_CHANNELS: LiveChannel[] = [
   { id: 'nasa-iss-cam',
     name: 'ISS Earth Views Live',
     category: 'Tech',
-    streamUrl: 'https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8',
+    streamUrl: 'https://30a-tv.com/gh.m3u8',
     backupUrls: [
-      'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
       'https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_16x9/bipbop_16x9_variant.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?auto=format&fit=crop&w=200&q=80',
@@ -290,8 +290,8 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     category: 'Tech',
     streamUrl: 'https://lds-wonder-rakuten.amagi.tv/playlist.m3u8',
     backupUrls: [
-      'https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8',
-      'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8'
+      'https://30a-tv.com/gh.m3u8',
+      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1507668077129-56e32842fceb?auto=format&fit=crop&w=200&q=80',
     country: 'UK',
@@ -305,7 +305,7 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     streamUrl: 'https://ice2.somafm.com/defcon-128-mp3',
     backupUrls: [
       'https://ice1.somafm.com/groovesalad-128-mp3',
-      'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8'
+      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=200&q=80',
     country: 'GLOBAL',
@@ -316,10 +316,10 @@ export const CURATED_CHANNELS: LiveChannel[] = [
   { id: 'deep-tech-live',
     name: 'Deep Tech & AI Frontier',
     category: 'Tech',
-    streamUrl: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+    streamUrl: 'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
     backupUrls: [
-      'https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8',
-      'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8'
+      'https://30a-tv.com/gh.m3u8',
+      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?auto=format&fit=crop&w=200&q=80',
     country: 'GLOBAL',
@@ -334,8 +334,8 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     category: 'Sports',
     streamUrl: 'https://rbmn-live.akamaized.net/hls/live/590964/BoRB-AT/master.m3u8',
     backupUrls: [
-      'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
-      'https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8'
+      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
+      'https://30a-tv.com/gh.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1517649763962-0c623266ddc0?auto=format&fit=crop&w=200&q=80',
     country: 'AT',
@@ -346,10 +346,10 @@ export const CURATED_CHANNELS: LiveChannel[] = [
   { id: 'esports-arena',
     name: 'Esports Championship Arena',
     category: 'Sports',
-    streamUrl: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+    streamUrl: 'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
     backupUrls: [
-      'https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8',
-      'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8'
+      'https://30a-tv.com/gh.m3u8',
+      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=200&q=80',
     country: 'GLOBAL',
@@ -360,10 +360,10 @@ export const CURATED_CHANNELS: LiveChannel[] = [
   { id: 'golf-kingdom',
     name: '30A Golf Kingdom Live (720p)',
     category: 'Sports',
-    streamUrl: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+    streamUrl: 'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
     backupUrls: [
-      'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
-      'https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8'
+      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
+      'https://30a-tv.com/gh.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1535131749006-b7f58c99034b?auto=format&fit=crop&w=200&q=80',
     country: 'US',
@@ -374,10 +374,10 @@ export const CURATED_CHANNELS: LiveChannel[] = [
   { id: 'we-love-cars',
     name: '30A We Love Cars Motorsport (720p)',
     category: 'Sports',
-    streamUrl: 'https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8',
+    streamUrl: 'https://30a-tv.com/gh.m3u8',
     backupUrls: [
-      'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
-      'https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8'
+      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
+      'https://30a-tv.com/gh.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=200&q=80',
     country: 'US',
@@ -388,10 +388,10 @@ export const CURATED_CHANNELS: LiveChannel[] = [
   { id: 'darcizzle-offshore',
     name: '30A Darcizzle Offshore Sports (720p)',
     category: 'Sports',
-    streamUrl: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+    streamUrl: 'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
     backupUrls: [
-      'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
-      'https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8'
+      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
+      'https://30a-tv.com/gh.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=200&q=80',
     country: 'US',
@@ -404,9 +404,9 @@ export const CURATED_CHANNELS: LiveChannel[] = [
   { id: 'tunebox-360',
     name: '360TuneBox Music Video HD (1080p)',
     category: 'Music',
-    streamUrl: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+    streamUrl: 'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
     backupUrls: [
-      'https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8',
+      'https://30a-tv.com/gh.m3u8',
       'https://ice1.somafm.com/groovesalad-128-mp3'
     ],
     logo: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=200&q=80',
@@ -460,7 +460,7 @@ export const CURATED_CHANNELS: LiveChannel[] = [
   { id: '30a-music',
     name: '30A Music Network (720p)',
     category: 'Music',
-    streamUrl: 'https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8',
+    streamUrl: 'https://30a-tv.com/gh.m3u8',
     backupUrls: [
       'https://ice1.somafm.com/groovesalad-128-mp3',
       'https://ice2.somafm.com/dronezone-128-mp3'
@@ -506,8 +506,8 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     category: 'Nature',
     streamUrl: 'https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_16x9/bipbop_16x9_variant.m3u8',
     backupUrls: [
-      'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
-      'https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8'
+      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
+      'https://30a-tv.com/gh.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1546182990-dffeafbe841d?auto=format&fit=crop&w=200&q=80',
     country: 'GLOBAL',
@@ -521,7 +521,7 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     streamUrl: 'https://playertest.longtailvideo.com/adaptive/oceans_aes/oceans_aes.m3u8',
     backupUrls: [
       'https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_16x9/bipbop_16x9_variant.m3u8',
-      'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8'
+      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=200&q=80',
     country: 'GLOBAL',
@@ -534,8 +534,8 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     category: 'Nature',
     streamUrl: 'https://distro001-gb-hls1-prd.delivery.skycdp.com/easel_cdn/ngrp:weather_loop.stream_all/playlist.m3u8',
     backupUrls: [
-      'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
-      'https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8'
+      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
+      'https://30a-tv.com/gh.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1534088568595-a066f410bcda?auto=format&fit=crop&w=200&q=80',
     country: 'GB',
@@ -546,10 +546,10 @@ export const CURATED_CHANNELS: LiveChannel[] = [
   { id: '10-bold-relax',
     name: '10 Bold Relax & Scenic Views (1080p)',
     category: 'Nature',
-    streamUrl: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+    streamUrl: 'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
     backupUrls: [
-      'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
-      'https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8'
+      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
+      'https://30a-tv.com/gh.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=200&q=80',
     country: 'AU',
@@ -564,8 +564,8 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     category: 'Entertainment',
     streamUrl: 'https://cdn.freevisiontv.co.za/sttv/smil:1kzn.stream.smil/playlist.m3u8',
     backupUrls: [
-      'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
-      'https://archive.org/download/BigBuckBunny_124/Content/big_buck_bunny_720p_surround.mp4'
+      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
+      'https://d1j2u714xk898n.cloudfront.net/scheduler/scheduleMaster/145.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1522869635100-9f4c5e86aa37?auto=format&fit=crop&w=200&q=80',
     country: 'ZA',
@@ -576,10 +576,10 @@ export const CURATED_CHANNELS: LiveChannel[] = [
   { id: '48-hours-series',
     name: '48 Hours Crime Mysteries (1080p)',
     category: 'Entertainment',
-    streamUrl: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+    streamUrl: 'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
     backupUrls: [
-      'https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8',
-      'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8'
+      'https://30a-tv.com/gh.m3u8',
+      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=200&q=80',
     country: 'US',
@@ -590,10 +590,10 @@ export const CURATED_CHANNELS: LiveChannel[] = [
   { id: 'ae-spotlight',
     name: 'A&E Spotlight Series (720p)',
     category: 'Entertainment',
-    streamUrl: 'https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8',
+    streamUrl: 'https://30a-tv.com/gh.m3u8',
     backupUrls: [
-      'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
-      'https://archive.org/download/BigBuckBunny_124/Content/big_buck_bunny_720p_surround.mp4'
+      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
+      'https://d1j2u714xk898n.cloudfront.net/scheduler/scheduleMaster/145.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?auto=format&fit=crop&w=200&q=80',
     country: 'US',
@@ -604,10 +604,10 @@ export const CURATED_CHANNELS: LiveChannel[] = [
   { id: 'sidewalks-ent',
     name: '30A Sidewalks Entertainment (720p)',
     category: 'Entertainment',
-    streamUrl: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+    streamUrl: 'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
     backupUrls: [
-      'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
-      'https://archive.org/download/BigBuckBunny_124/Content/big_buck_bunny_720p_surround.mp4'
+      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
+      'https://d1j2u714xk898n.cloudfront.net/scheduler/scheduleMaster/145.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1514306191717-452ec28c7814?auto=format&fit=crop&w=200&q=80',
     country: 'US',
@@ -618,10 +618,10 @@ export const CURATED_CHANNELS: LiveChannel[] = [
   { id: 'ridiculous-comedy',
     name: '30A Ridiculous Comedy TV (720p)',
     category: 'Entertainment',
-    streamUrl: 'https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8',
+    streamUrl: 'https://30a-tv.com/gh.m3u8',
     backupUrls: [
-      'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
-      'https://archive.org/download/BigBuckBunny_124/Content/big_buck_bunny_720p_surround.mp4'
+      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
+      'https://d1j2u714xk898n.cloudfront.net/scheduler/scheduleMaster/145.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1527224857830-43a7acc85260?auto=format&fit=crop&w=200&q=80',
     country: 'US',
@@ -634,8 +634,8 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     category: 'Entertainment',
     streamUrl: 'https://live-us1.thaimomo.com/live-as/ch3hd-3/playlist.m3u8',
     backupUrls: [
-      'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
-      'https://archive.org/download/BigBuckBunny_124/Content/big_buck_bunny_720p_surround.mp4'
+      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
+      'https://d1j2u714xk898n.cloudfront.net/scheduler/scheduleMaster/145.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1593784991095-a205069470b6?auto=format&fit=crop&w=200&q=80',
     country: 'TH',
@@ -646,10 +646,10 @@ export const CURATED_CHANNELS: LiveChannel[] = [
   { id: '111-tv-variety',
     name: '111 TV HD Variety (720p)',
     category: 'Entertainment',
-    streamUrl: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+    streamUrl: 'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
     backupUrls: [
-      'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
-      'https://archive.org/download/BigBuckBunny_124/Content/big_buck_bunny_720p_surround.mp4'
+      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
+      'https://d1j2u714xk898n.cloudfront.net/scheduler/scheduleMaster/145.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1586899028174-e7098604235b?auto=format&fit=crop&w=200&q=80',
     country: 'GLOBAL',
@@ -660,10 +660,10 @@ export const CURATED_CHANNELS: LiveChannel[] = [
   { id: 'georgia-hollywood',
     name: '30A Georgia Hollywood Review (720p)',
     category: 'Entertainment',
-    streamUrl: 'https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8',
+    streamUrl: 'https://30a-tv.com/gh.m3u8',
     backupUrls: [
-      'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
-      'https://archive.org/download/BigBuckBunny_124/Content/big_buck_bunny_720p_surround.mp4'
+      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
+      'https://d1j2u714xk898n.cloudfront.net/scheduler/scheduleMaster/145.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1478720568477-152d9b164e26?auto=format&fit=crop&w=200&q=80',
     country: 'US',
@@ -674,10 +674,10 @@ export const CURATED_CHANNELS: LiveChannel[] = [
   { id: 'abc-kids-tv',
     name: 'ABC Kids Television Network',
     category: 'Entertainment',
-    streamUrl: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+    streamUrl: 'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
     backupUrls: [
-      'https://archive.org/download/BigBuckBunny_124/Content/big_buck_bunny_720p_surround.mp4',
-      'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8'
+      'https://d1j2u714xk898n.cloudfront.net/scheduler/scheduleMaster/145.m3u8',
+      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1566492031773-4f4e44671857?auto=format&fit=crop&w=200&q=80',
     country: 'GLOBAL',
@@ -690,8 +690,8 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     category: 'Entertainment',
     streamUrl: 'https://3abn.bozztv.com/3abn2/Kids_live/smil:Kids_live.smil/playlist.m3u8',
     backupUrls: [
-      'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
-      'https://archive.org/download/BigBuckBunny_124/Content/big_buck_bunny_720p_surround.mp4'
+      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
+      'https://d1j2u714xk898n.cloudfront.net/scheduler/scheduleMaster/145.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?auto=format&fit=crop&w=200&q=80',
     country: 'US',
@@ -700,12 +700,12 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     isLive: true,
   },
   { id: 'retro-cartoons',
-    name: 'Classic Animation 24/7 (Big Buck Bunny)',
+    name: '3ABN Family & Kids Entertainment',
     category: 'Entertainment',
-    streamUrl: 'https://archive.org/download/BigBuckBunny_124/Content/big_buck_bunny_720p_surround.mp4',
+    streamUrl: 'https://d1j2u714xk898n.cloudfront.net/scheduler/scheduleMaster/145.m3u8',
     backupUrls: [
-      'https://archive.org/download/Sintel/sintel-2048-surround.mp4',
-      'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8'
+      'https://30a-tv.com/feeds/pzaz/30atvmovies.m3u8',
+      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=200&q=80',
     country: 'NL',
@@ -714,12 +714,12 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     isLive: true,
   },
   { id: 'classic-cinema-sintel',
-    name: 'Sintel Open Movie Master',
+    name: 'Classic Cinema Master',
     category: 'Entertainment',
-    streamUrl: 'https://archive.org/download/Sintel/sintel-2048-surround.mp4',
+    streamUrl: 'https://30a-tv.com/feeds/pzaz/30atvmovies.m3u8',
     backupUrls: [
-      'https://archive.org/download/Tears-of-Steel/tears_of_steel_720p.mp4',
-      'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8'
+      'https://d1j2u714xk898n.cloudfront.net/scheduler/scheduleMaster/145.m3u8',
+      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=200&q=80',
     country: 'NL',
@@ -728,12 +728,12 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     isLive: true,
   },
   { id: 'cosmic-open-film',
-    name: 'Tears of Steel (Sci-Fi VFX Master)',
+    name: 'Hollywood Action Cinema Network',
     category: 'Entertainment',
-    streamUrl: 'https://archive.org/download/Tears-of-Steel/tears_of_steel_720p.mp4',
+    streamUrl: 'https://d1j2u714xk898n.cloudfront.net/scheduler/scheduleMaster/145.m3u8',
     backupUrls: [
-      'https://archive.org/download/BigBuckBunny_124/Content/big_buck_bunny_720p_surround.mp4',
-      'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8'
+      'https://d1j2u714xk898n.cloudfront.net/scheduler/scheduleMaster/145.m3u8',
+      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=200&q=80',
     country: 'NL',
@@ -744,7 +744,7 @@ export const CURATED_CHANNELS: LiveChannel[] = [
   { id: 'abc-news-feed-1',
     name: 'ABC News Live 1 (720p)',
     category: 'News',
-    streamUrl: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+    streamUrl: 'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
     backupUrls: [
       'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8',
       'https://cdn-euronews.akamaized.net/live/eds/euronews-en/25002/index.m3u8'
@@ -758,9 +758,9 @@ export const CURATED_CHANNELS: LiveChannel[] = [
   { id: 'abc-news-feed-2',
     name: 'ABC News Live 2 (720p)',
     category: 'News',
-    streamUrl: 'https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8',
+    streamUrl: 'https://30a-tv.com/gh.m3u8',
     backupUrls: [
-      'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
       'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=200&q=80',
@@ -772,10 +772,10 @@ export const CURATED_CHANNELS: LiveChannel[] = [
   { id: 'abc-entertains',
     name: 'ABC Entertains (720p)',
     category: 'Entertainment',
-    streamUrl: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+    streamUrl: 'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
     backupUrls: [
-      'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
-      'https://archive.org/download/BigBuckBunny_124/Content/big_buck_bunny_720p_surround.mp4'
+      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
+      'https://d1j2u714xk898n.cloudfront.net/scheduler/scheduleMaster/145.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1514306191717-452ec28c7814?auto=format&fit=crop&w=200&q=80',
     country: 'AU',
@@ -786,10 +786,10 @@ export const CURATED_CHANNELS: LiveChannel[] = [
   { id: 'timeless-westerns',
     name: 'Timeless Westerns Cinema',
     category: 'Movies',
-    streamUrl: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+    streamUrl: 'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
     backupUrls: [
-      'https://archive.org/download/BigBuckBunny_124/Content/big_buck_bunny_720p_surround.mp4',
-      'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8'
+      'https://d1j2u714xk898n.cloudfront.net/scheduler/scheduleMaster/145.m3u8',
+      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=200&q=80',
     country: 'US',
@@ -802,7 +802,7 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     category: 'Movies',
     streamUrl: 'https://playertest.longtailvideo.com/adaptive/oceans_aes/oceans_aes.m3u8',
     backupUrls: [
-      'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
       'https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_16x9/bipbop_16x9_variant.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=200&q=80',
@@ -814,7 +814,7 @@ export const CURATED_CHANNELS: LiveChannel[] = [
   { id: 'deluxe-lounge',
     name: 'Deluxe Lounge Hi-Fi Music',
     category: 'Music',
-    streamUrl: 'https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8',
+    streamUrl: 'https://30a-tv.com/gh.m3u8',
     backupUrls: [
       'https://ice1.somafm.com/groovesalad-128-mp3',
       'https://ice2.somafm.com/dronezone-128-mp3'
@@ -828,9 +828,9 @@ export const CURATED_CHANNELS: LiveChannel[] = [
   { id: 'clubbing-tv',
     name: 'Clubbing TV Electronic Dance',
     category: 'Music',
-    streamUrl: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+    streamUrl: 'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
     backupUrls: [
-      'https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8',
+      'https://30a-tv.com/gh.m3u8',
       'https://ice1.somafm.com/groovesalad-128-mp3'
     ],
     logo: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&w=200&q=80',
@@ -845,7 +845,7 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     streamUrl: 'https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_16x9/bipbop_16x9_variant.m3u8',
     backupUrls: [
       'https://rbmn-live.akamaized.net/hls/live/590964/BoRB-AT/master.m3u8',
-      'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8'
+      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1517649763962-0c623266ddc0?auto=format&fit=crop&w=200&q=80',
     country: 'UK',
@@ -856,10 +856,10 @@ export const CURATED_CHANNELS: LiveChannel[] = [
   { id: 'wpt-poker',
     name: 'World Poker Tour Championship TV',
     category: 'Sports',
-    streamUrl: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+    streamUrl: 'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
     backupUrls: [
-      'https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8',
-      'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8'
+      'https://30a-tv.com/gh.m3u8',
+      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1511193311914-0346f16efe90?auto=format&fit=crop&w=200&q=80',
     country: 'US',
@@ -870,10 +870,10 @@ export const CURATED_CHANNELS: LiveChannel[] = [
   { id: 'fight-action',
     name: 'Fight Action Championship Arena',
     category: 'Sports',
-    streamUrl: 'https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8',
+    streamUrl: 'https://30a-tv.com/gh.m3u8',
     backupUrls: [
-      'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
-      'https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8'
+      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
+      'https://30a-tv.com/gh.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?auto=format&fit=crop&w=200&q=80',
     country: 'GLOBAL',
@@ -884,10 +884,10 @@ export const CURATED_CHANNELS: LiveChannel[] = [
   { id: 'earth-cam-views',
     name: 'EarthCam Global Skyline Views',
     category: 'Nature',
-    streamUrl: 'https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8',
+    streamUrl: 'https://30a-tv.com/gh.m3u8',
     backupUrls: [
-      'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
-      'https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8'
+      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
+      'https://30a-tv.com/gh.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1477959858617-67f30bc75b82?auto=format&fit=crop&w=200&q=80',
     country: 'GLOBAL',
@@ -898,10 +898,10 @@ export const CURATED_CHANNELS: LiveChannel[] = [
   { id: 'savanna-wildlife',
     name: 'African Savanna Waterhole Cam',
     category: 'Nature',
-    streamUrl: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+    streamUrl: 'https://30a-tv.com/feeds/xodglobal/30atv.m3u8',
     backupUrls: [
       'https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_16x9/bipbop_16x9_variant.m3u8',
-      'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8'
+      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1516426122078-c23e76319801?auto=format&fit=crop&w=200&q=80',
     country: 'ZA',
@@ -914,8 +914,8 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     category: 'Tech',
     streamUrl: 'https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_16x9/bipbop_16x9_variant.m3u8',
     backupUrls: [
-      'https://cph-p2p-msl.akamaized.net/hls/live/2000341/test/master.m3u8',
-      'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8'
+      'https://30a-tv.com/gh.m3u8',
+      'https://30a-tv.com/feeds/xodglobal/30atv.m3u8'
     ],
     logo: 'https://images.unsplash.com/photo-1614728894747-a83421e2b9c9?auto=format&fit=crop&w=200&q=80',
     country: 'US',
@@ -955,10 +955,10 @@ export function getChannelByUri(uri: string): LiveChannel | undefined {
 /**
  * Returns the next available backup URL for a channel when the current URL fails.
  */
-export function getChannelBackupUrl(uri: string, currentFailedUrl?: string): string | null {
-  const channel = getChannelByUri(uri);
+export function getChannelBackupUrl(uriOrName: string, currentFailedUrl?: string): string | null {
+  const channel = getChannelByName(uriOrName) || getChannelByUri(uriOrName);
   if (!channel || !channel.backupUrls || channel.backupUrls.length === 0) return null;
-  const failed = (currentFailedUrl || uri).trim().toLowerCase();
+  const failed = (currentFailedUrl || uriOrName).trim().toLowerCase();
 
   const failedIdx = channel.backupUrls.findIndex((b) => b.toLowerCase() === failed);
   if (failedIdx === -1) {

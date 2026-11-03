@@ -9,6 +9,7 @@ import {
   MousePointer,
   Search,
   Filter,
+  Gamepad2,
 } from 'lucide-react';
 
 interface GamesSectionProps {
@@ -277,53 +278,77 @@ export const GamesSection: React.FC<GamesSectionProps> = ({ onClose: _onClose, o
 
           {/* Grid of Games */}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5 overflow-y-auto max-h-[460px] pr-1 scrollbar-thin">
-            {filteredGames.map((game) => (
-              <div
-                key={game.id}
-                onClick={() => {
-                  if (onOpenGames) {
-                    if (_onClose) _onClose();
-                    onOpenGames(game.id);
-                  } else {
-                    setSelectedGame(game);
-                    setIsPlaying(true);
-                  }
-                }}
-                className="p-3.5 rounded-2xl bg-white/5 border border-white/10 hover:border-purple-400/50 hover:bg-white/10 cursor-pointer transition-all flex flex-col justify-between gap-3 group shadow-md"
-              >
-                <div className="relative aspect-video rounded-xl overflow-hidden bg-black/40 border border-white/10">
-                  <img
-                    src={game.thumbnail}
-                    alt={game.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                  <div className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-purple-600/90 text-white font-bold text-[10px] shadow">
-                    {game.badge}
-                  </div>
-                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                    <div className="p-2.5 rounded-xl bg-purple-600 text-white shadow-lg">
-                      <Play className="w-5 h-5 fill-white" />
+            {filteredGames.length === 0 ? (
+              <div className="col-span-full flex flex-col items-center justify-center py-12 px-4 text-center bg-white/5 rounded-2xl border border-white/10">
+                <div className="p-3.5 rounded-2xl bg-purple-500/20 border border-purple-500/30 text-purple-400 mb-3">
+                  <Gamepad2 className="w-8 h-8" />
+                </div>
+                <h4 className="text-sm font-bold text-white mb-1">No Games Found</h4>
+                <p className="text-xs text-white/50 mb-4 max-w-sm leading-relaxed">
+                  No games matched &ldquo;{searchTerm || searchQuery}&rdquo; in category &ldquo;{activeCategory}&rdquo;.
+                </p>
+                <button
+                  onClick={() => {
+                    setActiveCategory('All');
+                    setSearchQuery('');
+                  }}
+                  className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold transition-all shadow-md shadow-purple-600/30"
+                >
+                  Clear Filters & Show All {GAMES_CATALOG.length} Games
+                </button>
+              </div>
+            ) : (
+              filteredGames.map((game) => (
+                <div
+                  key={game.id}
+                  onClick={() => {
+                    if (onOpenGames) {
+                      if (_onClose) _onClose();
+                      onOpenGames(game.id);
+                    } else {
+                      setSelectedGame(game);
+                      setIsPlaying(true);
+                    }
+                  }}
+                  className="p-3.5 rounded-2xl bg-white/5 border border-white/10 hover:border-purple-400/50 hover:bg-white/10 cursor-pointer transition-all flex flex-col justify-between gap-3 group shadow-md"
+                >
+                  <div className="relative aspect-video rounded-xl overflow-hidden bg-black/40 border border-white/10">
+                    <img
+                      src={game.thumbnail}
+                      alt={game.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLElement).style.display = 'none';
+                      }}
+                    />
+                    <div className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-purple-600/90 text-white font-bold text-[10px] shadow">
+                      {game.badge}
+                    </div>
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="p-2.5 rounded-xl bg-purple-600 text-white shadow-lg">
+                        <Play className="w-5 h-5 fill-white" />
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="flex flex-col gap-1">
-                  <h4 className="text-xs font-bold text-white group-hover:text-purple-300 transition-colors">
-                    {game.title}
-                  </h4>
-                  <p className="text-[11px] text-slate-300 line-clamp-2 leading-relaxed">
-                    {game.description}
-                  </p>
-                </div>
+                  <div className="flex flex-col gap-1">
+                    <h4 className="text-xs font-bold text-white group-hover:text-purple-300 transition-colors">
+                      {game.title}
+                    </h4>
+                    <p className="text-[11px] text-slate-300 line-clamp-2 leading-relaxed">
+                      {game.description}
+                    </p>
+                  </div>
 
-                <div className="flex items-center justify-between pt-2 border-t border-white/10 text-[10px] text-slate-400">
-                  <span>{game.controlsHint}</span>
-                  <span className="text-purple-400 font-bold flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
-                    Play Now →
-                  </span>
+                  <div className="flex items-center justify-between pt-2 border-t border-white/10 text-[10px] text-slate-400">
+                    <span>{game.controlsHint}</span>
+                    <span className="text-purple-400 font-bold flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+                      Play Now →
+                    </span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       )}
