@@ -196,13 +196,45 @@ export const App: React.FC = () => {
   const handleConfirmResume = (item: MediaHistoryItem) => {
     setIsResumeChoiceOpen(false);
     setPendingResumeItem(null);
-    openMedia(item.uri, item.title, true, item.lastPositionMs);
+    const isItemAudio =
+      (item.uri && /\.(mp3|wav|flac|aac|m4a|ogg|opus)/i.test(item.uri)) ||
+      item.uri.includes('/mp3') ||
+      item.uri.includes('somafm') ||
+      item.uri.includes('soundcloud') ||
+      item.uri.includes('jamendo') ||
+      item.uri.includes('audiomack') ||
+      item.uri.includes('bandcamp') ||
+      item.uri.includes('apple.com') ||
+      item.uri.includes('itunes') ||
+      item.title.toLowerCase().includes('song') ||
+      item.title.toLowerCase().includes('track') ||
+      item.title.toLowerCase().includes('hindi') ||
+      item.title.toLowerCase().includes('dooriyan') ||
+      item.title.toLowerCase().includes('saiyaara');
+    openMedia(item.uri, item.title, true, item.lastPositionMs, item.thumbnailUri, isItemAudio ? 'music' : 'video');
+    if (isItemAudio) setMusicPlayerOpen(true);
   };
 
   const handleConfirmRestart = (item: MediaHistoryItem) => {
     setIsResumeChoiceOpen(false);
     setPendingResumeItem(null);
-    openMedia(item.uri, item.title, false, 0);
+    const isItemAudio =
+      (item.uri && /\.(mp3|wav|flac|aac|m4a|ogg|opus)/i.test(item.uri)) ||
+      item.uri.includes('/mp3') ||
+      item.uri.includes('somafm') ||
+      item.uri.includes('soundcloud') ||
+      item.uri.includes('jamendo') ||
+      item.uri.includes('audiomack') ||
+      item.uri.includes('bandcamp') ||
+      item.uri.includes('apple.com') ||
+      item.uri.includes('itunes') ||
+      item.title.toLowerCase().includes('song') ||
+      item.title.toLowerCase().includes('track') ||
+      item.title.toLowerCase().includes('hindi') ||
+      item.title.toLowerCase().includes('dooriyan') ||
+      item.title.toLowerCase().includes('saiyaara');
+    openMedia(item.uri, item.title, false, 0, item.thumbnailUri, isItemAudio ? 'music' : 'video');
+    if (isItemAudio) setMusicPlayerOpen(true);
   };
 
   // Auto-capture video thumbnail of the stopped point

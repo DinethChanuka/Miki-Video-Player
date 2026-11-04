@@ -111,7 +111,7 @@ const COVER_FLOW_ALBUMS: CoverFlowTrack[] = [
     artist: 'Vishal-Shekhar, Shafqat Amanat Ali',
     album: 'I Hate Luv Storys',
     albumArt: ALBUM_POSTERS.binTere,
-    url: 'https://raw.githubusercontent.com/rafaelreis-hotmart/Audio-Sample-files/master/sample2.mp3',
+    url: 'https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/e3/47/21/e34721b2-10c1-a36f-b904-ddd9b63db1ea/mzaf_17410533736535216988.plus.aac.p.m4a',
     durationSec: 330,
   },
   {
@@ -120,7 +120,7 @@ const COVER_FLOW_ALBUMS: CoverFlowTrack[] = [
     artist: 'Raju Singh, Sonu Nigam, Shreya Ghoshal',
     album: 'Raaz: The Mystery Continues',
     albumArt: ALBUM_POSTERS.soniyo,
-    url: 'https://ice1.somafm.com/groovesalad-128-mp3',
+    url: 'https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/19/51/ac/1951ac5b-81c8-72ea-ffe5-31e1a3369d9b/mzaf_17405745395809731793.plus.aac.p.m4a',
     durationSec: 312,
   },
   {
@@ -129,7 +129,7 @@ const COVER_FLOW_ALBUMS: CoverFlowTrack[] = [
     artist: 'Pritam, Mohit Chauhan & Arijit Singh',
     album: 'SoundCloud Discover Hits',
     albumArt: ALBUM_POSTERS.dooriyan,
-    url: 'https://raw.githubusercontent.com/rafaelreis-hotmart/Audio-Sample-files/master/sample.mp3',
+    url: 'https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/3a/fd/6c/3afd6c59-09a1-8587-795c-537fdb807e5f/mzaf_14422382797970666821.plus.aac.p.m4a',
     durationSec: 338,
     platform: 'soundcloud',
   },
@@ -139,7 +139,7 @@ const COVER_FLOW_ALBUMS: CoverFlowTrack[] = [
     artist: 'Mithoon, Arijit Singh, Sunidhi Chauhan',
     album: 'Shivaay',
     albumArt: ALBUM_POSTERS.darkhaast,
-    url: 'https://ice1.somafm.com/suburbsofgoa-128-mp3',
+    url: 'https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/b1/f1/bd/b1f1bd27-1711-1f5d-5093-e4a03f78f09c/mzaf_14087819254288091059.plus.aac.p.m4a',
     durationSec: 374,
   },
   {
@@ -148,7 +148,7 @@ const COVER_FLOW_ALBUMS: CoverFlowTrack[] = [
     artist: 'Pritam, Mohit Chauhan',
     album: 'Crook',
     albumArt: ALBUM_POSTERS.tujhkoJoPaaya,
-    url: 'https://ice1.somafm.com/secretagent-128-mp3',
+    url: 'https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/a7/83/48/a7834853-acd5-cd0c-ea9f-cabc6b9cbec6/mzaf_2556134586638453063.plus.aac.p.m4a',
     durationSec: 290,
   },
 ];
@@ -755,8 +755,9 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
     };
   }, [localMediaList]);
 
-  // Live dynamic online search across iTunes & streaming APIs when user searches
+  // Live dynamic online search across iTunes & streaming APIs when user searches (Race condition resilient)
   useEffect(() => {
+    let isCancelled = false;
     const q = searchQuery.trim();
     if (!q) {
       setLiveSearchedTracks([]);
@@ -765,17 +766,21 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
     const timer = setTimeout(() => {
       fetchOnlineMusicSearch(q, selectedMusicPlatform)
         .then((tracks) => {
-          if (tracks && tracks.length > 0) {
+          if (!isCancelled && tracks && tracks.length > 0) {
             setLiveSearchedTracks(tracks);
           }
         })
         .catch(() => {});
     }, 200);
-    return () => clearTimeout(timer);
+    return () => {
+      isCancelled = true;
+      clearTimeout(timer);
+    };
   }, [searchQuery, selectedMusicPlatform]);
 
-  // Live dynamic online search across CineSubz real movie database
+  // Live dynamic online search across CineSubz real movie database (Race condition resilient)
   useEffect(() => {
+    let isCancelled = false;
     const q = searchQuery.trim();
     if (!q || q.length < 2) {
       setLiveCinesubzMovies([]);
@@ -786,16 +791,21 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
     const timer = setTimeout(() => {
       searchCineSubzLive(q)
         .then((movies) => {
-          if (movies && movies.length > 0) {
+          if (!isCancelled && movies && movies.length > 0) {
             setLiveCinesubzMovies(movies);
           }
         })
         .catch(() => {})
         .finally(() => {
-          setIsSearchingCinesubz(false);
+          if (!isCancelled) {
+            setIsSearchingCinesubz(false);
+          }
         });
     }, 250);
-    return () => clearTimeout(timer);
+    return () => {
+      isCancelled = true;
+      clearTimeout(timer);
+    };
   }, [searchQuery]);
 
   // Determine effective section mode

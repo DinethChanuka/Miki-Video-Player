@@ -51,6 +51,19 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
   const [isLyricsOpen, setIsLyricsOpen] = useState(false);
   const [isQueueOpen, setIsQueueOpen] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const createdBlobUrlsRef = useRef<string[]>([]);
+
+  // Revoke created blob URLs on unmount to eliminate memory leaks
+  useEffect(() => {
+    return () => {
+      createdBlobUrlsRef.current.forEach((url) => {
+        try {
+          URL.revokeObjectURL(url);
+        } catch {}
+      });
+      createdBlobUrlsRef.current = [];
+    };
+  }, []);
 
   // Sync activeIndex with currentUri if playing a track from list or dynamic stream
   useEffect(() => {
@@ -104,6 +117,7 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
     const file = e.target.files?.[0];
     if (file) {
       const uri = URL.createObjectURL(file);
+      createdBlobUrlsRef.current.push(uri);
       const newTrack = {
         id: `local-${Date.now()}`,
         title: file.name.replace(/\.[^/.]+$/, ''),
