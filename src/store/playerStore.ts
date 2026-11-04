@@ -230,6 +230,12 @@ export interface PlayerStoreState {
   // Thumbnail stopped-point persistence
   saveCurrentThumbnail: (dataUrl: string) => void;
 
+  // Navigation & Category History Preservation
+  lastActiveNav: string;
+  setLastActiveNav: (nav: string) => void;
+  lastActiveCategory: string;
+  setLastActiveCategory: (category: string) => void;
+
   // Actions
   bootEngine: (preferred?: EngineType, videoEl?: HTMLVideoElement) => Promise<void>;
   handleStreamError: (error: PlayerErrorEnvelope) => Promise<void>;
@@ -600,6 +606,10 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
   setCurrentArtwork: (url) => set({ currentArtwork: url }),
   isMusicPlayerOpen: false,
   setMusicPlayerOpen: (open) => set({ isMusicPlayerOpen: open }),
+  lastActiveNav: 'browse',
+  setLastActiveNav: (nav) => set({ lastActiveNav: nav }),
+  lastActiveCategory: 'All',
+  setLastActiveCategory: (category) => set({ lastActiveCategory: category }),
 
   playNextMedia: async () => {
     const { recentMedia, currentUri, openMedia } = get();
@@ -1308,7 +1318,7 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
           currentTitle: resolvedTitle,
           currentArtwork: resolvedArtwork || null,
           activePlaybackMode: playbackMode,
-          isMusicPlayerOpen: playbackMode === 'music' ? true : get().isMusicPlayerOpen,
+          isMusicPlayerOpen: get().isMusicPlayerOpen,
           bookmarks: session.bookmarks,
           eqGainsDb: parsedEq,
           nightModeEnabled: session.preferences.nightModeEnabled,
@@ -1341,7 +1351,7 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
       currentTitle: resolvedTitle,
       currentArtwork: resolvedArtwork || null,
       activePlaybackMode: playbackMode,
-      isMusicPlayerOpen: playbackMode === 'music' ? true : get().isMusicPlayerOpen,
+      isMusicPlayerOpen: get().isMusicPlayerOpen,
       retryCount: 0,
       lastError: null,
       resumeBannerPositionMs: null,

@@ -28,3 +28,4 @@ describe('Website & HTML Stream Routing and Fallback Audit', () => {
     assert.match(code, /removeAttribute\(['"]crossOrigin['"]\)/, 'PlayerEngine must support removing crossOrigin on rejection');
   });
 });
+

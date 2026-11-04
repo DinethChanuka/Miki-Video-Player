@@ -64,6 +64,7 @@ export class ChunkedAudioStreamController {
   public static isAudioUrl(url: string): boolean {
     if (!url || typeof url !== 'string') return false;
     const clean = url.split('?')[0].toLowerCase();
+    const full = url.toLowerCase();
     return (
       clean.endsWith('.mp3') ||
       clean.endsWith('.ogg') ||
@@ -73,9 +74,17 @@ export class ChunkedAudioStreamController {
       clean.endsWith('.m4a') ||
       clean.endsWith('.weba') ||
       clean.endsWith('.opus') ||
-      url.includes('/mp3/') ||
-      url.includes('mythium') ||
-      url.includes('somafm.com')
+      full.includes('.mp3') ||
+      full.includes('.m4a') ||
+      full.includes('.aac') ||
+      full.includes('jamendo') ||
+      full.includes('soundcloud') ||
+      full.includes('audiomack') ||
+      full.includes('bandcamp') ||
+      full.includes('apple') ||
+      full.includes('/mp3/') ||
+      full.includes('mythium') ||
+      full.includes('somafm.com')
     );
   }
 
@@ -171,10 +180,10 @@ export class ChunkedAudioStreamController {
       el.addEventListener('loadeddata', onLoadedData, { once: true });
       el.addEventListener('loadedmetadata', onLoadedData, { once: true });
 
-      // Fallback timeout: if loadeddata doesn't fire in 600ms, proceed anyway so play() kicks off stream
+      // Fallback timeout: if loadeddata doesn't fire in 250ms, proceed anyway so play() kicks off stream
       setTimeout(() => {
         triggerReady();
-      }, 600);
+      }, 250);
 
       // Set source and initiate browser range-chunk pipeline
       el.src = url;

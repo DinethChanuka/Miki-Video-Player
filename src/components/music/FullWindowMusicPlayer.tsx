@@ -9,6 +9,7 @@ import {
   VolumeX,
   Sliders,
   X,
+  ChevronDown,
   ListMusic,
   MessageSquareText,
   Sparkles,
@@ -21,12 +22,14 @@ export interface FullWindowMusicPlayerProps {
   isOpen: boolean;
   onClose: () => void;
   onOpenEq?: () => void;
+  onStartWindowDrag?: (e: React.MouseEvent) => void;
 }
 
 export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
   isOpen,
   onClose,
   onOpenEq,
+  onStartWindowDrag,
 }) => {
   const currentUri = usePlayerStore((s) => s.currentUri);
   const currentTitle = usePlayerStore((s) => s.currentTitle);
@@ -193,6 +196,26 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
     return `${m}:${sec < 10 ? '0' : ''}${sec}`;
   };
 
+  const handleInternalWindowDrag = (e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || target.closest('input') || target.closest('label') || target.closest('a')) {
+      return;
+    }
+    if (onStartWindowDrag) {
+      onStartWindowDrag(e);
+      return;
+    }
+    if (
+      typeof window !== 'undefined' &&
+      (window as unknown as { webkit?: { messageHandlers?: { windowAction?: { postMessage: (msg: string) => void } } } }).webkit?.messageHandlers?.windowAction
+    ) {
+      (window as unknown as { webkit: { messageHandlers: { windowAction: { postMessage: (msg: string) => void } } } }).webkit.messageHandlers.windowAction.postMessage('startDrag');
+    } else if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
+      import('@tauri-apps/api/window').then(({ getCurrentWindow }) => getCurrentWindow().startDragging()).catch(() => {});
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -200,9 +223,17 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
       {/* Background Visualizer Canvas */}
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none" />
 
-      {/* Top Header Bar */}
-      <div className="relative z-10 w-full h-14 flex items-center justify-between px-6 border-b border-white/10 bg-slate-950/60 backdrop-blur-xl">
-        <div className="flex items-center gap-3">
+      {/* Top Header Bar with Borderless Window Dragging */}
+      <div
+        data-tauri-drag-region
+        onMouseDown={handleInternalWindowDrag}
+        className="relative z-10 w-full h-14 flex items-center justify-between px-6 border-b border-white/10 bg-slate-950/60 backdrop-blur-xl select-none cursor-default"
+        style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+      >
+        <div
+          className="flex items-center gap-3"
+          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+        >
           <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-cyan-500 to-purple-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
             <Music className="w-4 h-4 text-white" />
           </div>
@@ -217,7 +248,10 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div
+          className="flex items-center gap-2.5"
+          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+        >
           <label className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/10 text-xs font-semibold text-white/80 hover:text-white cursor-pointer transition-all active:scale-95">
             <FolderOpen className="w-3.5 h-3.5 text-cyan-400" />
             <span>Open Audio File</span>
@@ -256,6 +290,16 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
 
           <div className="w-[1px] h-4 bg-white/15 mx-1" />
 
+          {/* Minimize back to persistent Music Control Hub without terminating playback */}
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-xl bg-white/5 hover:bg-white/20 text-white/70 hover:text-white border border-white/10 flex items-center justify-center transition-all cursor-pointer"
+            title="Minimize to System Music Hub"
+          >
+            <ChevronDown className="w-4 h-4" />
+          </button>
+
+          {/* Stop playback and close */}
           <button
             onClick={() => {
               onClose();

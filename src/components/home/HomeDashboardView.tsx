@@ -290,8 +290,27 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
   onOpenEq,
   onOpenLocalFile,
 }) => {
-  const [activeNav, setActiveNav] = useState<HomeNavTab>('browse');
-  const [activeCategory, setActiveCategory] = useState<HomeViewCategory>('All');
+  const lastActiveNav = usePlayerStore((s) => s.lastActiveNav);
+  const setLastActiveNav = usePlayerStore((s) => s.setLastActiveNav);
+  const lastActiveCategory = usePlayerStore((s) => s.lastActiveCategory);
+  const setLastActiveCategory = usePlayerStore((s) => s.setLastActiveCategory);
+
+  const [activeNav, setActiveNavState] = useState<HomeNavTab>(
+    ((lastActiveNav as HomeNavTab) || 'browse')
+  );
+  const [activeCategory, setActiveCategoryState] = useState<HomeViewCategory>(
+    ((lastActiveCategory as HomeViewCategory) || 'All')
+  );
+
+  const setActiveNav = (nav: HomeNavTab) => {
+    setActiveNavState(nav);
+    setLastActiveNav(nav);
+  };
+
+  const setActiveCategory = (cat: HomeViewCategory) => {
+    setActiveCategoryState(cat);
+    setLastActiveCategory(cat);
+  };
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isSearchFocused, setIsSearchFocused] = useState<boolean>(false);
   const [isRefreshingMusic, setIsRefreshingMusic] = useState<boolean>(false);
@@ -544,7 +563,6 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
     if (track) {
       openMedia(track.url, `${track.title} - ${track.artist}`, true, 0, track.albumArt);
       setIsCoverFlowPlaying(true);
-      if (onOpenMusic) onOpenMusic();
     }
   };
 
@@ -1020,7 +1038,6 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                           onClick={() => {
                             if (track.streamUrl) {
                               openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl);
-                              if (onOpenMusic) onOpenMusic();
                               setIsSearchFocused(false);
                             }
                           }}
@@ -1057,7 +1074,6 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                                 e.stopPropagation();
                                 if (track.streamUrl) {
                                   openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl);
-                                  if (onOpenMusic) onOpenMusic();
                                   setIsSearchFocused(false);
                                 }
                               }}
@@ -1184,6 +1200,19 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                     opacity = Math.max(0.3, 0.9 - offset * 0.2);
                   }
 
+                  const displayCover =
+                    isCenter && previouslyPlayed?.thumbnailUri
+                      ? previouslyPlayed.thumbnailUri
+                      : album.albumArt;
+                  const displayTitle =
+                    isCenter && previouslyPlayed?.title
+                      ? previouslyPlayed.title
+                      : album.title;
+                  const displayArtist =
+                    isCenter && previouslyPlayed
+                      ? 'Resume Playback • Recent Media'
+                      : album.artist;
+
                   return (
                     <div
                       key={album.id}
@@ -1197,15 +1226,15 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                       }}
                     >
                       <img
-                        src={album.albumArt}
-                        alt={album.title}
+                        src={displayCover}
+                        alt={displayTitle}
                         referrerPolicy="no-referrer"
                         className="w-full h-full object-cover"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex items-end p-3">
                         <div>
-                          <h4 className="text-xs font-bold text-white truncate">{album.title}</h4>
-                          <p className="text-[10px] text-white/60 truncate">{album.artist}</p>
+                          <h4 className="text-xs font-bold text-white truncate">{displayTitle}</h4>
+                          <p className="text-[10px] text-white/60 truncate">{displayArtist}</p>
                         </div>
                       </div>
                     </div>
@@ -1259,7 +1288,6 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                           previouslyPlayed.thumbnailUri
                         );
                         setIsCoverFlowPlaying(true);
-                        if (onOpenMusic) onOpenMusic();
                       } else {
                         handlePlayAlbum(activeAlbumIdx);
                       }
@@ -1447,7 +1475,6 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                             onClick={() => {
                               if (track.streamUrl) {
                                 openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl);
-                                if (onOpenMusic) onOpenMusic();
                               }
                             }}
                             className="group relative flex flex-col rounded-2xl bg-white/5 border border-white/10 overflow-hidden hover:border-emerald-500/50 hover:bg-white/10 transition-all shadow-xl hover:shadow-2xl cursor-pointer"
@@ -1488,7 +1515,6 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                                     e.stopPropagation();
                                     if (track.streamUrl) {
                                       openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl);
-                                      if (onOpenMusic) onOpenMusic();
                                     }
                                   }}
                                   className="w-11 h-11 rounded-full bg-white text-black hover:scale-110 flex items-center justify-center shadow-xl transition-all cursor-pointer"
@@ -1525,7 +1551,6 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                                     e.stopPropagation();
                                     if (track.streamUrl) {
                                       openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl);
-                                      if (onOpenMusic) onOpenMusic();
                                     }
                                   }}
                                   className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-emerald-600/80 hover:bg-emerald-500 hover:scale-[1.02] text-white text-[10px] font-bold shadow-md transition-all cursor-pointer"

@@ -75,3 +75,4 @@ describe('Default SoundCloud Music, Previously Played Display & Live Preview Sea
     );
   });
 });
+

@@ -21,6 +21,7 @@ import { SubtitleOverlay } from './components/player/SubtitleOverlay';
 import { ApplicationMenu } from './components/hud/ApplicationMenu';
 import { GmailSignInModal } from './components/hud/GmailSignInModal';
 import { FullWindowMusicPlayer } from './components/music/FullWindowMusicPlayer';
+import { PersistentMusicControlHub } from './components/hud/PersistentMusicControlHub';
 import { FullWindowDashboard } from './components/dashboard/FullWindowDashboard';
 import { HomeDashboardView } from './components/home/HomeDashboardView';
 import { parseWebStream, isDirectMediaUrl, WebPlatform } from './utils/webStreamUtils';
@@ -606,13 +607,13 @@ export const App: React.FC = () => {
           className="flex items-center gap-3"
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
-          {currentUri ? (
+          {currentUri && activePlaybackMode === 'video' ? (
             <button
               onClick={() => {
                 captureCurrentVideoFrame();
                 closeMedia();
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-white/5 hover:bg-white/15 border border-white/10 text-xs font-semibold text-white/90 hover:text-white transition-all active:scale-95 shadow-sm"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-white/5 hover:bg-white/15 border border-white/10 text-xs font-semibold text-white/90 hover:text-white transition-all active:scale-95 shadow-sm cursor-pointer"
               title="Return to Library / Home"
             >
               <ArrowLeft className="w-3.5 h-3.5 text-cyan-400" />
@@ -1015,7 +1016,7 @@ export const App: React.FC = () => {
         )}
 
         {/* Complete Home Streaming Dashboard (Netflix + Adze.DESIGN + Apple Cover Flow 3D) */}
-        {!currentUri && (
+        {(!currentUri && (activePlaybackMode !== 'video' || !currentUri) || (activePlaybackMode === 'music' && !isMusicPlayerOpen)) && (
           <div className="absolute inset-0 z-30 pointer-events-auto animate-in fade-in duration-300 overflow-hidden">
             <HomeDashboardView
               onOpenGames={(gameId) => {
@@ -1095,19 +1096,22 @@ export const App: React.FC = () => {
         )}
 
         {/* Glassmorphic Controls Overlay (for native/local/HLS video & streams) */}
-        {currentUri && !activeWebStream && (
+        {currentUri && !activeWebStream && activePlaybackMode === 'video' && (
           <ControlsOverlay
             onOpenEq={() => setIsEqOpen(true)}
             onOpenSettings={() => setIsSettingsOpen(true)}
             onOpenFileBrowser={() => {
-              if (activePlaybackMode === 'music') {
-                setMusicPlayerOpen(true);
-              } else {
-                setIsDashboardOpen(true);
-              }
+              setIsDashboardOpen(true);
             }}
             containerRef={containerRef}
             isVisible={areControlsVisible}
+          />
+        )}
+
+        {/* Persistent System-Wide Music Control Hub (Active across all sections) */}
+        {currentUri && (activePlaybackMode === 'music' || activePlaybackMode === 'radio') && !isMusicPlayerOpen && (
+          <PersistentMusicControlHub
+            onOpenStudio={() => setMusicPlayerOpen(true)}
           />
         )}
       </div>
@@ -1171,6 +1175,7 @@ export const App: React.FC = () => {
           isOpen={isMusicPlayerOpen}
           onClose={() => setMusicPlayerOpen(false)}
           onOpenEq={() => setIsEqOpen(true)}
+          onStartWindowDrag={handleStartWindowDrag}
         />
       </ErrorBoundary>
 
