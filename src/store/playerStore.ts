@@ -206,6 +206,14 @@ export interface PlayerStoreState {
   setSuperResolution: (mode: VideoShaderConfig['superResolution']) => void;
   setSplitCompare: (enabled: boolean, position?: number) => void;
 
+  // Playback Mode & Music Studio Routing
+  activePlaybackMode: 'video' | 'music' | 'radio';
+  setActivePlaybackMode: (mode: 'video' | 'music' | 'radio') => void;
+  currentArtwork: string | null;
+  setCurrentArtwork: (url: string | null) => void;
+  isMusicPlayerOpen: boolean;
+  setMusicPlayerOpen: (open: boolean) => void;
+
   // Track & Playlist Navigation
   playNextMedia: () => Promise<void>;
   playPreviousMedia: () => Promise<void>;
@@ -576,6 +584,14 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
       ...(position !== undefined ? { splitComparePosition: position } : {}),
     });
   },
+
+  activePlaybackMode: 'video',
+  setActivePlaybackMode: (mode) => set({ activePlaybackMode: mode }),
+  currentArtwork: null,
+  setCurrentArtwork: (url) => set({ currentArtwork: url }),
+  isMusicPlayerOpen: false,
+  setMusicPlayerOpen: (open) => set({ isMusicPlayerOpen: open }),
+
   playNextMedia: async () => {
     const { recentMedia, currentUri, openMedia } = get();
     if (recentMedia.length <= 1) return;
@@ -1109,6 +1125,13 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     const resolvedTitle = title ?? extractCleanFileName(uri);
     let startPos = startPositionMs ?? 0;
     const resolvedArtwork = lookupArtwork(uri, resolvedTitle, artworkUrl);
+    const isAudio =
+      /\.(?:mp3|ogg|flac|wav|aac|m4a|weba|opus)(?:\?|$)/i.test(uri) ||
+      uri.includes('/mp3/') ||
+      uri.includes('mythium') ||
+      uri.includes('somafm.com') ||
+      Boolean(artworkUrl);
+    const playbackMode = isAudio ? 'music' : (get().activePlaybackMode === 'radio' ? 'radio' : 'video');
 
     // Check if it's an external web stream (YouTube, TikTok, Instagram, Vimeo, Twitch, Dailymotion, Cinema portals or Web stream)
     const webStream = parseWebStream(uri);
@@ -1195,6 +1218,8 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
       set({
         currentUri: uri,
         currentTitle: webHistoryItem.title,
+        currentArtwork: defaultThumb || null,
+        activePlaybackMode: 'video',
         positionMs: startPos,
         durationMs: existingWeb?.durationMs || 0,
         retryCount: 0,
@@ -1272,6 +1297,9 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
           currentMediaId: session.mediaId,
           currentUri: uri,
           currentTitle: resolvedTitle,
+          currentArtwork: resolvedArtwork || null,
+          activePlaybackMode: playbackMode,
+          isMusicPlayerOpen: playbackMode === 'music' ? true : get().isMusicPlayerOpen,
           bookmarks: session.bookmarks,
           eqGainsDb: parsedEq,
           nightModeEnabled: session.preferences.nightModeEnabled,
@@ -1302,6 +1330,9 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     set({
       currentUri: uri,
       currentTitle: resolvedTitle,
+      currentArtwork: resolvedArtwork || null,
+      activePlaybackMode: playbackMode,
+      isMusicPlayerOpen: playbackMode === 'music' ? true : get().isMusicPlayerOpen,
       retryCount: 0,
       lastError: null,
       resumeBannerPositionMs: null,
@@ -1358,6 +1389,9 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
       currentUri: null,
       currentTitle: '',
       currentMediaId: null,
+      currentArtwork: null,
+      activePlaybackMode: 'video',
+      isMusicPlayerOpen: false,
       positionMs: 0,
       durationMs: 0,
       isPaused: true,

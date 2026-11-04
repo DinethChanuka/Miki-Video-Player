@@ -29,6 +29,8 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
   onOpenEq,
 }) => {
   const currentUri = usePlayerStore((s) => s.currentUri);
+  const currentTitle = usePlayerStore((s) => s.currentTitle);
+  const currentArtwork = usePlayerStore((s) => s.currentArtwork);
   const isPaused = usePlayerStore((s) => s.isPaused);
   const positionMs = usePlayerStore((s) => s.positionMs);
   const durationMs = usePlayerStore((s) => s.durationMs);
@@ -39,6 +41,7 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
   const togglePlay = usePlayerStore((s) => s.togglePlay);
   const seek = usePlayerStore((s) => s.seek);
   const openMedia = usePlayerStore((s) => s.openMedia);
+  const closeMedia = usePlayerStore((s) => s.closeMedia);
 
   const [tracks, setTracks] = useState(FEATURED_MUSIC_TRACKS);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -46,15 +49,29 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
   const [isQueueOpen, setIsQueueOpen] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  // Sync activeIndex with currentUri if playing a track from list
+  // Sync activeIndex with currentUri if playing a track from list or dynamic stream
   useEffect(() => {
     if (currentUri) {
       const idx = tracks.findIndex((t) => t.url === currentUri);
       if (idx !== -1) {
         setActiveIndex(idx);
+      } else if (currentTitle) {
+        const parts = currentTitle.split(' - ');
+        const title = parts[0]?.trim() || currentTitle;
+        const artist = parts[1]?.trim() || 'Featured Artist';
+        const newTrack = {
+          id: `current-${Date.now()}`,
+          title,
+          artist,
+          url: currentUri,
+          durationSec: durationMs ? Math.floor(durationMs / 1000) : 210,
+          albumArt: currentArtwork || 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=500&auto=format&fit=crop&q=80',
+        };
+        setTracks((prev) => [newTrack, ...prev.filter((t) => t.url !== currentUri)]);
+        setActiveIndex(0);
       }
     }
-  }, [currentUri, tracks]);
+  }, [currentUri, currentTitle, currentArtwork, durationMs, tracks]);
 
   const activeTrack = tracks[activeIndex] || tracks[0];
 
@@ -240,8 +257,11 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
           <div className="w-[1px] h-4 bg-white/15 mx-1" />
 
           <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-xl bg-white/5 hover:bg-rose-500/30 text-white/70 hover:text-rose-200 border border-white/10 flex items-center justify-center transition-all"
+            onClick={() => {
+              onClose();
+              closeMedia();
+            }}
+            className="w-8 h-8 rounded-xl bg-white/5 hover:bg-rose-500/30 text-white/70 hover:text-rose-200 border border-white/10 flex items-center justify-center transition-all cursor-pointer"
             title="Close Full-Window Music Player"
           >
             <X className="w-4 h-4" />
