@@ -19,7 +19,9 @@ export interface HlsStreamControllerConfig {
 export class HlsStreamController {
   private hls: Hls | null = null;
   private networkRetryCount: number = 0;
+  private mediaRetryCount: number = 0;
   private maxNetworkRetries: number;
+  private maxMediaRetries: number = 2;
   private onFatalError?: (diagnostic: StreamDiagnosticResult) => void;
   private onManifestParsed?: () => void;
   private onLevelChanged?: (level: number) => void;
@@ -233,7 +235,19 @@ export class HlsStreamController {
             }
             break;
           case Hls.ErrorTypes.MEDIA_ERROR:
-            this.hls?.recoverMediaError();
+            if (this.mediaRetryCount < this.maxMediaRetries) {
+              this.mediaRetryCount++;
+              if (this.mediaRetryCount === 1) {
+                this.hls?.recoverMediaError();
+              } else {
+                this.hls?.swapAudioCodec();
+                this.hls?.recoverMediaError();
+              }
+            } else {
+              this.destroy();
+              const diag = diagnoseStreamFailure(data.details || 'mediaError', undefined, uri);
+              if (this.onFatalError) this.onFatalError(diag);
+            }
             break;
           default:
             this.destroy();
@@ -253,5 +267,6 @@ export class HlsStreamController {
       this.hls = null;
     }
     this.networkRetryCount = 0;
+    this.mediaRetryCount = 0;
   }
 }

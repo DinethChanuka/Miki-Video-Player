@@ -97,7 +97,7 @@ const COVER_FLOW_ALBUMS: CoverFlowTrack[] = [
     artist: 'Vishal-Shekhar, Shafqat Amanat Ali',
     album: 'I Hate Luv Storys',
     albumArt: ALBUM_POSTERS.binTere,
-    url: 'https://cdn.freesound.org/previews/612/612627_5674468-lq.mp3',
+    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
     durationSec: 330,
   },
   {
@@ -106,7 +106,7 @@ const COVER_FLOW_ALBUMS: CoverFlowTrack[] = [
     artist: 'Raju Singh, Sonu Nigam, Shreya Ghoshal',
     album: 'Raaz: The Mystery Continues',
     albumArt: ALBUM_POSTERS.soniyo,
-    url: 'https://cdn.freesound.org/previews/615/615483_11861866-lq.mp3',
+    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
     durationSec: 312,
   },
   {
@@ -115,7 +115,7 @@ const COVER_FLOW_ALBUMS: CoverFlowTrack[] = [
     artist: 'Pritam, Mohit Chauhan',
     album: 'Love Aaj Kal',
     albumArt: ALBUM_POSTERS.dooriyan,
-    url: 'https://cdn.freesound.org/previews/530/530704_11861866-lq.mp3',
+    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
     durationSec: 338,
   },
   {
@@ -124,7 +124,7 @@ const COVER_FLOW_ALBUMS: CoverFlowTrack[] = [
     artist: 'Mithoon, Arijit Singh, Sunidhi Chauhan',
     album: 'Shivaay',
     albumArt: ALBUM_POSTERS.darkhaast,
-    url: 'https://cdn.freesound.org/previews/530/530704_11861866-lq.mp3',
+    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3',
     durationSec: 374,
   },
   {
@@ -133,7 +133,7 @@ const COVER_FLOW_ALBUMS: CoverFlowTrack[] = [
     artist: 'Pritam, Mohit Chauhan',
     album: 'Crook',
     albumArt: ALBUM_POSTERS.tujhkoJoPaaya,
-    url: 'https://cdn.freesound.org/previews/612/612627_5674468-lq.mp3',
+    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3',
     durationSec: 290,
   },
 ];
@@ -462,7 +462,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
     setActiveAlbumIdx(idx);
     const track = COVER_FLOW_ALBUMS[idx];
     if (track) {
-      openMedia(track.url, `${track.title} - ${track.artist}`);
+      openMedia(track.url, `${track.title} - ${track.artist}`, true, 0, track.albumArt);
       setIsCoverFlowPlaying(true);
     }
   };
@@ -1247,7 +1247,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                               <button
                                 onClick={() => {
                                   if (track.streamUrl) {
-                                    openMedia(track.streamUrl, `${track.title} - ${track.artist}`);
+                                    openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl);
                                   } else if (onOpenWebBrowser) {
                                     onOpenWebBrowser(track.pageUrl);
                                   }
@@ -1284,7 +1284,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                               <button
                                 onClick={() => {
                                   if (track.streamUrl) {
-                                    openMedia(track.streamUrl, `${track.title} - ${track.artist}`);
+                                    openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl);
                                   } else if (onOpenWebBrowser) {
                                     onOpenWebBrowser(track.pageUrl);
                                   }
@@ -1345,7 +1345,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                     <button
                       onClick={() => {
                         const station = INTERNET_MUSIC_STREAMS[0];
-                        if (station) openMedia(station.streamUrl, `${station.title} - ${station.artist}`, false);
+                        if (station) openMedia(station.streamUrl, `${station.title} - ${station.artist}`, false, 0, station.logoUrl);
                       }}
                       className="px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs flex items-center gap-2 shadow-lg shadow-cyan-500/30 transition-all cursor-pointer"
                     >
@@ -1382,7 +1382,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                 {filteredRadioStations.map((station: InternetMusicStation) => (
                   <div
                     key={station.id}
-                    onClick={() => openMedia(station.streamUrl, `${station.title} - ${station.artist}`, false)}
+                    onClick={() => openMedia(station.streamUrl, `${station.title} - ${station.artist}`, false, 0, station.logoUrl)}
                     className="group flex items-center gap-3.5 p-3.5 rounded-2xl bg-white/5 border border-white/10 hover:border-cyan-500/50 hover:bg-white/10 transition-all cursor-pointer shadow-lg"
                   >
                     <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0 bg-black/40 border border-white/10">
@@ -2251,15 +2251,22 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                         className="group relative flex flex-col rounded-2xl overflow-hidden bg-white/5 border border-white/10 hover:border-rose-400/50 hover:bg-white/10 transition-all cursor-pointer shadow-lg"
                       >
                         <div className="relative aspect-video w-full overflow-hidden bg-black/60">
-                          {item.thumbnailUri ? (
+                          {item.thumbnailUri && !item.thumbnailUri.includes('google.com/s2/favicons') ? (
                             <img
                               src={item.thumbnailUri}
                               alt={item.title}
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                             />
                           ) : (
-                            <div className="w-full h-full flex items-center justify-center bg-slate-900 text-white/30">
-                              <Film className="w-6 h-6" />
+                            <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 text-white/40 gap-1.5 p-2">
+                              {item.thumbnailUri ? (
+                                <img src={item.thumbnailUri} alt="" className="w-7 h-7 rounded-lg object-contain bg-black/40 p-1 border border-white/10" />
+                              ) : (
+                                <Film className="w-6 h-6 text-rose-400" />
+                              )}
+                              <span className="text-[10px] text-white/60 font-medium truncate max-w-full text-center px-1">
+                                {item.title}
+                              </span>
                             </div>
                           )}
                           <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">

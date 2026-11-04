@@ -12,6 +12,7 @@ import {
   VideoShaderConfig,
   parsePlayerError,
 } from '../core/PlayerEngine';
+import { MediaEngineRouter } from '../core/MediaEngineRouter';
 import { PlayerThemeId } from '../types/theme';
 import {
   SpatialAudioEngine,
@@ -34,10 +35,41 @@ import {
   extractCleanFileName,
 } from '../utils/pathUtils';
 import { parseWebStream, isDirectMediaUrl, WebPlatform } from '../utils/webStreamUtils';
-import { getChannelByUri, getChannelBackupUrl, getChannelByName } from '../utils/channelCatalog';
+import { getChannelByUri, getChannelBackupUrl, getChannelByName, CURATED_CHANNELS } from '../utils/channelCatalog';
 import { StreamFailoverManager } from '../core/StreamFailoverManager.ts';
+import { ALBUM_POSTERS } from '../utils/mediaPosters';
+import { CINESUBZ_MOVIES } from '../utils/cinesubzService';
 
 let activeFailoverManager: StreamFailoverManager | null = null;
+
+export function lookupArtwork(uri: string, title?: string, explicitArtwork?: string): string | undefined {
+  if (explicitArtwork) return explicitArtwork;
+  if (!uri) return undefined;
+
+  // 1. Channel catalog matching
+  const ch = CURATED_CHANNELS.find(
+    (c) => c.streamUrl === uri || (title && c.name.toLowerCase() === title.toLowerCase())
+  );
+  if (ch?.logo) return ch.logo;
+
+  // 2. Known music tracks and albums
+  const lowerTitle = (title || '').toLowerCase();
+  const lowerUri = uri.toLowerCase();
+  if (lowerTitle.includes('dooriyan') || lowerUri.includes('dooriyan')) return ALBUM_POSTERS.dooriyan;
+  if (lowerTitle.includes('soniyo') || lowerUri.includes('soniyo')) return ALBUM_POSTERS.soniyo;
+  if (lowerTitle.includes('bin tere') || lowerUri.includes('bin tere')) return ALBUM_POSTERS.binTere;
+  if (lowerTitle.includes('darkhaast') || lowerUri.includes('darkhaast')) return ALBUM_POSTERS.darkhaast;
+  if (lowerTitle.includes('tujhko') || lowerUri.includes('tujhko')) return ALBUM_POSTERS.tujhkoJoPaaya;
+
+  // 3. CineSubz movies
+  const movie = CINESUBZ_MOVIES.find(
+    (m) => m.watchUrl === uri || m.downloadUrl === uri || (title && m.title.toLowerCase() === title.toLowerCase())
+  );
+  if (movie?.posterUrl) return movie.posterUrl;
+  if (movie?.remotePosterUrl) return movie.remotePosterUrl;
+
+  return undefined;
+}
 
 export interface MediaHistoryItem {
   mediaId: string;
@@ -110,6 +142,7 @@ export interface MediaSessionBundle {
 export interface PlayerStoreState {
   // Engine & Media Identity
   engine: IPlayerEngine | null;
+  router: MediaEngineRouter | null;
   activeEngineType: EngineType;
   currentSessionId: string;
   currentMediaId: string | null;
@@ -133,6 +166,9 @@ export interface PlayerStoreState {
   // Audio DSP & Shaders
   eqGainsDb: number[];
   nightModeEnabled: boolean;
+  dspBypass: boolean;
+  setDspBypass: (bypass: boolean) => void;
+  toggleDspBypass: () => void;
   shaderConfig: VideoShaderConfig;
 
   // Themes & Customization
@@ -180,7 +216,7 @@ export interface PlayerStoreState {
   // Actions
   bootEngine: (preferred?: EngineType, videoEl?: HTMLVideoElement) => Promise<void>;
   handleStreamError: (error: PlayerErrorEnvelope) => Promise<void>;
-  openMedia: (uri: string, title?: string, autoResume?: boolean, startPositionMs?: number) => Promise<void>;
+  openMedia: (uri: string, title?: string, autoResume?: boolean, startPositionMs?: number, artworkUrl?: string) => Promise<void>;
   closeMedia: () => Promise<void>;
   togglePlay: () => Promise<void>;
   seek: (timestampMs: number, exact?: boolean) => Promise<void>;
@@ -445,6 +481,7 @@ let sessionCounter = 0;
 
 export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
   engine: null,
+  router: null,
   activeEngineType: isTauriRuntime() ? 'tauri-mpv' : 'web-media',
   currentSessionId: 'session_initial',
   currentMediaId: null,
@@ -466,6 +503,19 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
 
   eqGainsDb: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
   nightModeEnabled: false,
+  dspBypass: false,
+  setDspBypass: (bypass: boolean) => {
+    set({ dspBypass: bypass });
+    get().router?.setDspBypass(bypass);
+    const engine = get().engine;
+    if (engine && 'setDspBypass' in engine) {
+      (engine as { setDspBypass?: (b: boolean) => void }).setDspBypass?.(bypass);
+    }
+  },
+  toggleDspBypass: () => {
+    const next = !get().dspBypass;
+    get().setDspBypass(next);
+  },
   shaderConfig: {
     ambientGlowEnabled: true,
     brightness: 0,
@@ -850,6 +900,13 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     const current = get().engine;
     if (current) await current.destroy();
 
+    const router = new MediaEngineRouter();
+    router.setDspBypass(get().dspBypass);
+    try {
+      await router.initialize(videoEl);
+    } catch {}
+    set({ router });
+
     const targetType: EngineType =
       preferred ?? (isTauriRuntime() ? 'tauri-mpv' : 'web-media');
 
@@ -858,6 +915,9 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
 
     if (engine && 'attachSpatialAudio' in engine) {
       (engine as { attachSpatialAudio: (s: any) => void }).attachSpatialAudio(get().spatialAudio);
+    }
+    if (engine && 'setDspBypass' in engine) {
+      (engine as { setDspBypass: (b: boolean) => void }).setDspBypass(get().dspBypass);
     }
 
     engine.onTelemetry((telemetry: PlaybackTelemetry) => {
@@ -1037,7 +1097,7 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     }
   },
 
-  openMedia: async (uri, title, autoResume = true, startPositionMs?: number) => {
+  openMedia: async (uri, title, autoResume = true, startPositionMs?: number, artworkUrl?: string) => {
     // Invalidate prior sessions and cancel any pending retry timeouts
     if (activeRetryTimer) {
       clearTimeout(activeRetryTimer);
@@ -1048,6 +1108,7 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
 
     const resolvedTitle = title ?? extractCleanFileName(uri);
     let startPos = startPositionMs ?? 0;
+    const resolvedArtwork = lookupArtwork(uri, resolvedTitle, artworkUrl);
 
     // Check if it's an external web stream (YouTube, TikTok, Instagram, Vimeo, Twitch, Dailymotion, Cinema portals or Web stream)
     const webStream = parseWebStream(uri);
@@ -1080,9 +1141,7 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
 
       const defaultThumb = activeWebStream.platform === 'youtube' && activeWebStream.id
         ? `https://img.youtube.com/vi/${activeWebStream.id}/mqdefault.jpg`
-        : isHttp
-        ? getWebsiteFaviconUrl(uri, 128)
-        : undefined;
+        : resolvedArtwork || (isHttp ? getWebsiteFaviconUrl(uri, 128) : undefined);
 
       const webHistoryItem: MediaHistoryItem = {
         mediaId: uri,
@@ -1173,7 +1232,7 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
       startPos = autoResume ? savedPos : 0;
     }
     const domain = isHttp ? extractDomain(uri) : undefined;
-    const defaultThumb = isHttp ? getWebsiteFaviconUrl(uri, 128) : undefined;
+    const defaultThumb = resolvedArtwork || (isHttp ? getWebsiteFaviconUrl(uri, 128) : undefined);
     const mediaId = uri;
     const newHistoryItem: MediaHistoryItem = {
       mediaId,
