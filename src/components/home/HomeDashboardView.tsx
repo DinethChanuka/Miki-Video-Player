@@ -7,6 +7,7 @@ import { INTERNET_MUSIC_STREAMS, InternetMusicStation } from '../../utils/musicS
 import { MOVIE_POSTERS, ALBUM_POSTERS } from '../../utils/mediaPosters';
 import { HERO_ARTWORKS } from '../../utils/heroArtworks';
 import { CINESUBZ_MOVIES, fetchLatestCineSubzMovies, CineSubzMovie } from '../../utils/cinesubzService';
+import { CINESUBZ_TV_SHOWS, fetchLatestCineSubzTvShows, CineSubzTvShow } from '../../utils/cinesubzTvService';
 import {
   Film,
   Play,
@@ -144,7 +145,7 @@ const RECOMMENDED_MOVIES: MovieItem[] = [
     genre: 'Sci-Fi, Mystery',
     duration: '2h 15min',
     image: MOVIE_POSTERS.soulConductor,
-    url: 'https://cinesubz.co',
+    url: 'https://cinesubz.lk',
   },
   {
     id: 'spider-man',
@@ -154,7 +155,7 @@ const RECOMMENDED_MOVIES: MovieItem[] = [
     genre: 'Animation, Action',
     duration: '2h 20min',
     image: MOVIE_POSTERS.spiderMan,
-    url: 'https://cinesubz.co',
+    url: 'https://cinesubz.lk',
   },
   {
     id: 'harry-potter',
@@ -164,7 +165,7 @@ const RECOMMENDED_MOVIES: MovieItem[] = [
     genre: 'Fantasy, Adventure',
     duration: '2h 10min',
     image: MOVIE_POSTERS.harryPotter,
-    url: 'https://cinesubz.co',
+    url: 'https://cinesubz.lk',
   },
   {
     id: 'interstellar',
@@ -174,7 +175,7 @@ const RECOMMENDED_MOVIES: MovieItem[] = [
     genre: 'Sci-Fi, Adventure',
     duration: '2h 49min',
     image: MOVIE_POSTERS.interstellar,
-    url: 'https://cinesubz.co',
+    url: 'https://cinesubz.lk',
   },
   {
     id: 'inception',
@@ -184,7 +185,7 @@ const RECOMMENDED_MOVIES: MovieItem[] = [
     genre: 'Sci-Fi, Action',
     duration: '2h 28min',
     image: MOVIE_POSTERS.inception,
-    url: 'https://cinesubz.co',
+    url: 'https://cinesubz.lk',
   },
   {
     id: 'tenet',
@@ -194,7 +195,7 @@ const RECOMMENDED_MOVIES: MovieItem[] = [
     genre: 'Sci-Fi, Action',
     duration: '2h 30min',
     image: MOVIE_POSTERS.tenet,
-    url: 'https://cinesubz.co',
+    url: 'https://cinesubz.lk',
   },
   {
     id: 'mortal-engines',
@@ -204,7 +205,7 @@ const RECOMMENDED_MOVIES: MovieItem[] = [
     genre: 'Sci-Fi, Action',
     duration: '2h 08min',
     image: MOVIE_POSTERS.mortalEngines,
-    url: 'https://cinesubz.co',
+    url: 'https://cinesubz.lk',
   },
   {
     id: 'wonder-woman',
@@ -214,7 +215,7 @@ const RECOMMENDED_MOVIES: MovieItem[] = [
     genre: 'Action, Fantasy',
     duration: '2h 21min',
     image: MOVIE_POSTERS.wonderWoman,
-    url: 'https://cinesubz.co',
+    url: 'https://cinesubz.lk',
   },
 ];
 
@@ -235,7 +236,7 @@ const ADZE_PARTIES: PartyItem[] = [
     genre: 'Science Fiction, Fantasy',
     viewers: '+4 friends watching',
     image: MOVIE_POSTERS.spiderMan,
-    url: 'https://cinesubz.co',
+    url: 'https://cinesubz.lk',
   },
   {
     id: 'party-wonderwoman',
@@ -243,7 +244,7 @@ const ADZE_PARTIES: PartyItem[] = [
     genre: 'Adventure, Action',
     viewers: '+7 friends watching',
     image: MOVIE_POSTERS.wonderWoman,
-    url: 'https://cinesubz.co',
+    url: 'https://cinesubz.lk',
   },
   {
     id: 'party-mortalengines',
@@ -251,7 +252,7 @@ const ADZE_PARTIES: PartyItem[] = [
     genre: 'Science Fiction, Suspense',
     viewers: '+3 friends watching',
     image: MOVIE_POSTERS.mortalEngines,
-    url: 'https://cinesubz.co',
+    url: 'https://cinesubz.lk',
   },
   {
     id: 'party-rampage',
@@ -259,7 +260,7 @@ const ADZE_PARTIES: PartyItem[] = [
     genre: 'Adventure, Action',
     viewers: '+9 friends watching',
     image: MOVIE_POSTERS.rampage,
-    url: 'https://cinesubz.co',
+    url: 'https://cinesubz.lk',
   },
 ];
 
@@ -282,6 +283,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
   const [partiesToggle, setPartiesToggle] = useState<boolean>(true);
   const [continueToggle, setContinueToggle] = useState<boolean>(true);
   const [cinesubzList, setCinesubzList] = useState<CineSubzMovie[]>(CINESUBZ_MOVIES);
+  const [cinesubzTvList, setCinesubzTvList] = useState<CineSubzTvShow[]>(CINESUBZ_TV_SHOWS);
 
   // Background auto-refresh for latest CineSubz releases
   useEffect(() => {
@@ -289,6 +291,14 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
       .then((movies) => {
         if (movies && movies.length > 0) {
           setCinesubzList(movies);
+        }
+      })
+      .catch(() => {});
+
+    fetchLatestCineSubzTvShows()
+      .then((shows) => {
+        if (shows && shows.length > 0) {
+          setCinesubzTvList(shows);
         }
       })
       .catch(() => {});
@@ -371,6 +381,19 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
         m.genres.some((g) => g.toLowerCase().includes(q))
     );
   }, [cinesubzList, searchQuery]);
+
+  // Filtered CineSubz Sinhala Subtitle TV Series
+  const filteredCinesubzTv = useMemo(() => {
+    if (!searchQuery.trim()) return cinesubzTvList;
+    const q = searchQuery.toLowerCase();
+    return cinesubzTvList.filter(
+      (m) =>
+        m.title.toLowerCase().includes(q) ||
+        m.sinhalaTitle.toLowerCase().includes(q) ||
+        m.season.toLowerCase().includes(q) ||
+        m.genres.some((g) => g.toLowerCase().includes(q))
+    );
+  }, [cinesubzTvList, searchQuery]);
 
   const handlePlayAlbum = (idx: number) => {
     setActiveAlbumIdx(idx);
@@ -1273,7 +1296,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                   <div className="flex items-center gap-3">
                     <button
                       onClick={() => {
-                        if (onOpenWebBrowser) onOpenWebBrowser('https://cinesubz.co');
+                        if (onOpenWebBrowser) onOpenWebBrowser('https://cinesubz.lk');
                       }}
                       className="flex items-center gap-2 px-6 py-2.5 rounded-full bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-all shadow-xl active:scale-95 cursor-pointer"
                     >
@@ -1283,7 +1306,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
 
                     <button
                       onClick={() => {
-                        if (onOpenWebBrowser) onOpenWebBrowser('https://cinesubz.co');
+                        if (onOpenWebBrowser) onOpenWebBrowser('https://cinesubz.lk');
                       }}
                       className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 text-white text-xs font-semibold transition-all backdrop-blur-md cursor-pointer"
                     >
@@ -1361,46 +1384,72 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
               {/* Latest Blockbusters & Theatrical Releases */}
               <section className="flex flex-col gap-3">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-base font-bold text-white tracking-wide">
-                    Latest Theatrical Releases & Blockbusters
-                  </h2>
-                  <span className="text-xs text-rose-400">Ultra HD 4K</span>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse" />
+                    <h2 className="text-base font-bold text-white tracking-wide">
+                      Latest Theatrical Releases & Blockbusters
+                    </h2>
+                  </div>
+                  <span className="text-xs text-rose-400 font-mono">Ultra HD 4K • CineSubz Releases</span>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                  {RECOMMENDED_MOVIES.map((movie) => (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3.5">
+                  {(filteredCinesubz.length > 0 ? filteredCinesubz.slice(0, 6) : RECOMMENDED_MOVIES.map((m) => ({
+                    id: m.id,
+                    title: m.title,
+                    sinhalaTitle: 'සිංහල උපසිරැසි සමඟ',
+                    year: Number(m.year) || 2026,
+                    rating: m.rating,
+                    quality: '1080p WEB-DL',
+                    posterUrl: m.image,
+                    watchUrl: m.url,
+                  }))).map((movie) => (
                     <div
                       key={movie.id}
                       onClick={() => {
-                        if (onOpenWebBrowser) onOpenWebBrowser(movie.url);
+                        if (onOpenWebBrowser) onOpenWebBrowser(movie.watchUrl);
                       }}
                       className="group relative flex flex-col rounded-2xl overflow-hidden bg-white/5 border border-white/10 hover:border-rose-500/50 hover:bg-white/10 transition-all cursor-pointer shadow-lg"
                     >
-                      <div className="relative aspect-[3/4] w-full overflow-hidden bg-black/60">
+                      <div className="relative aspect-[2/3] w-full overflow-hidden bg-black/60">
                         <img
-                          src={movie.image}
+                          src={movie.posterUrl}
                           alt={movie.title}
                           referrerPolicy="no-referrer"
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          loading="lazy"
+                          onError={(e) => {
+                            const img = e.currentTarget;
+                            const remoteUrl = (movie as { remotePosterUrl?: string }).remotePosterUrl;
+                            if (remoteUrl && img.src !== remoteUrl) {
+                              img.src = remoteUrl;
+                            }
+                          }}
                         />
-                        <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
-                          <span className="text-[9px] font-mono px-2 py-0.5 rounded-md bg-black/70 backdrop-blur-md text-white/90 border border-white/10">
+                        <div className="absolute top-2 left-2 flex flex-col gap-1">
+                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-black/80 backdrop-blur-md text-amber-400 font-bold border border-white/10">
                             {movie.rating}
+                          </span>
+                          <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-rose-600 text-white shadow">
+                            {movie.quality}
                           </span>
                         </div>
 
-                        <div className="absolute bottom-3 right-3 w-9 h-9 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center text-white group-hover:bg-rose-600 transition-all shadow-lg">
-                          <Play className="w-4 h-4 fill-white ml-0.5" />
+                        <div className="absolute bottom-2 right-2 w-8 h-8 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center text-white group-hover:bg-rose-600 transition-all shadow-lg">
+                          <Play className="w-3.5 h-3.5 fill-white ml-0.5" />
                         </div>
                       </div>
 
-                      <div className="p-3 flex flex-col gap-1">
+                      <div className="p-2.5 flex flex-col gap-1">
                         <span className="text-xs font-bold text-white truncate group-hover:text-rose-300">
                           {movie.title}
                         </span>
-                        <div className="flex items-center justify-between text-[10px] text-white/50">
-                          <span>{movie.genre}</span>
-                          <span className="font-mono">{movie.duration}</span>
+                        <span className="text-[10px] text-rose-400 font-medium truncate">
+                          {movie.sinhalaTitle}
+                        </span>
+                        <div className="flex items-center justify-between text-[9px] text-white/50">
+                          <span>{movie.year}</span>
+                          <span className="text-emerald-400 font-mono">සිංහල උපසිරැසි</span>
                         </div>
                       </div>
                     </div>
@@ -1545,6 +1594,86 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                 </div>
               </div>
 
+              {/* CineSubz Sinhala Subtitle TV Series Section */}
+              <section className="flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-fuchsia-500 animate-pulse" />
+                    <h2 className="text-base font-bold text-white tracking-wide">
+                      CineSubz Sinhala Subtitle TV Series (සිංහල උපසිරැසි ටෙලිනාට්‍ය)
+                    </h2>
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (onOpenWebBrowser) onOpenWebBrowser('https://cinesubz.lk/tvshows/');
+                    }}
+                    className="text-xs text-fuchsia-400 hover:text-fuchsia-300 font-mono flex items-center gap-1 transition-colors cursor-pointer"
+                  >
+                    <span>Browse All on CineSubz TV</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3.5">
+                  {filteredCinesubzTv.map((show) => (
+                    <div
+                      key={show.id}
+                      onClick={() => {
+                        if (onOpenWebBrowser) onOpenWebBrowser(show.watchUrl);
+                      }}
+                      className="group relative flex flex-col rounded-2xl overflow-hidden bg-white/5 border border-white/10 hover:border-fuchsia-500/50 hover:bg-white/10 transition-all cursor-pointer shadow-lg"
+                    >
+                      <div className="relative aspect-[2/3] w-full overflow-hidden bg-black/60">
+                        <img
+                          src={show.posterUrl}
+                          alt={show.title}
+                          referrerPolicy="no-referrer"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          loading="lazy"
+                          onError={(e) => {
+                            const img = e.currentTarget;
+                            if (show.remotePosterUrl && img.src !== show.remotePosterUrl) {
+                              img.src = show.remotePosterUrl;
+                            }
+                          }}
+                        />
+                        <div className="absolute top-2 left-2 flex flex-col gap-1">
+                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-black/80 backdrop-blur-md text-amber-400 font-bold border border-white/10">
+                            {show.rating}
+                          </span>
+                          <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-fuchsia-600 text-white shadow">
+                            {show.season}
+                          </span>
+                        </div>
+
+                        <div className="absolute top-2 right-2">
+                          <span className="text-[8px] font-mono px-1.5 py-0.5 rounded bg-black/70 text-cyan-300 border border-white/10">
+                            {show.quality}
+                          </span>
+                        </div>
+
+                        <div className="absolute bottom-2 right-2 w-8 h-8 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center text-white group-hover:bg-fuchsia-600 transition-all shadow-lg">
+                          <Play className="w-3.5 h-3.5 fill-white ml-0.5" />
+                        </div>
+                      </div>
+
+                      <div className="p-2.5 flex flex-col gap-1">
+                        <span className="text-xs font-bold text-white truncate group-hover:text-fuchsia-300">
+                          {show.title}
+                        </span>
+                        <span className="text-[10px] text-fuchsia-400 font-medium truncate">
+                          {show.sinhalaTitle}
+                        </span>
+                        <div className="flex items-center justify-between text-[9px] text-white/50">
+                          <span>{show.year}</span>
+                          <span className="text-emerald-400 font-mono">සිංහල උපසිරැසි</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
               {/* Dedicated Anime Platforms */}
               <section className="flex flex-col gap-3">
                 <h2 className="text-base font-bold text-white tracking-wide">
@@ -1623,7 +1752,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                   <div className="flex items-center gap-3">
                     <button
                       onClick={() => {
-                        if (onOpenWebBrowser) onOpenWebBrowser('https://cinesubz.co');
+                        if (onOpenWebBrowser) onOpenWebBrowser('https://cinesubz.lk');
                       }}
                       className="flex items-center gap-2 px-6 py-3 rounded-full bg-white text-slate-950 hover:bg-slate-200 text-xs font-bold transition-all shadow-xl active:scale-95 cursor-pointer"
                     >
@@ -1633,7 +1762,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
 
                     <button
                       onClick={() => {
-                        if (onOpenWebBrowser) onOpenWebBrowser('https://cinesubz.co');
+                        if (onOpenWebBrowser) onOpenWebBrowser('https://cinesubz.lk');
                       }}
                       className="flex items-center gap-2 px-5 py-3 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 text-white text-xs font-semibold transition-all backdrop-blur-md cursor-pointer"
                     >
@@ -1823,7 +1952,28 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  {RECOMMENDED_MOVIES.slice(0, 4).map((movie) => (
+                  {(filteredCinesubz.length >= 4
+                    ? filteredCinesubz.slice(0, 4).map((m) => ({
+                        id: m.id,
+                        title: m.title,
+                        rating: m.rating,
+                        genre: m.sinhalaTitle,
+                        duration: String(m.year),
+                        image: m.posterUrl,
+                        remoteImage: m.remotePosterUrl,
+                        url: m.watchUrl,
+                      }))
+                    : RECOMMENDED_MOVIES.slice(0, 4).map((m) => ({
+                        id: m.id,
+                        title: m.title,
+                        rating: m.rating,
+                        genre: m.genre.split(',')[0],
+                        duration: m.duration,
+                        image: m.image,
+                        remoteImage: undefined,
+                        url: m.url,
+                      }))
+                  ).map((movie) => (
                     <div
                       key={movie.id}
                       onClick={() => {
@@ -1837,6 +1987,12 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                           alt={movie.title}
                           referrerPolicy="no-referrer"
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          onError={(e) => {
+                            const img = e.currentTarget;
+                            if (movie.remoteImage && img.src !== movie.remoteImage) {
+                              img.src = movie.remoteImage;
+                            }
+                          }}
                         />
                         <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
                           <span className="text-[9px] font-mono px-2 py-0.5 rounded-md bg-black/70 backdrop-blur-md text-white/90 border border-white/10">
@@ -1854,8 +2010,8 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                           {movie.title}
                         </span>
                         <div className="flex items-center justify-between text-[10px] text-white/50">
-                          <span>{movie.genre.split(',')[0]}</span>
-                          <span className="font-mono">{movie.duration}</span>
+                          <span className="text-rose-400 font-medium truncate">{movie.genre}</span>
+                          <span className="font-mono text-emerald-400">{movie.duration}</span>
                         </div>
                       </div>
                     </div>
