@@ -3,6 +3,8 @@ import { usePlayerStore } from '../../store/playerStore';
 import { CURATED_CHANNELS, LiveChannel } from '../../utils/channelCatalog';
 import { GAMES_CATALOG, GameItem } from '../../utils/gamesCatalog';
 import { CINEMA_LINKS, CinemaSiteItem } from '../../utils/cinemaLinks';
+import { INTERNET_MUSIC_STREAMS, InternetMusicStation } from '../../utils/musicStreams';
+import { MOVIE_POSTERS, ALBUM_POSTERS } from '../../utils/mediaPosters';
 import {
   Film,
   Play,
@@ -76,7 +78,7 @@ const COVER_FLOW_ALBUMS: CoverFlowTrack[] = [
     title: 'Bin Tere',
     artist: 'Vishal-Shekhar, Shafqat Amanat Ali',
     album: 'I Hate Luv Storys',
-    albumArt: 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=600&q=80',
+    albumArt: ALBUM_POSTERS.binTere,
     url: 'https://cdn.freesound.org/previews/612/612627_5674468-lq.mp3',
     durationSec: 330,
   },
@@ -85,7 +87,7 @@ const COVER_FLOW_ALBUMS: CoverFlowTrack[] = [
     title: 'Soniyo',
     artist: 'Raju Singh, Sonu Nigam, Shreya Ghoshal',
     album: 'Raaz: The Mystery Continues',
-    albumArt: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=600&q=80',
+    albumArt: ALBUM_POSTERS.soniyo,
     url: 'https://cdn.freesound.org/previews/615/615483_11861866-lq.mp3',
     durationSec: 312,
   },
@@ -94,7 +96,7 @@ const COVER_FLOW_ALBUMS: CoverFlowTrack[] = [
     title: 'Dooriyan',
     artist: 'Pritam, Mohit Chauhan',
     album: 'Love Aaj Kal',
-    albumArt: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=600&q=80',
+    albumArt: ALBUM_POSTERS.dooriyan,
     url: 'https://cdn.freesound.org/previews/530/530704_11861866-lq.mp3',
     durationSec: 338,
   },
@@ -103,7 +105,7 @@ const COVER_FLOW_ALBUMS: CoverFlowTrack[] = [
     title: 'Darkhaast',
     artist: 'Mithoon, Arijit Singh, Sunidhi Chauhan',
     album: 'Shivaay',
-    albumArt: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=600&q=80',
+    albumArt: ALBUM_POSTERS.darkhaast,
     url: 'https://cdn.freesound.org/previews/530/530704_11861866-lq.mp3',
     durationSec: 374,
   },
@@ -112,7 +114,7 @@ const COVER_FLOW_ALBUMS: CoverFlowTrack[] = [
     title: 'Tujhko Jo Paaya',
     artist: 'Pritam, Mohit Chauhan',
     album: 'Crook',
-    albumArt: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=600&q=80',
+    albumArt: ALBUM_POSTERS.tujhkoJoPaaya,
     url: 'https://cdn.freesound.org/previews/612/612627_5674468-lq.mp3',
     durationSec: 290,
   },
@@ -138,7 +140,7 @@ const RECOMMENDED_MOVIES: MovieItem[] = [
     rating: 'IMDb 8.1',
     genre: 'Fantasy, Adventure',
     duration: '2h 10min',
-    image: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=600&q=80',
+    image: MOVIE_POSTERS.harryPotter,
     url: 'https://cinesubz.co',
   },
   {
@@ -148,7 +150,7 @@ const RECOMMENDED_MOVIES: MovieItem[] = [
     rating: 'IMDb 8.7',
     genre: 'Sci-Fi, Adventure',
     duration: '2h 49min',
-    image: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=600&q=80',
+    image: MOVIE_POSTERS.interstellar,
     url: 'https://cinesubz.co',
   },
   {
@@ -158,7 +160,7 @@ const RECOMMENDED_MOVIES: MovieItem[] = [
     rating: 'IMDb 8.8',
     genre: 'Sci-Fi, Action',
     duration: '2h 28min',
-    image: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=600&q=80',
+    image: MOVIE_POSTERS.inception,
     url: 'https://cinesubz.co',
   },
   {
@@ -168,7 +170,7 @@ const RECOMMENDED_MOVIES: MovieItem[] = [
     rating: 'IMDb 7.3',
     genre: 'Sci-Fi, Action',
     duration: '2h 30min',
-    image: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=80',
+    image: MOVIE_POSTERS.tenet,
     url: 'https://cinesubz.co',
   },
 ];
@@ -189,7 +191,7 @@ const ADZE_PARTIES: PartyItem[] = [
     title: 'Spider Man',
     genre: 'Science Fiction, Fantasy',
     viewers: '+4 friends watching',
-    image: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=500&q=80',
+    image: MOVIE_POSTERS.spiderMan,
     url: 'https://cinesubz.co',
   },
   {
@@ -197,7 +199,7 @@ const ADZE_PARTIES: PartyItem[] = [
     title: 'Wonder Woman',
     genre: 'Adventure, Action',
     viewers: '+7 friends watching',
-    image: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=500&q=80',
+    image: MOVIE_POSTERS.wonderWoman,
     url: 'https://cinesubz.co',
   },
   {
@@ -205,7 +207,7 @@ const ADZE_PARTIES: PartyItem[] = [
     title: 'Mortal Engines',
     genre: 'Science Fiction, Suspense',
     viewers: '+3 friends watching',
-    image: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=500&q=80',
+    image: MOVIE_POSTERS.mortalEngines,
     url: 'https://cinesubz.co',
   },
   {
@@ -213,7 +215,7 @@ const ADZE_PARTIES: PartyItem[] = [
     title: 'Rampage',
     genre: 'Adventure, Action',
     viewers: '+9 friends watching',
-    image: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=500&q=80',
+    image: MOVIE_POSTERS.rampage,
     url: 'https://cinesubz.co',
   },
 ];
@@ -751,6 +753,50 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                       <Volume2 className="w-4 h-4" />
                     )}
                   </button>
+                </div>
+              </div>
+
+              {/* 24/7 Live Internet Radio Stations */}
+              <div className="w-full max-w-5xl flex flex-col gap-4 mt-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Music className="w-4 h-4 text-emerald-400" />
+                    <h3 className="text-sm font-bold text-white tracking-wide uppercase">
+                      24/7 Live Internet Radio Stations
+                    </h3>
+                  </div>
+                  <span className="text-xs text-white/50">{INTERNET_MUSIC_STREAMS.length} Channels Broadcasting</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                  {INTERNET_MUSIC_STREAMS.map((station: InternetMusicStation) => (
+                    <div
+                      key={station.id}
+                      onClick={() => openMedia(station.streamUrl, `${station.title} - ${station.artist}`, true)}
+                      className="group flex items-center gap-3 p-3 rounded-2xl bg-white/5 border border-white/10 hover:border-emerald-500/50 hover:bg-white/10 transition-all cursor-pointer shadow-lg"
+                    >
+                      <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0 bg-black/40 border border-white/10">
+                        <img src={station.logoUrl} alt={station.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                      </div>
+                      <div className="flex flex-col min-w-0 flex-1">
+                        <span className="text-xs font-bold text-white truncate group-hover:text-emerald-400 transition-colors">
+                          {station.title}
+                        </span>
+                        <span className="text-[10px] text-white/60 truncate">
+                          {station.genre} • {station.artist}
+                        </span>
+                        <span className="text-[9px] font-mono text-emerald-400/90 mt-0.5">
+                          {station.badge}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        className="w-8 h-8 rounded-full bg-white/10 group-hover:bg-emerald-500 group-hover:text-black flex items-center justify-center text-white/70 transition-all shrink-0"
+                      >
+                        <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
+                      </button>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
