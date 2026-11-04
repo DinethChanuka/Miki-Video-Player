@@ -811,7 +811,7 @@ export const FullWindowDashboard: React.FC<FullWindowDashboardProps> = ({
                   <div
                     key={track.id}
                     onClick={() => {
-                      openMedia(track.url, track.title);
+                      openMedia(track.url, track.title, true, 0, track.albumArt, 'music');
                       if (onOpenMusic) onOpenMusic();
                       onClose();
                     }}

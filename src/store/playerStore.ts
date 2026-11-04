@@ -1148,8 +1148,10 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     // Explicit video detection: video files and video web streams MUST NEVER be misclassified as audio
     const isExplicitVideo =
       mediaType === 'video' ||
-      /\.(?:mp4|mkv|webm|avi|mov|m4v|flv|ts|wmv|3gp|m3u8)(?:\?|$)/i.test(uri) ||
-      Boolean(parseWebStream(uri));
+      (mediaType !== 'music' &&
+        mediaType !== 'radio' &&
+        (/\.(?:mp4|mkv|webm|avi|mov|m4v|flv|ts|wmv|3gp|m3u8)(?:\?|$)/i.test(uri) ||
+          Boolean(parseWebStream(uri))));
 
     // Explicit radio stream detection
     const isRadio =
@@ -1195,13 +1197,15 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     // Check if it's an external web stream (YouTube, TikTok, Instagram, Vimeo, Twitch, Dailymotion, Cinema portals or Web stream)
     const webStream = parseWebStream(uri);
     const isHttp = uri.startsWith('http://') || uri.startsWith('https://');
-    const activeWebStream = webStream || (!isAudio && isHttp && !isDirectMediaUrl(uri) ? {
-      platform: 'cinema' as const,
-      id: `cinema_${Date.now()}`,
-      embedUrl: uri,
-      originalUrl: uri,
-      title: resolvedTitle,
-    } : null);
+    const activeWebStream =
+      !isAudio && playbackMode === 'video' && webStream ? webStream :
+      (!isAudio && isHttp && playbackMode === 'video' && !isDirectMediaUrl(uri) ? {
+        platform: 'cinema' as const,
+        id: `cinema_${Date.now()}`,
+        embedUrl: uri,
+        originalUrl: uri,
+        title: resolvedTitle,
+      } : null);
 
     if (activeWebStream) {
       if (activeWebStream.platform === 'youtube') {
@@ -1352,13 +1356,14 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
         const savedPos = session.history?.lastPositionMs ?? 0;
         startPos = autoResume ? savedPos : 0;
 
+        const autoOpenStudio = playbackMode === 'music';
         set({
           currentMediaId: session.mediaId,
           currentUri: uri,
           currentTitle: resolvedTitle,
           currentArtwork: resolvedArtwork || null,
           activePlaybackMode: playbackMode,
-          isMusicPlayerOpen: get().isMusicPlayerOpen,
+          isMusicPlayerOpen: autoOpenStudio ? true : false,
           bookmarks: session.bookmarks,
           eqGainsDb: parsedEq,
           nightModeEnabled: session.preferences.nightModeEnabled,
@@ -1386,12 +1391,13 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     }
 
     // Web / Standalone mode
+    const autoOpenStudio = playbackMode === 'music';
     set({
       currentUri: uri,
       currentTitle: resolvedTitle,
       currentArtwork: resolvedArtwork || null,
       activePlaybackMode: playbackMode,
-      isMusicPlayerOpen: get().isMusicPlayerOpen,
+      isMusicPlayerOpen: autoOpenStudio ? true : false,
       retryCount: 0,
       lastError: null,
       resumeBannerPositionMs: null,

@@ -82,7 +82,7 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
     setActiveIndex(idx);
     const tr = tracks[idx];
     if (tr) {
-      openMedia(tr.url, tr.title, true);
+      openMedia(tr.url, tr.title, true, 0, tr.albumArt, 'music');
     }
   };
 
@@ -110,7 +110,7 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
       };
       setTracks((prev) => [newTrack, ...prev]);
       setActiveIndex(0);
-      openMedia(uri, newTrack.title, true);
+      openMedia(uri, newTrack.title, true, 0, newTrack.albumArt, 'music');
     }
   };
 

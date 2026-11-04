@@ -660,14 +660,20 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
     return (
       recentMedia.find(
         (m) =>
+          (m.uri && /\.(mp3|wav|flac|aac|m4a|ogg|opus)/i.test(m.uri)) ||
+          m.uri.includes('/mp3') ||
+          m.uri.includes('-mp3') ||
+          m.uri.includes('somafm') ||
           m.uri.includes('soundcloud') ||
-        (m.webDomain && m.webDomain.includes('soundcloud')) ||
-          m.webPlatform === 'cinema' ||
+          m.uri.includes('jamendo') ||
+          m.uri.includes('audiomack') ||
+          m.uri.includes('bandcamp') ||
           m.title.toLowerCase().includes('hindi') ||
           m.title.toLowerCase().includes('dooriyan') ||
-          /\.(mp3|wav|flac|aac|m4a|ogg)/i.test(m.uri) ||
-          Boolean(m.thumbnailUri)
-      ) || recentMedia[0] || null
+          m.title.toLowerCase().includes('saiyaara') ||
+          m.title.toLowerCase().includes('song') ||
+          m.title.toLowerCase().includes('track')
+      ) || null
     );
   }, [recentMedia]);
 
@@ -966,7 +972,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
     setActiveAlbumIdx(idx);
     const track = COVER_FLOW_ALBUMS[idx];
     if (track) {
-      openMedia(track.url, `${track.title} - ${track.artist}`, true, 0, track.albumArt);
+      openMedia(track.url, `${track.title} - ${track.artist}`, true, 0, track.albumArt, 'music');
       setIsCoverFlowPlaying(true);
     }
   };
@@ -1627,7 +1633,8 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                             key={track.id}
                             onClick={() => {
                               if (track.streamUrl) {
-                                openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl);
+                                openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl, 'music');
+                                usePlayerStore.setState({ isMusicPlayerOpen: true });
                                 setIsSearchFocused(false);
                               }
                             }}
@@ -1663,7 +1670,8 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   if (track.streamUrl) {
-                                    openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl);
+                                    openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl, 'music');
+                                    usePlayerStore.setState({ isMusicPlayerOpen: true });
                                     setIsSearchFocused(false);
                                   }
                                 }}
@@ -1911,7 +1919,8 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                           dimensions: file.resolution,
                         });
                       } else if (file.category === 'music') {
-                        openMedia(file.uri, file.title, true, file.lastPositionMs || 0, file.thumbnailUrl);
+                        openMedia(file.uri, file.title, true, file.lastPositionMs || 0, file.thumbnailUrl, 'music');
+                        usePlayerStore.setState({ isMusicPlayerOpen: true });
                       } else {
                         openMedia(file.uri, file.title, true, file.lastPositionMs || 0);
                       }
@@ -2142,7 +2151,8 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                           previouslyPlayed.title,
                           true,
                           previouslyPlayed.lastPositionMs,
-                          previouslyPlayed.thumbnailUri
+                          previouslyPlayed.thumbnailUri,
+                          'music'
                         );
                         setIsCoverFlowPlaying(true);
                       } else {
@@ -2331,7 +2341,8 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                             key={track.id}
                             onClick={() => {
                               if (track.streamUrl) {
-                                openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl);
+                                openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl, 'music');
+                                usePlayerStore.setState({ isMusicPlayerOpen: true });
                               }
                             }}
                             className="group relative flex flex-col rounded-2xl bg-white/5 border border-white/10 overflow-hidden hover:border-emerald-500/50 hover:bg-white/10 transition-all shadow-xl hover:shadow-2xl cursor-pointer"
@@ -2371,7 +2382,8 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     if (track.streamUrl) {
-                                      openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl);
+                                      openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl, 'music');
+                                      usePlayerStore.setState({ isMusicPlayerOpen: true });
                                     }
                                   }}
                                   className="w-11 h-11 rounded-full bg-white text-black hover:scale-110 flex items-center justify-center shadow-xl transition-all cursor-pointer"
@@ -2407,7 +2419,8 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     if (track.streamUrl) {
-                                      openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl);
+                                      openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl, 'music');
+                                      usePlayerStore.setState({ isMusicPlayerOpen: true });
                                     }
                                   }}
                                   className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-emerald-600/80 hover:bg-emerald-500 hover:scale-[1.02] text-white text-[10px] font-bold shadow-md transition-all cursor-pointer"
@@ -3531,7 +3544,8 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                             dimensions: file.resolution,
                           });
                         } else if (file.category === 'music') {
-                          openMedia(file.uri, file.title, true, file.lastPositionMs || 0, file.thumbnailUrl);
+                          openMedia(file.uri, file.title, true, file.lastPositionMs || 0, file.thumbnailUrl, 'music');
+                          usePlayerStore.setState({ isMusicPlayerOpen: true });
                         } else {
                           openMedia(file.uri, file.title, true, file.lastPositionMs || 0);
                         }

@@ -1146,7 +1146,7 @@ export const App: React.FC = () => {
         )}
 
         {/* Glassmorphic Controls Overlay (for native/local/HLS video & streams) */}
-        {currentUri && !activeWebStream && activePlaybackMode === 'video' && (
+        {currentUri && !activeWebStream && activePlaybackMode === 'video' && !isMusicPlayerOpen && (
           <ControlsOverlay
             onOpenEq={() => setIsEqOpen(true)}
             onOpenSettings={() => setIsSettingsOpen(true)}
