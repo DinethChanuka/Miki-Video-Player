@@ -31,6 +31,9 @@ import {
   ArrowLeft,
   Camera,
   RefreshCw,
+  Music,
+  Sliders,
+  Sparkles,
 } from 'lucide-react';
 
 export function parseYouTubeId(url: string | null): string | null {
@@ -106,6 +109,8 @@ export const App: React.FC = () => {
   const isSubtitlesVisible = usePlayerStore((s) => s.isSubtitlesVisible);
   const subtitleStyle = usePlayerStore((s) => s.subtitleStyle);
   const activePlaybackMode = usePlayerStore((s) => s.activePlaybackMode);
+  const currentArtwork = usePlayerStore((s) => s.currentArtwork);
+  const isPaused = usePlayerStore((s) => s.isPaused);
   const isMusicPlayerOpen = usePlayerStore((s) => s.isMusicPlayerOpen);
   const setMusicPlayerOpen = usePlayerStore((s) => s.setMusicPlayerOpen);
 
@@ -734,10 +739,96 @@ export const App: React.FC = () => {
           />
         ) : activeEngineType === 'web-media' ? (
           <div ref={viewportRef} className={`relative w-full h-full flex items-center justify-center overflow-hidden ${!currentUri ? 'hidden' : ''}`}>
+            {/* When playing Music, display Modern Music Studio Viewport with Real Cover Artwork & Visualizer */}
+            {activePlaybackMode === 'music' && (
+              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center pointer-events-auto p-6 bg-gradient-to-b from-slate-950/80 via-slate-900/90 to-slate-950/95 backdrop-blur-xl animate-in fade-in duration-300">
+                {/* Ambient Glow matching cover art */}
+                <div
+                  className="absolute w-96 h-96 rounded-full blur-3xl opacity-35 -z-10 animate-pulse pointer-events-none"
+                  style={{
+                    background: 'radial-gradient(circle, rgba(168,85,247,0.4) 0%, rgba(6,182,212,0.2) 60%, transparent 100%)',
+                  }}
+                />
+
+                {/* Album Cover Art Display */}
+                <div className="relative group mb-6">
+                  <div className="relative w-64 h-64 sm:w-80 sm:h-80 rounded-2xl overflow-hidden shadow-2xl shadow-cyan-950/60 border border-white/10 ring-1 ring-white/10 transition-all duration-300 group-hover:scale-[1.02]">
+                    <img
+                      src={currentArtwork || 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=500&auto=format&fit=crop&q=80'}
+                      alt={currentTitle || 'Now Playing'}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).src =
+                          'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=500&auto=format&fit=crop&q=80';
+                      }}
+                    />
+                    {/* Vinyl Groove Overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-tr from-black/40 via-transparent to-white/10 pointer-events-none" />
+                  </div>
+
+                  {/* Audio Status Pill */}
+                  <div className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-slate-950/80 backdrop-blur-md border border-white/15 text-[10px] font-mono text-cyan-300 font-bold shadow-lg flex items-center gap-1.5">
+                    <span className={`w-2 h-2 rounded-full ${!isPaused ? 'bg-emerald-400 animate-ping' : 'bg-amber-400'}`} />
+                    <span>{!isPaused ? 'PLAYING' : 'PAUSED'}</span>
+                  </div>
+
+                  {/* Quality Badge */}
+                  <div className="absolute bottom-3 right-3 px-2.5 py-1 rounded-full bg-slate-950/80 backdrop-blur-md border border-white/15 text-[10px] font-mono text-purple-300 font-bold shadow-lg flex items-center gap-1">
+                    <Sparkles className="w-3 h-3 text-purple-400" />
+                    <span>24-BIT / 192kHz HI-FI</span>
+                  </div>
+                </div>
+
+                {/* Track Metadata */}
+                <div className="text-center max-w-lg mb-4">
+                  <h2 className="text-lg sm:text-2xl font-black text-white tracking-tight drop-shadow truncate px-2">
+                    {currentTitle || 'Miki Audio Stream'}
+                  </h2>
+                  <p className="text-xs sm:text-sm text-white/60 font-medium mt-1">
+                    Lossless Audio Pipeline • Chunk-by-Chunk Progressive Engine
+                  </p>
+                </div>
+
+                {/* Dynamic Equalizer Waveform Bars */}
+                <div className="flex items-center gap-1 h-8 mb-5">
+                  {[24, 38, 55, 75, 42, 88, 62, 95, 70, 48, 80, 58, 32, 68, 90, 45].map((h, i) => (
+                    <div
+                      key={i}
+                      className="w-1 rounded-full bg-gradient-to-t from-cyan-500 to-purple-500 transition-all duration-150"
+                      style={{
+                        height: !isPaused ? `${h}%` : '20%',
+                        opacity: !isPaused ? 0.9 : 0.35,
+                      }}
+                    />
+                  ))}
+                </div>
+
+                {/* Action Buttons: Full Studio & EQ */}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setMusicPlayerOpen(true)}
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-600 to-purple-600 hover:from-cyan-500 hover:to-purple-500 text-white text-xs font-bold shadow-lg shadow-cyan-600/30 border border-white/20 transition-all hover:scale-105 active:scale-95 cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Music className="w-3.5 h-3.5" />
+                    <span>Open Full-Window Studio</span>
+                  </button>
+                  <button
+                    onClick={() => setIsEqOpen(true)}
+                    className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold border border-white/15 transition-all cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Sliders className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>10-Band EQ</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
             <video
               id="aether-video-viewport"
               ref={videoRef}
-              className={`w-full h-full object-contain z-10 cursor-pointer ${!currentUri ? 'hidden' : ''}`}
+              className={`w-full h-full object-contain z-10 cursor-pointer ${
+                !currentUri ? 'hidden' : activePlaybackMode === 'music' ? 'opacity-0 pointer-events-none absolute w-1 h-1' : ''
+              }`}
               playsInline
               preload="auto"
               onWaiting={() => usePlayerStore.setState({ isBuffering: true })}

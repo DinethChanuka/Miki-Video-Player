@@ -60,6 +60,15 @@ export function lookupArtwork(uri: string, title?: string, explicitArtwork?: str
   if (lowerTitle.includes('bin tere') || lowerUri.includes('bin tere')) return ALBUM_POSTERS.binTere;
   if (lowerTitle.includes('darkhaast') || lowerUri.includes('darkhaast')) return ALBUM_POSTERS.darkhaast;
   if (lowerTitle.includes('tujhko') || lowerUri.includes('tujhko')) return ALBUM_POSTERS.tujhkoJoPaaya;
+  if (lowerTitle.includes('blackpink') || lowerTitle.includes('black pink')) {
+    return 'https://upload.wikimedia.org/wikipedia/en/b/be/Blackpink_-_The_Album.png';
+  }
+  if (lowerTitle.includes('bts') || lowerTitle.includes('dynamite') || lowerTitle.includes('butter')) {
+    return 'https://upload.wikimedia.org/wikipedia/en/5/50/BTS_-_Butter.png';
+  }
+  if (lowerTitle.includes('taylor swift') || lowerTitle.includes('cardigan') || lowerTitle.includes('anti-hero') || lowerTitle.includes('lover')) {
+    return 'https://upload.wikimedia.org/wikipedia/en/9/9f/Midnights_-_Taylor_Swift.png';
+  }
 
   // 3. CineSubz movies
   const movie = CINESUBZ_MOVIES.find(

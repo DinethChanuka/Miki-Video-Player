@@ -305,7 +305,8 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
   const [musicDiscoveryList, setMusicDiscoveryList] = useState<MusicTrack[]>(MUSIC_DISCOVERY_CATALOG);
   const [radioFilterGenre, setRadioFilterGenre] = useState<string>('All');
   const [musicCurrentPage, setMusicCurrentPage] = useState<number>(1);
-  const MUSIC_PAGE_SIZE = 12;
+  const CHUNK_SIZE = 12; // 12 tracks per chunk for progressive stream buffering
+  const MUSIC_PAGE_SIZE = CHUNK_SIZE;
 
   // Background auto-refresh for latest CineSubz & Music Discovery releases
   useEffect(() => {
@@ -1467,14 +1468,19 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                       })}
                     </div>
 
-                    {/* Music Page Pagination Controls */}
+                    {/* Chunk-by-Chunk Progressive Music Loading & Pagination Controls */}
                     {filteredMusicTracks.length > MUSIC_PAGE_SIZE && (
                       <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-6 border-t border-white/10 w-full">
-                        <span className="text-xs text-white/50 font-mono">
-                          Showing {(musicCurrentPage - 1) * MUSIC_PAGE_SIZE + 1} -{' '}
-                          {Math.min(filteredMusicTracks.length, musicCurrentPage * MUSIC_PAGE_SIZE)} of{' '}
-                          {filteredMusicTracks.length} Songs (Page {musicCurrentPage} of {musicTotalPages})
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400 font-mono text-[10px] font-bold border border-emerald-500/30">
+                            Chunk {musicCurrentPage} of {musicTotalPages}
+                          </span>
+                          <span className="text-xs text-white/50 font-mono">
+                            Showing {(musicCurrentPage - 1) * MUSIC_PAGE_SIZE + 1} -{' '}
+                            {Math.min(filteredMusicTracks.length, musicCurrentPage * MUSIC_PAGE_SIZE)} of{' '}
+                            {filteredMusicTracks.length} Songs (Chunked Streaming)
+                          </span>
+                        </div>
 
                         <div className="flex items-center gap-1.5">
                           <button
@@ -1483,33 +1489,33 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                             className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-white border border-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center gap-1"
                           >
                             <ChevronLeft className="w-3.5 h-3.5" />
-                            <span>Previous</span>
+                            <span>Previous Chunk</span>
                           </button>
 
-                          {Array.from({ length: musicTotalPages }, (_, i) => i + 1).map((pageNum) => {
+                          {Array.from({ length: musicTotalPages }, (_, i) => i + 1).map((chunkNum) => {
                             if (
-                              pageNum === 1 ||
-                              pageNum === musicTotalPages ||
-                              (pageNum >= musicCurrentPage - 2 && pageNum <= musicCurrentPage + 2)
+                              chunkNum === 1 ||
+                              chunkNum === musicTotalPages ||
+                              (chunkNum >= musicCurrentPage - 2 && chunkNum <= musicCurrentPage + 2)
                             ) {
-                              const isActive = musicCurrentPage === pageNum;
+                              const isActive = musicCurrentPage === chunkNum;
                               return (
                                 <button
-                                  key={pageNum}
-                                  onClick={() => setMusicCurrentPage(pageNum)}
+                                  key={chunkNum}
+                                  onClick={() => setMusicCurrentPage(chunkNum)}
                                   className={`w-8 h-8 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                                     isActive
                                       ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/40'
                                       : 'bg-white/5 text-white/70 hover:bg-white/10 hover:text-white border border-white/10'
                                   }`}
                                 >
-                                  {pageNum}
+                                  {chunkNum}
                                 </button>
                               );
                             }
-                            if (pageNum === musicCurrentPage - 3 || pageNum === musicCurrentPage + 3) {
+                            if (chunkNum === musicCurrentPage - 3 || chunkNum === musicCurrentPage + 3) {
                               return (
-                                <span key={pageNum} className="text-xs text-white/40 px-1">
+                                <span key={chunkNum} className="text-xs text-white/40 px-1">
                                   ...
                                 </span>
                               );
@@ -1522,7 +1528,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                             disabled={musicCurrentPage === musicTotalPages}
                             className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-white border border-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center gap-1"
                           >
-                            <span>Next</span>
+                            <span>Next Chunk</span>
                             <ChevronRight className="w-3.5 h-3.5" />
                           </button>
                         </div>
