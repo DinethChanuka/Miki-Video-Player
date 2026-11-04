@@ -51,7 +51,63 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
   const [isLyricsOpen, setIsLyricsOpen] = useState(false);
   const [isQueueOpen, setIsQueueOpen] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const ytIframeRef = useRef<HTMLIFrameElement | null>(null);
   const createdBlobUrlsRef = useRef<string[]>([]);
+
+  const activeTrack = tracks[activeIndex] || tracks[0];
+  const activeYouTubeId = React.useMemo(() => {
+    const raw = currentUri || activeTrack?.url || '';
+    const match = raw.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i);
+    return match ? match[1] : null;
+  }, [currentUri, activeTrack?.url]);
+
+  // Synchronize play/pause with YouTube Audio Bridge
+  useEffect(() => {
+    if (activeYouTubeId && ytIframeRef.current?.contentWindow) {
+      const cmd = isPaused ? 'pauseVideo' : 'playVideo';
+      ytIframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: cmd, args: [] }), '*');
+    }
+  }, [isPaused, activeYouTubeId]);
+
+  // Synchronize sound volume with YouTube Audio Bridge
+  useEffect(() => {
+    if (activeYouTubeId && ytIframeRef.current?.contentWindow) {
+      if (isMuted) {
+        ytIframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'mute', args: [] }), '*');
+      } else {
+        ytIframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'unMute', args: [] }), '*');
+        ytIframeRef.current.contentWindow.postMessage(
+          JSON.stringify({ event: 'command', func: 'setVolume', args: [volume] }),
+          '*'
+        );
+      }
+    }
+  }, [volume, isMuted, activeYouTubeId]);
+
+  // Listen for time updates and metadata from YouTube Audio Bridge
+  useEffect(() => {
+    if (!activeYouTubeId) return;
+    const handleMessage = (e: MessageEvent) => {
+      try {
+        const data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
+        if (data?.event === 'infoDelivery' && data?.info) {
+          const info = data.info;
+          if (typeof info.currentTime === 'number') {
+            usePlayerStore.setState({
+              positionMs: Math.round(info.currentTime * 1000),
+            });
+          }
+          if (typeof info.duration === 'number' && info.duration > 0) {
+            usePlayerStore.setState({
+              durationMs: Math.round(info.duration * 1000),
+            });
+          }
+        }
+      } catch {}
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [activeYouTubeId]);
 
   // Revoke created blob URLs on unmount to eliminate memory leaks
   useEffect(() => {
@@ -92,8 +148,6 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
       });
     }
   }, [currentUri, currentTitle, currentArtwork, durationMs]);
-
-  const activeTrack = tracks[activeIndex] || tracks[0];
 
   const handleSelectTrack = (idx: number) => {
     setActiveIndex(idx);
@@ -178,24 +232,35 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
       ctx.fillStyle = bgGrad;
       ctx.fillRect(0, 0, w, h);
 
-      // Floating sine wave spectrum bars
-      const barCount = 48;
+      // Atmospheric sound stage visualizer behind Cover Flow
+      const barCount = 64;
       const barWidth = w / barCount;
       const isAudible = !isPaused;
+      const floorY = h * 0.72; // Anchored to studio floor horizon
 
       for (let i = 0; i < barCount; i++) {
-        const factor = Math.sin(phase + i * 0.25) * 0.5 + 0.5;
-        const amp = isAudible ? factor * (h * 0.18) + 10 : 6;
-        const x = i * barWidth;
-        const y = h / 2;
+        const centerDist = Math.abs(i - barCount / 2) / (barCount / 2);
+        const archFactor = Math.cos(centerDist * Math.PI * 0.45);
+        const wave = Math.sin(phase + i * 0.22) * 0.5 + Math.cos(phase * 0.7 + i * 0.15) * 0.5;
+        const normalizedAmp = (wave * 0.5 + 0.5) * archFactor;
 
-        const grad = ctx.createLinearGradient(x, y - amp, x, y + amp);
-        grad.addColorStop(0, '#38bdf8');
-        grad.addColorStop(0.5, '#a855f7');
-        grad.addColorStop(1, '#ec4899');
+        const amp = isAudible ? normalizedAmp * (h * 0.28) + 12 : Math.sin(phase * 0.5 + i * 0.2) * 4 + 6;
+        const x = i * barWidth;
+        const barH = amp * 1.6;
+
+        const grad = ctx.createLinearGradient(x, floorY - barH, x, floorY);
+        grad.addColorStop(0, 'rgba(56, 189, 248, 0.85)'); // Cyan top
+        grad.addColorStop(0.5, 'rgba(168, 85, 247, 0.65)'); // Purple mid tone
+        grad.addColorStop(1, 'rgba(236, 72, 153, 0.15)'); // Soft base
 
         ctx.fillStyle = grad;
-        ctx.fillRect(x + barWidth * 0.2, y - amp, barWidth * 0.6, amp * 2);
+        ctx.beginPath();
+        if (ctx.roundRect) {
+          ctx.roundRect(x + barWidth * 0.15, floorY - barH, barWidth * 0.7, barH, [4, 4, 0, 0]);
+          ctx.fill();
+        } else {
+          ctx.fillRect(x + barWidth * 0.15, floorY - barH, barWidth * 0.7, barH);
+        }
       }
 
       animId = requestAnimationFrame(render);
@@ -363,7 +428,7 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
               <div
                 key={track.id}
                 onClick={() => handleSelectTrack(idx)}
-                className="absolute w-64 h-64 cursor-pointer transition-all duration-500 ease-out flex flex-col items-center group"
+                className="absolute w-64 h-64 cursor-pointer transition-all duration-500 ease-out flex flex-col items-center group select-none"
                 style={{
                   transform,
                   zIndex,
@@ -371,12 +436,12 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
                   transformStyle: 'preserve-3d',
                 }}
               >
-                {/* Vinyl / Cover Card */}
-                <div className="relative w-full h-full rounded-2xl overflow-hidden border-2 border-white/20 shadow-2xl bg-slate-900 group-hover:border-cyan-400/60 transition-colors">
+                {/* 3D Vinyl / Cover Art Card */}
+                <div className="relative w-full h-full rounded-2xl overflow-hidden border-2 border-white/20 shadow-2xl bg-slate-900 group-hover:border-cyan-400/60 transition-all duration-300">
                   <img
                     src={track.albumArt}
                     alt={track.title}
-                    className="w-full h-full object-cover select-none"
+                    className="w-full h-full object-cover select-none pointer-events-none"
                     onError={(e) => {
                       (e.target as HTMLElement).style.display = 'none';
                     }}
@@ -388,16 +453,33 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
                   )}
                 </div>
 
-                {/* Mirror Reflection Effect */}
+                {/* Floor Contact Shadow / Ambient Occlusion */}
                 <div
-                  className="w-full h-20 mt-1 rounded-b-2xl overflow-hidden opacity-30 pointer-events-none"
+                  className="contact-shadow absolute -bottom-3 left-1/2 -translate-x-1/2 w-56 h-5 rounded-full pointer-events-none blur-sm"
+                  style={{
+                    background: 'radial-gradient(ellipse at center, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 45%, transparent 75%)',
+                    transform: 'rotateX(80deg)',
+                  }}
+                />
+
+                {/* Realistic 3D Floor Reflection */}
+                <div
+                  className="floor-reflection absolute -bottom-[102px] left-0 right-0 h-[100px] overflow-hidden pointer-events-none select-none rounded-b-2xl"
                   style={{
                     transform: 'scaleY(-1)',
-                    WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.8), transparent)',
-                    maskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.8), transparent)',
+                    opacity: isCenter ? 0.45 : 0.3,
+                    WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.25) 35%, rgba(0,0,0,0.05) 65%, transparent 85%)',
+                    maskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.25) 35%, rgba(0,0,0,0.05) 65%, transparent 85%)',
+                    filter: 'blur(0.5px)',
                   }}
                 >
-                  <img src={track.albumArt} alt="" className="w-full h-full object-cover" />
+                  <img
+                    src={track.albumArt}
+                    alt=""
+                    className="w-full h-64 object-cover object-bottom"
+                  />
+                  {/* Dark Glass Floor Tint Overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-transparent via-[#05060a]/30 to-[#05060a]/50" />
                 </div>
               </div>
             );
@@ -557,6 +639,27 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
             })}
           </div>
         </div>
+      )}
+
+      {/* Hidden YouTube Music Audio Bridge for Full-Track Playback */}
+      {activeYouTubeId && (
+        <iframe
+          ref={ytIframeRef}
+          key={`yt-audio-bridge-${activeYouTubeId}`}
+          src={`https://www.youtube-nocookie.com/embed/${activeYouTubeId}?autoplay=1&enablejsapi=1&playsinline=1&rel=0`}
+          title="YouTube Music Audio Bridge"
+          className="w-0 h-0 opacity-0 pointer-events-none absolute -bottom-10"
+          allow="autoplay; encrypted-media"
+          onLoad={() => {
+            if (ytIframeRef.current?.contentWindow) {
+              ytIframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'listening' }), '*');
+              ytIframeRef.current.contentWindow.postMessage(
+                JSON.stringify({ event: 'command', func: 'setVolume', args: [isMuted ? 0 : volume] }),
+                '*'
+              );
+            }
+          }}
+        />
       )}
     </div>
   );

@@ -1626,7 +1626,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                   {liveSearchTracks.length > 0 && (
                     <div className="flex flex-col gap-2 pt-1">
                       <div className="flex items-center justify-between px-1 pb-1 border-b border-white/10 text-[10px] font-bold text-emerald-400 tracking-wider">
-                        <span>ONLINE MUSIC DISCOVERY ({liveSearchTracks.length})</span>
+                        <span>ONLINE & YOUTUBE MUSIC DISCOVERY ({liveSearchTracks.length})</span>
                         <button
                           onClick={() => {
                             setActiveNav('music');
@@ -1665,9 +1665,16 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                                 />
                               </div>
                               <div className="min-w-0 flex flex-col">
-                                <span className="text-xs font-bold text-white truncate group-hover:text-emerald-300 transition-colors">
-                                  {track.title}
-                                </span>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-xs font-bold text-white truncate group-hover:text-emerald-300 transition-colors">
+                                    {track.title}
+                                  </span>
+                                  {track.platform === 'youtube' && (
+                                    <span className="text-[8px] font-bold px-1.5 py-0.2 rounded bg-red-600/30 text-rose-300 border border-red-500/30 shrink-0">
+                                      YouTube Music
+                                    </span>
+                                  )}
+                                </div>
                                 <span className="text-[10px] text-white/60 truncate">
                                   {track.artist}
                                 </span>
@@ -1676,7 +1683,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
 
                             <div className="flex items-center gap-2 shrink-0">
                               <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/10 text-white/70">
-                                {track.genre.split('/')[0].trim()}
+                                {track.duration || track.genre.split('/')[0].trim()}
                               </span>
                               <button
                                 onClick={(e) => {
@@ -1689,7 +1696,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                                   }
                                 }}
                                 className="w-7 h-7 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 flex items-center justify-center font-bold shadow-md transition-transform hover:scale-110 active:scale-95 cursor-pointer"
-                                title="Play Track"
+                                title="Play Track in Hi-Fi Music Studio"
                               >
                                 <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
                               </button>
@@ -2302,6 +2309,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                   <div className="flex items-center gap-1.5 flex-wrap">
                     {[
                       { id: 'all', label: 'All Platforms', color: 'bg-white/40' },
+                      { id: 'youtube', label: 'YouTube Music', color: 'bg-[#FF0000]' },
                       { id: 'jamendo', label: 'Jamendo', color: 'bg-[#E11456]' },
                       { id: 'soundcloud', label: 'SoundCloud', color: 'bg-[#FF5500]' },
                       { id: 'bandcamp', label: 'Bandcamp', color: 'bg-[#1DA0C3]' },

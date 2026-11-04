@@ -4,7 +4,9 @@
  * Provides instant search filtering, real cover artwork, direct audio streams, and live web search.
  */
 
-export type MusicPlatform = 'jamendo' | 'soundcloud' | 'bandcamp' | 'audiomack';
+import { searchYouTubeMusicLive } from './youtubeMusicService.ts';
+
+export type MusicPlatform = 'jamendo' | 'soundcloud' | 'bandcamp' | 'audiomack' | 'youtube';
 
 export interface MusicTrack {
   id: string;
@@ -72,6 +74,14 @@ export const PLATFORM_INFO: Record<
     url: 'https://audiomack.com',
     searchUrl: 'https://audiomack.com/search?q=',
     badgeLabel: 'Trending Worldwide',
+  },
+  youtube: {
+    name: 'YouTube Music',
+    brandColor: '#FF0000',
+    bgGradient: 'from-red-600 to-rose-600',
+    url: 'https://music.youtube.com',
+    searchUrl: 'https://music.youtube.com/search?q=',
+    badgeLabel: 'YouTube Music Full Track',
   },
 };
 
@@ -739,10 +749,18 @@ export async function fetchOnlineMusicSearch(
     return ONLINE_SEARCH_CACHE.get(cacheKey)!;
   }
 
+  // Live YouTube Music search for authentic full songs
+  const ytPromise =
+    platform === 'all' || platform === 'youtube'
+      ? searchYouTubeMusicLive(clean).catch(() => [])
+      : Promise.resolve([]);
+
   const platforms: MusicPlatform[] =
     platform === 'all'
-      ? ['soundcloud', 'jamendo', 'bandcamp', 'audiomack']
+      ? ['soundcloud', 'jamendo', 'bandcamp', 'audiomack', 'youtube']
       : [platform];
+
+  let liveTracks: MusicTrack[] = [];
 
   try {
     const url = `https://itunes.apple.com/search?term=${encodeURIComponent(clean)}&entity=song&limit=24`;
@@ -750,7 +768,7 @@ export async function fetchOnlineMusicSearch(
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data.results) && data.results.length > 0) {
-        const liveTracks: MusicTrack[] = data.results.map((item: any, i: number) => {
+        liveTracks = data.results.map((item: any, i: number) => {
           const p = platforms[i % platforms.length];
           // Transform low-res thumbnail into crisp 600x600 artwork
           const rawArt = item.artworkUrl100 || item.artworkUrl60 || '';
@@ -777,13 +795,35 @@ export async function fetchOnlineMusicSearch(
             isLiveUpdate: true,
           };
         });
-
-        ONLINE_SEARCH_CACHE.set(cacheKey, liveTracks);
-        return liveTracks;
       }
     }
   } catch {
     // Network or offline fallback
+  }
+
+  // Format YouTube Music tracks with full song duration
+  const ytResults = await ytPromise;
+  const formattedYt: MusicTrack[] = ytResults.map((yt) => ({
+    id: yt.id,
+    title: yt.title,
+    artist: yt.artist,
+    platform: 'youtube',
+    coverUrl: yt.coverUrl,
+    pageUrl: yt.streamUrl,
+    streamUrl: yt.streamUrl,
+    genre: yt.genre,
+    duration: yt.duration,
+    plays: 'Full Track',
+    badge: 'YouTube Music Full Track',
+    isLiveUpdate: true,
+  }));
+
+  // Combine full YouTube Music tracks with preview tracks
+  const combined = [...formattedYt, ...liveTracks];
+
+  if (combined.length > 0) {
+    ONLINE_SEARCH_CACHE.set(cacheKey, combined);
+    return combined;
   }
 
   // Graceful fallback to verified offline catalog

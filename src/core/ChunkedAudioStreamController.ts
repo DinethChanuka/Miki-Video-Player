@@ -210,11 +210,55 @@ export class ChunkedAudioStreamController {
           if (this.onChunkLoaded) {
             this.onChunkLoaded(0, buf.byteLength);
           }
+          // Continuously preload remaining chunks in background so the entire audio plays as one contiguous track
+          this.preloadRemainingChunks(url, 1);
         })
         .catch(() => {
           // Non-fatal: browser native pipeline will continue via el.src
         });
     });
+  }
+
+  /**
+   * Continuously preloads remaining chunks in background (chunks 1, 2, ... N)
+   * while initial chunk 0 is actively playing, buffering the full stream without interruption.
+   */
+  public preloadRemainingChunks(url: string, startChunk = 1): void {
+    let currentChunk = startChunk;
+    const fetchNext = async () => {
+      if (this.isDestroyed || this.activeUrl !== url) return;
+      const startByte = currentChunk * this.chunkSize;
+
+      // If total content length is known and we have exceeded it, complete preloading
+      if (this.totalContentLength !== null && startByte >= this.totalContentLength) {
+        return;
+      }
+
+      const endByte = this.totalContentLength !== null
+        ? Math.min(startByte + this.chunkSize - 1, this.totalContentLength - 1)
+        : startByte + this.chunkSize - 1;
+
+      try {
+        const buf = await this.fetchChunk(url, startByte, endByte);
+        if (this.onChunkLoaded) {
+          this.onChunkLoaded(currentChunk, buf.byteLength);
+        }
+        currentChunk++;
+        this.currentChunkIndex = currentChunk;
+
+        // If returned bytes are fewer than chunk size, end of audio reached
+        if (buf.byteLength < this.chunkSize) {
+          return;
+        }
+
+        // Paced progressive preloading to keep buffer full without network congestion
+        setTimeout(fetchNext, 120);
+      } catch {
+        // Range requests complete or reached end of stream
+      }
+    };
+
+    setTimeout(fetchNext, 100);
   }
 
   public destroy(): void {
