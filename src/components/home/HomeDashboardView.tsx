@@ -10,6 +10,7 @@ import { CINESUBZ_MOVIES, fetchLatestCineSubzMovies, CineSubzMovie } from '../..
 import { CINESUBZ_TV_SHOWS, fetchLatestCineSubzTvShows, CineSubzTvShow } from '../../utils/cinesubzTvService';
 import {
   MUSIC_DISCOVERY_CATALOG,
+  searchMusicOnline,
   fetchLiveMusicDiscovery,
   MusicTrack,
   MusicPlatform,
@@ -23,6 +24,7 @@ import {
   Tv2,
   Gamepad2,
   Music,
+  Radio,
   Clock,
   Search,
   Settings,
@@ -42,7 +44,6 @@ import {
   FolderOpen,
   LogIn,
   LogOut,
-  ExternalLink,
   Sparkles,
 } from 'lucide-react';
 
@@ -54,7 +55,8 @@ export type HomeViewCategory =
   | 'Sports'
   | 'Live TV'
   | 'Games'
-  | 'Music';
+  | 'Music'
+  | 'Radio';
 
 export type HomeNavTab =
   | 'browse'
@@ -63,6 +65,7 @@ export type HomeNavTab =
   | 'channels'
   | 'games'
   | 'music'
+  | 'radio'
   | 'history'
   | 'settings';
 
@@ -93,7 +96,7 @@ const COVER_FLOW_ALBUMS: CoverFlowTrack[] = [
     artist: 'Vishal-Shekhar, Shafqat Amanat Ali',
     album: 'I Hate Luv Storys',
     albumArt: ALBUM_POSTERS.binTere,
-    url: 'https://cdn.freesound.org/previews/612/612627_5674468-lq.mp3',
+    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
     durationSec: 330,
   },
   {
@@ -102,7 +105,7 @@ const COVER_FLOW_ALBUMS: CoverFlowTrack[] = [
     artist: 'Raju Singh, Sonu Nigam, Shreya Ghoshal',
     album: 'Raaz: The Mystery Continues',
     albumArt: ALBUM_POSTERS.soniyo,
-    url: 'https://cdn.freesound.org/previews/615/615483_11861866-lq.mp3',
+    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
     durationSec: 312,
   },
   {
@@ -111,7 +114,7 @@ const COVER_FLOW_ALBUMS: CoverFlowTrack[] = [
     artist: 'Pritam, Mohit Chauhan',
     album: 'Love Aaj Kal',
     albumArt: ALBUM_POSTERS.dooriyan,
-    url: 'https://cdn.freesound.org/previews/530/530704_11861866-lq.mp3',
+    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
     durationSec: 338,
   },
   {
@@ -120,7 +123,7 @@ const COVER_FLOW_ALBUMS: CoverFlowTrack[] = [
     artist: 'Mithoon, Arijit Singh, Sunidhi Chauhan',
     album: 'Shivaay',
     albumArt: ALBUM_POSTERS.darkhaast,
-    url: 'https://cdn.freesound.org/previews/530/530704_11861866-lq.mp3',
+    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3',
     durationSec: 374,
   },
   {
@@ -129,7 +132,7 @@ const COVER_FLOW_ALBUMS: CoverFlowTrack[] = [
     artist: 'Pritam, Mohit Chauhan',
     album: 'Crook',
     albumArt: ALBUM_POSTERS.tujhkoJoPaaya,
-    url: 'https://cdn.freesound.org/previews/612/612627_5674468-lq.mp3',
+    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3',
     durationSec: 290,
   },
 ];
@@ -296,6 +299,9 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
   const [cinesubzTvList, setCinesubzTvList] = useState<CineSubzTvShow[]>(CINESUBZ_TV_SHOWS);
   const [selectedMusicPlatform, setSelectedMusicPlatform] = useState<MusicPlatform | 'all'>('all');
   const [musicDiscoveryList, setMusicDiscoveryList] = useState<MusicTrack[]>(MUSIC_DISCOVERY_CATALOG);
+  const [radioFilterGenre, setRadioFilterGenre] = useState<string>('All');
+  const [musicCurrentPage, setMusicCurrentPage] = useState<number>(1);
+  const MUSIC_PAGE_SIZE = 12;
 
   // Background auto-refresh for latest CineSubz & Music Discovery releases
   useEffect(() => {
@@ -333,10 +339,11 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
   const activeAlbum = COVER_FLOW_ALBUMS[activeAlbumIdx] || COVER_FLOW_ALBUMS[0];
 
   // Determine effective section mode
-  const effectiveSection: 'all' | 'movies' | 'series' | 'channels' | 'games' | 'music' | 'watchlist' = useMemo(() => {
+  const effectiveSection: 'all' | 'movies' | 'series' | 'channels' | 'games' | 'music' | 'radio' | 'watchlist' = useMemo(() => {
     if (activeNav === 'watchlist') return 'watchlist';
     if (activeNav === 'channels' || activeCategory === 'Live TV') return 'channels';
     if (activeNav === 'games' || activeCategory === 'Games') return 'games';
+    if (activeNav === 'radio' || activeCategory === 'Radio') return 'radio';
     if (activeNav === 'music' || activeCategory === 'Music') return 'music';
     if (activeCategory === 'Movies') return 'movies';
     if (activeCategory === 'Tv series' || activeCategory === 'Animation') return 'series';
@@ -422,30 +429,55 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
     );
   }, [cinesubzTvList, searchQuery]);
 
-  // Filtered Online Music Discovery (Jamendo, SoundCloud, Bandcamp, Audiomack)
+  // Filtered Online Music Discovery (Jamendo, SoundCloud, Bandcamp, Audiomack) with Live Online Search
   const filteredMusicTracks = useMemo(() => {
+    if (searchQuery.trim()) {
+      return searchMusicOnline(searchQuery, selectedMusicPlatform);
+    }
     let list = musicDiscoveryList;
     if (selectedMusicPlatform !== 'all') {
       list = list.filter((t) => t.platform === selectedMusicPlatform);
     }
+    return list;
+  }, [musicDiscoveryList, selectedMusicPlatform, searchQuery]);
+
+  // Reset pagination to page 1 whenever search query or platform changes
+  useEffect(() => {
+    setMusicCurrentPage(1);
+  }, [searchQuery, selectedMusicPlatform]);
+
+  const musicTotalPages = useMemo(() => {
+    return Math.max(1, Math.ceil(filteredMusicTracks.length / MUSIC_PAGE_SIZE));
+  }, [filteredMusicTracks.length]);
+
+  const paginatedMusicTracks = useMemo(() => {
+    const start = (musicCurrentPage - 1) * MUSIC_PAGE_SIZE;
+    return filteredMusicTracks.slice(start, start + MUSIC_PAGE_SIZE);
+  }, [filteredMusicTracks, musicCurrentPage]);
+
+  // Filtered 24/7 Live Internet Radio Stations
+  const filteredRadioStations = useMemo(() => {
+    let list = INTERNET_MUSIC_STREAMS;
+    if (radioFilterGenre !== 'All') {
+      list = list.filter((s) => s.genre.toLowerCase().includes(radioFilterGenre.toLowerCase()));
+    }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       list = list.filter(
-        (t) =>
-          t.title.toLowerCase().includes(q) ||
-          t.artist.toLowerCase().includes(q) ||
-          t.genre.toLowerCase().includes(q) ||
-          t.platform.toLowerCase().includes(q)
+        (s) =>
+          s.title.toLowerCase().includes(q) ||
+          s.artist.toLowerCase().includes(q) ||
+          s.genre.toLowerCase().includes(q)
       );
     }
     return list;
-  }, [musicDiscoveryList, selectedMusicPlatform, searchQuery]);
+  }, [radioFilterGenre, searchQuery]);
 
   const handlePlayAlbum = (idx: number) => {
     setActiveAlbumIdx(idx);
     const track = COVER_FLOW_ALBUMS[idx];
     if (track) {
-      openMedia(track.url, `${track.title} - ${track.artist}`);
+      openMedia(track.url, `${track.title} - ${track.artist}`, true, 0, track.albumArt);
       setIsCoverFlowPlaying(true);
     }
   };
@@ -557,13 +589,28 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                 setActiveCategory('Music');
               }}
               className={`p-2.5 rounded-full transition-all cursor-pointer ${
-                activeNav === 'music' || activeCategory === 'Music'
+                effectiveSection === 'music'
                   ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/40'
                   : 'text-white/50 hover:text-white hover:bg-white/10'
               }`}
-              title="Apple Cover Flow 3D Music"
+              title="3D Music & Discovery"
             >
               <Music className="w-4 h-4" />
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveNav('radio');
+                setActiveCategory('Radio');
+              }}
+              className={`p-2.5 rounded-full transition-all cursor-pointer ${
+                effectiveSection === 'radio'
+                  ? 'bg-cyan-600 text-white shadow-md shadow-cyan-600/40'
+                  : 'text-white/50 hover:text-white hover:bg-white/10'
+              }`}
+              title="Music Radio Live (24/7)"
+            >
+              <Radio className="w-4 h-4" />
             </button>
           </div>
         </div>
@@ -705,7 +752,25 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                 <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-full bg-emerald-500 shadow-sm shadow-emerald-500" />
               )}
               <Music className="w-4 h-4 text-emerald-400" />
-              <span>3D Music & Radio</span>
+              <span>3D Music</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveNav('radio');
+                setActiveCategory('Radio');
+              }}
+              className={`relative flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all text-left cursor-pointer ${
+                effectiveSection === 'radio'
+                  ? 'text-white bg-white/5 font-bold'
+                  : 'text-white/60 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              {effectiveSection === 'radio' && (
+                <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-full bg-cyan-500 shadow-sm shadow-cyan-500" />
+              )}
+              <Radio className="w-4 h-4 text-cyan-400" />
+              <span>Music Radio Live</span>
             </button>
 
             <button
@@ -852,7 +917,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
 
           {/* Top Category Pills */}
           <div className="hidden lg:flex items-center gap-1.5">
-            {(['All', 'Movies', 'Tv series', 'Animation', 'Live TV', 'Games', 'Music'] as HomeViewCategory[]).map(
+            {(['All', 'Movies', 'Tv series', 'Animation', 'Live TV', 'Games', 'Music', 'Radio'] as HomeViewCategory[]).map(
               (cat) => (
                 <button
                   key={cat}
@@ -861,6 +926,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                     if (cat === 'Live TV') setActiveNav('channels');
                     else if (cat === 'Games') setActiveNav('games');
                     else if (cat === 'Music') setActiveNav('music');
+                    else if (cat === 'Radio') setActiveNav('radio');
                     else setActiveNav('browse');
                   }}
                   className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
@@ -1070,52 +1136,28 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                 </div>
               </div>
 
-              {/* 24/7 Live Internet Radio Stations */}
-              <div className="w-full max-w-5xl flex flex-col gap-4 mt-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Music className="w-4 h-4 text-emerald-400" />
-                    <h3 className="text-sm font-bold text-white tracking-wide uppercase">
-                      24/7 Live Internet Radio Stations
-                    </h3>
-                  </div>
-                  <span className="text-xs text-white/50">{INTERNET_MUSIC_STREAMS.length} Channels Broadcasting</span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                  {INTERNET_MUSIC_STREAMS.map((station: InternetMusicStation) => (
-                    <div
-                      key={station.id}
-                      onClick={() => openMedia(station.streamUrl, `${station.title} - ${station.artist}`, true)}
-                      className="group flex items-center gap-3 p-3 rounded-2xl bg-white/5 border border-white/10 hover:border-emerald-500/50 hover:bg-white/10 transition-all cursor-pointer shadow-lg"
-                    >
-                      <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0 bg-black/40 border border-white/10">
-                        <img src={station.logoUrl} alt={station.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
-                      </div>
-                      <div className="flex flex-col min-w-0 flex-1">
-                        <span className="text-xs font-bold text-white truncate group-hover:text-emerald-400 transition-colors">
-                          {station.title}
-                        </span>
-                        <span className="text-[10px] text-white/60 truncate">
-                          {station.genre} • {station.artist}
-                        </span>
-                        <span className="text-[9px] font-mono text-emerald-400/90 mt-0.5">
-                          {station.badge}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        className="w-8 h-8 rounded-full bg-white/10 group-hover:bg-emerald-500 group-hover:text-black flex items-center justify-center text-white/70 transition-all shrink-0"
-                      >
-                        <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
               {/* Online Music Discovery & Search (Jamendo, SoundCloud, Bandcamp, Audiomack) */}
               <div className="w-full max-w-5xl flex flex-col gap-5 mt-6">
+                {/* In-Section Live Music Search Bar */}
+                <div className="relative w-full">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Live search songs, artists & genres across Jamendo, SoundCloud, Bandcamp, Audiomack..."
+                    className="w-full pl-11 pr-24 py-3 rounded-2xl bg-white/5 border border-white/10 text-xs text-white placeholder-white/40 focus:outline-none focus:border-rose-500/60 focus:bg-white/10 transition-all font-medium"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-lg bg-white/10 text-[10px] text-white/70 hover:text-white hover:bg-white/20 transition-all cursor-pointer"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="flex items-center gap-2.5">
                     <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-rose-600 via-orange-500 to-amber-500 flex items-center justify-center text-white shadow-lg shadow-rose-500/20">
@@ -1178,112 +1220,266 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                     </button>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                    {filteredMusicTracks.map((track) => {
-                      const platformMeta = PLATFORM_INFO[track.platform];
-                      return (
-                        <div
-                          key={track.id}
-                          className="group relative flex flex-col rounded-2xl bg-white/5 border border-white/10 overflow-hidden hover:border-white/25 hover:bg-white/10 transition-all shadow-xl hover:shadow-2xl"
-                        >
-                          {/* Cover Image Container with Preview Zoom */}
-                          <div className="relative aspect-square w-full overflow-hidden bg-black/60">
-                            <img
-                              src={track.coverUrl}
-                              alt={track.title}
-                              loading="lazy"
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                              onError={(e) => {
-                                (e.currentTarget as HTMLImageElement).src =
-                                  'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&auto=format&fit=crop&q=80';
-                              }}
-                            />
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-80 group-hover:opacity-60 transition-opacity" />
+                  <div className="flex flex-col gap-6 w-full">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                      {paginatedMusicTracks.map((track) => {
+                        const platformMeta = PLATFORM_INFO[track.platform];
+                        return (
+                          <div
+                            key={track.id}
+                            onClick={() => {
+                              if (track.streamUrl) {
+                                openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl);
+                              }
+                            }}
+                            className="group relative flex flex-col rounded-2xl bg-white/5 border border-white/10 overflow-hidden hover:border-emerald-500/50 hover:bg-white/10 transition-all shadow-xl hover:shadow-2xl cursor-pointer"
+                          >
+                            {/* Cover Image Container with Preview Zoom */}
+                            <div className="relative aspect-square w-full overflow-hidden bg-black/60">
+                              <img
+                                src={track.coverUrl}
+                                alt={track.title}
+                                loading="lazy"
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                onError={(e) => {
+                                  (e.currentTarget as HTMLImageElement).src =
+                                    'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&auto=format&fit=crop&q=80';
+                                }}
+                              />
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-80 group-hover:opacity-60 transition-opacity" />
 
-                            {/* Platform Badge */}
-                            <div
-                              className="absolute top-2 left-2 flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold text-white shadow-md backdrop-blur-md border border-white/20"
-                              style={{ backgroundColor: `${platformMeta.brandColor}cc` }}
-                            >
-                              <span>{platformMeta.name.split(' ')[0]}</span>
+                              {/* Platform Badge */}
+                              <div
+                                className="absolute top-2 left-2 flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold text-white shadow-md backdrop-blur-md border border-white/20"
+                                style={{ backgroundColor: `${platformMeta.brandColor}cc` }}
+                              >
+                                <span>{platformMeta.name.split(' ')[0]}</span>
+                              </div>
+
+                              {/* Duration / Plays Badge */}
+                              {(track.duration || track.plays) && (
+                                <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded-md text-[9px] font-mono text-white/90 bg-black/70 backdrop-blur-md border border-white/10">
+                                  {track.duration || track.plays}
+                                </div>
+                              )}
+
+                              {/* Center Play Button Overlay */}
+                              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 backdrop-blur-[2px]">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (track.streamUrl) {
+                                      openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl);
+                                    }
+                                  }}
+                                  className="w-11 h-11 rounded-full bg-white text-black hover:scale-110 flex items-center justify-center shadow-xl transition-all cursor-pointer"
+                                  title="Stream Song in Miki Player"
+                                >
+                                  <Play className="w-5 h-5 fill-current ml-0.5 text-black" />
+                                </button>
+                              </div>
                             </div>
 
-                            {/* Duration / Plays Badge */}
-                            {(track.duration || track.plays) && (
-                              <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded-md text-[9px] font-mono text-white/90 bg-black/70 backdrop-blur-md border border-white/10">
-                                {track.duration || track.plays}
+                            {/* Track Details & Action Footer */}
+                            <div className="p-3 flex flex-col flex-1 justify-between gap-2">
+                              <div>
+                                <h4
+                                  className="text-xs font-bold text-white truncate group-hover:text-emerald-400 transition-colors"
+                                  title={track.title}
+                                >
+                                  {track.title}
+                                </h4>
+                                <p className="text-[11px] text-white/60 truncate" title={track.artist}>
+                                  {track.artist}
+                                </p>
+                                <div className="mt-1 flex items-center gap-1">
+                                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/10 text-white/70 font-medium truncate">
+                                    {track.genre}
+                                  </span>
+                                </div>
                               </div>
-                            )}
 
-                            {/* Center Play Button Overlay */}
-                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 backdrop-blur-[2px]">
-                              <button
-                                onClick={() => {
-                                  if (track.streamUrl) {
-                                    openMedia(track.streamUrl, `${track.title} - ${track.artist}`);
-                                  } else if (onOpenWebBrowser) {
-                                    onOpenWebBrowser(track.pageUrl);
-                                  }
-                                }}
-                                className="w-11 h-11 rounded-full bg-white text-black hover:scale-110 flex items-center justify-center shadow-xl transition-all cursor-pointer"
-                                title={track.streamUrl ? 'Stream Song in Miki Player' : 'Open in Web Browser'}
-                              >
-                                <Play className="w-5 h-5 fill-current ml-0.5 text-black" />
-                              </button>
+                              {/* In-App Direct Play Action */}
+                              <div className="pt-2 border-t border-white/5 flex items-center justify-between gap-1">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (track.streamUrl) {
+                                      openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl);
+                                    }
+                                  }}
+                                  className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-emerald-600/80 hover:bg-emerald-500 hover:scale-[1.02] text-white text-[10px] font-bold shadow-md transition-all cursor-pointer"
+                                  title="Play Directly in Miki Player"
+                                >
+                                  <Play className="w-3.5 h-3.5 fill-current" />
+                                  <span>Play Song In-App</span>
+                                </button>
+                              </div>
                             </div>
                           </div>
+                        );
+                      })}
+                    </div>
 
-                          {/* Track Details & Action Footer */}
-                          <div className="p-3 flex flex-col flex-1 justify-between gap-2">
-                            <div>
-                              <h4
-                                className="text-xs font-bold text-white truncate group-hover:text-rose-400 transition-colors"
-                                title={track.title}
-                              >
-                                {track.title}
-                              </h4>
-                              <p className="text-[11px] text-white/60 truncate" title={track.artist}>
-                                {track.artist}
-                              </p>
-                              <div className="mt-1 flex items-center gap-1">
-                                <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/10 text-white/70 font-medium truncate">
-                                  {track.genre}
+                    {/* Music Page Pagination Controls */}
+                    {filteredMusicTracks.length > MUSIC_PAGE_SIZE && (
+                      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-6 border-t border-white/10 w-full">
+                        <span className="text-xs text-white/50 font-mono">
+                          Showing {(musicCurrentPage - 1) * MUSIC_PAGE_SIZE + 1} -{' '}
+                          {Math.min(filteredMusicTracks.length, musicCurrentPage * MUSIC_PAGE_SIZE)} of{' '}
+                          {filteredMusicTracks.length} Songs (Page {musicCurrentPage} of {musicTotalPages})
+                        </span>
+
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => setMusicCurrentPage((p) => Math.max(1, p - 1))}
+                            disabled={musicCurrentPage === 1}
+                            className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-white border border-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center gap-1"
+                          >
+                            <ChevronLeft className="w-3.5 h-3.5" />
+                            <span>Previous</span>
+                          </button>
+
+                          {Array.from({ length: musicTotalPages }, (_, i) => i + 1).map((pageNum) => {
+                            if (
+                              pageNum === 1 ||
+                              pageNum === musicTotalPages ||
+                              (pageNum >= musicCurrentPage - 2 && pageNum <= musicCurrentPage + 2)
+                            ) {
+                              const isActive = musicCurrentPage === pageNum;
+                              return (
+                                <button
+                                  key={pageNum}
+                                  onClick={() => setMusicCurrentPage(pageNum)}
+                                  className={`w-8 h-8 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                    isActive
+                                      ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/40'
+                                      : 'bg-white/5 text-white/70 hover:bg-white/10 hover:text-white border border-white/10'
+                                  }`}
+                                >
+                                  {pageNum}
+                                </button>
+                              );
+                            }
+                            if (pageNum === musicCurrentPage - 3 || pageNum === musicCurrentPage + 3) {
+                              return (
+                                <span key={pageNum} className="text-xs text-white/40 px-1">
+                                  ...
                                 </span>
-                              </div>
-                            </div>
+                              );
+                            }
+                            return null;
+                          })}
 
-                            {/* Dual Actions: In-App Play & Web Link */}
-                            <div className="pt-2 border-t border-white/5 flex items-center justify-between gap-1">
-                              <button
-                                onClick={() => {
-                                  if (track.streamUrl) {
-                                    openMedia(track.streamUrl, `${track.title} - ${track.artist}`);
-                                  } else if (onOpenWebBrowser) {
-                                    onOpenWebBrowser(track.pageUrl);
-                                  }
-                                }}
-                                className="flex-1 flex items-center justify-center gap-1 py-1 rounded-lg bg-white/10 hover:bg-rose-500 hover:text-white text-white/80 text-[10px] font-semibold transition-all cursor-pointer"
-                              >
-                                <Play className="w-3 h-3 fill-current" />
-                                <span>{track.streamUrl ? 'Play Audio' : 'Play Web'}</span>
-                              </button>
-
-                              <button
-                                onClick={() => {
-                                  if (onOpenWebBrowser) onOpenWebBrowser(track.pageUrl);
-                                }}
-                                title={`Open on ${platformMeta.name}`}
-                                className="p-1 rounded-lg bg-white/5 hover:bg-white/15 text-white/60 hover:text-white transition-all cursor-pointer"
-                              >
-                                <ExternalLink className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
+                          <button
+                            onClick={() => setMusicCurrentPage((p) => Math.min(musicTotalPages, p + 1))}
+                            disabled={musicCurrentPage === musicTotalPages}
+                            className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-white border border-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center gap-1"
+                          >
+                            <span>Next</span>
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          </button>
                         </div>
-                      );
-                    })}
+                      </div>
+                    )}
                   </div>
                 )}
+              </div>
+            </div>
+          ) : effectiveSection === 'radio' ? (
+            /* ============================================================ */
+            /* A2. DYNAMIC SECTION: 24/7 MUSIC RADIO LIVE                   */
+            /* ============================================================ */
+            <div className="flex flex-col gap-6 w-full">
+              {/* Radio Broadcast Hero Banner */}
+              <div className="relative w-full rounded-3xl overflow-hidden border border-cyan-500/20 bg-gradient-to-r from-cyan-950/70 via-slate-900 to-black p-8 sm:p-10 flex flex-col justify-between min-h-[280px] shadow-2xl">
+                {/* Right Side Visual Artwork */}
+                <div className="absolute right-0 top-0 bottom-0 w-1/2 lg:w-3/5 pointer-events-none z-0 overflow-hidden flex items-center justify-end">
+                  <img
+                    src={HERO_ARTWORKS.audioSynthesizer}
+                    alt="Radio Broadcast Artwork"
+                    className="h-full w-full object-cover object-right opacity-80"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-transparent to-transparent pointer-events-none" />
+                </div>
+
+                <div className="relative z-10 flex flex-col gap-3 max-w-xl">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-xs font-semibold w-fit">
+                    <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                    <span>24/7 Global Live Audio Streams</span>
+                  </div>
+                  <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
+                    Music Radio Live
+                  </h1>
+                  <p className="text-sm text-white/70 leading-relaxed">
+                    Commercial-free high-bitrate live radio stations broadcasting worldwide ambient, lo-fi, synthwave, electronic, indie, and classical streams.
+                  </p>
+                  <div className="flex items-center gap-3 pt-2">
+                    <button
+                      onClick={() => {
+                        const station = INTERNET_MUSIC_STREAMS[0];
+                        if (station) openMedia(station.streamUrl, `${station.title} - ${station.artist}`, false, 0, station.logoUrl);
+                      }}
+                      className="px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs flex items-center gap-2 shadow-lg shadow-cyan-500/30 transition-all cursor-pointer"
+                    >
+                      <Play className="w-4 h-4 fill-current" />
+                      <span>Listen to Groove Salad Live</span>
+                    </button>
+                    <span className="text-xs text-white/50">{INTERNET_MUSIC_STREAMS.length} Channels Broadcasting</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Radio Genre Filter Pills */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {['All', 'Chillout', 'Ambient', 'Synthwave', 'Indie', 'Classical', 'Lo-Fi', 'Electronic'].map((genre) => {
+                  const isActive = radioFilterGenre === genre;
+                  return (
+                    <button
+                      key={genre}
+                      onClick={() => setRadioFilterGenre(genre)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                        isActive
+                          ? 'bg-cyan-600 text-white font-bold shadow-md shadow-cyan-600/30'
+                          : 'bg-white/5 text-white/70 hover:bg-white/10 hover:text-white border border-white/10'
+                      }`}
+                    >
+                      {genre}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Stations Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {filteredRadioStations.map((station: InternetMusicStation) => (
+                  <div
+                    key={station.id}
+                    onClick={() => openMedia(station.streamUrl, `${station.title} - ${station.artist}`, false, 0, station.logoUrl)}
+                    className="group flex items-center gap-3.5 p-3.5 rounded-2xl bg-white/5 border border-white/10 hover:border-cyan-500/50 hover:bg-white/10 transition-all cursor-pointer shadow-lg"
+                  >
+                    <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0 bg-black/40 border border-white/10">
+                      <img src={station.logoUrl} alt={station.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                    </div>
+                    <div className="flex flex-col min-w-0 flex-1">
+                      <span className="text-xs font-bold text-white truncate group-hover:text-cyan-400 transition-colors">
+                        {station.title}
+                      </span>
+                      <span className="text-[11px] text-white/60 truncate">
+                        {station.genre} • {station.artist}
+                      </span>
+                      <span className="text-[9px] font-mono text-cyan-400/90 mt-1">
+                        {station.badge}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      className="w-9 h-9 rounded-full bg-white/10 group-hover:bg-cyan-500 group-hover:text-black flex items-center justify-center text-white/70 transition-all shrink-0"
+                    >
+                      <Play className="w-4 h-4 fill-current ml-0.5" />
+                    </button>
+                  </div>
+                ))}
               </div>
             </div>
           ) : effectiveSection === 'channels' ? (
@@ -2128,15 +2324,22 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                         className="group relative flex flex-col rounded-2xl overflow-hidden bg-white/5 border border-white/10 hover:border-rose-400/50 hover:bg-white/10 transition-all cursor-pointer shadow-lg"
                       >
                         <div className="relative aspect-video w-full overflow-hidden bg-black/60">
-                          {item.thumbnailUri ? (
+                          {item.thumbnailUri && !item.thumbnailUri.includes('google.com/s2/favicons') ? (
                             <img
                               src={item.thumbnailUri}
                               alt={item.title}
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                             />
                           ) : (
-                            <div className="w-full h-full flex items-center justify-center bg-slate-900 text-white/30">
-                              <Film className="w-6 h-6" />
+                            <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 text-white/40 gap-1.5 p-2">
+                              {item.thumbnailUri ? (
+                                <img src={item.thumbnailUri} alt="" className="w-7 h-7 rounded-lg object-contain bg-black/40 p-1 border border-white/10" />
+                              ) : (
+                                <Film className="w-6 h-6 text-rose-400" />
+                              )}
+                              <span className="text-[10px] text-white/60 font-medium truncate max-w-full text-center px-1">
+                                {item.title}
+                              </span>
                             </div>
                           )}
                           <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">

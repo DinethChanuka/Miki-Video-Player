@@ -1,6 +1,6 @@
 import React from 'react';
 import { usePlayerStore } from '../../store/playerStore';
-import { X, Moon, RotateCcw } from 'lucide-react';
+import { X, Moon, RotateCcw, Zap } from 'lucide-react';
 
 interface EqualizerModalProps {
   isOpen: boolean;
@@ -13,6 +13,8 @@ export const EqualizerModal: React.FC<EqualizerModalProps> = ({ isOpen, onClose 
   const eqGainsDb = usePlayerStore((s) => s.eqGainsDb);
   const nightModeEnabled = usePlayerStore((s) => s.nightModeEnabled);
   const setEqualizer = usePlayerStore((s) => s.setEqualizer);
+  const dspBypass = usePlayerStore((s) => s.dspBypass);
+  const toggleDspBypass = usePlayerStore((s) => s.toggleDspBypass);
 
   if (!isOpen) return null;
 
@@ -75,25 +77,42 @@ export const EqualizerModal: React.FC<EqualizerModalProps> = ({ isOpen, onClose 
           })}
         </div>
 
-        {/* Footer Actions: Night Mode & Reset */}
-        <div className="flex items-center justify-between pt-4 border-t border-white/10">
-          <button
-            onClick={toggleNightMode}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-              nightModeEnabled
-                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30 border border-indigo-400/40'
-                : 'glass-pill text-white/80'
-            }`}
-          >
-            <Moon className="w-4 h-4" />
-            Night Mode (DRC)
-          </button>
+        {/* Footer Actions: Night Mode, DSP Bypass & Reset */}
+        <div className="flex items-center justify-between pt-4 border-t border-white/10 flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={toggleNightMode}
+              disabled={dspBypass}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium transition-all ${
+                nightModeEnabled && !dspBypass
+                  ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30 border border-indigo-400/40'
+                  : 'glass-pill text-white/80 disabled:opacity-40 disabled:cursor-not-allowed'
+              }`}
+            >
+              <Moon className="w-3.5 h-3.5" />
+              Night Mode (DRC)
+            </button>
+
+            <button
+              onClick={toggleDspBypass}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium transition-all ${
+                dspBypass
+                  ? 'bg-amber-600 text-white shadow-lg shadow-amber-500/30 border border-amber-400/40'
+                  : 'glass-pill text-white/80'
+              }`}
+              title="Bypass all WebAudio DSP filters for 0% CPU overhead and pure direct audio output"
+            >
+              <Zap className="w-3.5 h-3.5" />
+              {dspBypass ? 'Direct Audio (DSP Bypassed)' : 'Bypass DSP'}
+            </button>
+          </div>
 
           <button
             onClick={handleReset}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white/80 glass-pill transition-colors"
+            disabled={dspBypass}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium text-white/80 glass-pill transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            <RotateCcw className="w-4 h-4" />
+            <RotateCcw className="w-3.5 h-3.5" />
             Reset to Flat
           </button>
         </div>

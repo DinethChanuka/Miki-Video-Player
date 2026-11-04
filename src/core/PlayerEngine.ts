@@ -100,6 +100,8 @@ export interface IPlayerEngine {
   captureSnapshot?(): string | null;
   getQualityLevels?(): any[];
   setQualityLevel?(level: number): void;
+  setDspBypass?(bypass: boolean): void;
+  getDspBypass?(): boolean;
   onTelemetry(callback: (telemetry: PlaybackTelemetry) => void): () => void;
   onError(callback: (error: PlayerErrorEnvelope) => void): () => void;
   destroy(): Promise<void>;
@@ -290,6 +292,23 @@ export class WebMediaEngine implements IPlayerEngine {
 
   private static readonly EQ_FREQUENCIES = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
 
+  private dspBypass: boolean = false;
+
+  public setDspBypass(bypass: boolean): void {
+    this.dspBypass = bypass;
+    if (bypass) {
+      if (this.videoEl) {
+        this.videoEl.volume = Math.min(1, this.currentVolumePercent / 100);
+      }
+    } else {
+      this.setupWebAudioGraph();
+    }
+  }
+
+  public getDspBypass(): boolean {
+    return this.dspBypass;
+  }
+
   public attachSpatialAudio(spatial: SpatialAudioEngine): void {
     this.spatialAudio = spatial;
     if (this.audioCtx && this.lastEqNode) {
@@ -347,17 +366,39 @@ export class WebMediaEngine implements IPlayerEngine {
           .catch(() => {});
       }
       const err = this.videoEl?.error;
+      let code: ErrorCode = 'STREAM_ERROR';
+      let recovery: RecoveryStrategy = 'retry_with_backoff';
+
+      if (err) {
+        // HTMLMediaElement standard error codes:
+        // 1 = MEDIA_ERR_ABORTED
+        // 2 = MEDIA_ERR_NETWORK
+        // 3 = MEDIA_ERR_DECODE
+        // 4 = MEDIA_ERR_SRC_NOT_SUPPORTED
+        if (err.code === 3 || (typeof MediaError !== 'undefined' && err.code === MediaError.MEDIA_ERR_DECODE)) {
+          code = 'CODEC_UNSUPPORTED';
+          recovery = 'fallback_to_web_engine';
+        } else if (err.code === 2 || (typeof MediaError !== 'undefined' && err.code === MediaError.MEDIA_ERR_NETWORK)) {
+          code = 'STREAM_TIMEOUT';
+          recovery = 'retry_with_backoff';
+        } else if (err.code === 4 || (typeof MediaError !== 'undefined' && err.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED)) {
+          code = 'MEDIA_NOT_FOUND';
+          recovery = 'retry_with_backoff';
+        }
+      }
+
       this.emitError({
-        code: 'CODEC_UNSUPPORTED',
-        message: err?.message || 'Media playback error encountered in video element.',
-        severity: 'recoverable',
-        recovery: 'retry_with_backoff',
+        code,
+        message: err?.message || (code === 'MEDIA_NOT_FOUND' ? 'Media stream source not found or unreachable.' : 'Media playback error encountered in video element.'),
+        severity: code === 'MEDIA_NOT_FOUND' ? 'warning' : 'recoverable',
+        recovery,
         timestampMs: Date.now(),
       });
     };
   }
 
   public setupWebAudioGraph(): void {
+    if (this.dspBypass) return;
     const el = this.getVideoEl();
     if (!el) return;
     try {
@@ -527,6 +568,13 @@ export class WebMediaEngine implements IPlayerEngine {
     const clamped = Math.max(0, Math.min(200, volume));
     this.currentVolumePercent = clamped;
 
+    if (this.dspBypass) {
+      if (this.videoEl) {
+        this.videoEl.volume = Math.min(1, clamped / 100);
+      }
+      return;
+    }
+
     this.setupWebAudioGraph();
 
     const hasWebAudio = Boolean(this.gainNode || this.spatialAudio || this.mediaSourceNode);
@@ -553,6 +601,16 @@ export class WebMediaEngine implements IPlayerEngine {
   }
 
   async setMuted(muted: boolean): Promise<void> {
+    if (this.dspBypass) {
+      if (this.videoEl) {
+        this.videoEl.muted = muted;
+        if (!muted) {
+          this.videoEl.volume = Math.min(1, this.currentVolumePercent / 100);
+        }
+      }
+      return;
+    }
+
     const hasWebAudio = Boolean(this.gainNode || this.spatialAudio || this.mediaSourceNode);
     if (this.videoEl) {
       this.videoEl.muted = muted;
