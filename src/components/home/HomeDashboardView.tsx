@@ -11,6 +11,7 @@ import { CINESUBZ_TV_SHOWS, fetchLatestCineSubzTvShows, CineSubzTvShow } from '.
 import {
   MUSIC_DISCOVERY_CATALOG,
   searchMusicOnline,
+  fetchOnlineMusicSearch,
   fetchLiveMusicDiscovery,
   MusicTrack,
   MusicPlatform,
@@ -89,6 +90,7 @@ export interface CoverFlowTrack {
   albumArt: string;
   url: string;
   durationSec: number;
+  platform?: string;
 }
 
 const COVER_FLOW_ALBUMS: CoverFlowTrack[] = [
@@ -111,13 +113,14 @@ const COVER_FLOW_ALBUMS: CoverFlowTrack[] = [
     durationSec: 312,
   },
   {
-    id: 'track-dooriyan',
-    title: 'Dooriyan',
-    artist: 'Pritam, Mohit Chauhan',
-    album: 'Love Aaj Kal',
+    id: 'track-hindisongs3-soundcloud',
+    title: 'Hindi Songs 3',
+    artist: 'Pritam, Mohit Chauhan & Arijit Singh',
+    album: 'SoundCloud Discover Hits',
     albumArt: ALBUM_POSTERS.dooriyan,
-    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
+    url: 'https://raw.githubusercontent.com/rafaelreis-hotmart/Audio-Sample-files/master/sample.mp3',
     durationSec: 338,
+    platform: 'soundcloud',
   },
   {
     id: 'track-darkhaast',
@@ -295,7 +298,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
   const [channelFilterCategory, setChannelFilterCategory] = useState<string>('All');
   const [gameFilterCategory, setGameFilterCategory] = useState<string>('All');
   const [isUserLoggedIn, setIsUserLoggedIn] = useState<boolean>(true);
-  const [activeAlbumIdx, setActiveAlbumIdx] = useState<number>(2); // Default to Dooriyan (Love Aaj Kal)
+  const [activeAlbumIdx, setActiveAlbumIdx] = useState<number>(2); // Default to Hindi Songs 3 (SoundCloud)
   const [isCoverFlowPlaying, setIsCoverFlowPlaying] = useState<boolean>(false);
   const [partiesToggle, setPartiesToggle] = useState<boolean>(true);
   const [continueToggle, setContinueToggle] = useState<boolean>(true);
@@ -303,6 +306,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
   const [cinesubzTvList, setCinesubzTvList] = useState<CineSubzTvShow[]>(CINESUBZ_TV_SHOWS);
   const [selectedMusicPlatform, setSelectedMusicPlatform] = useState<MusicPlatform | 'all'>('all');
   const [musicDiscoveryList, setMusicDiscoveryList] = useState<MusicTrack[]>(MUSIC_DISCOVERY_CATALOG);
+  const [liveSearchedTracks, setLiveSearchedTracks] = useState<MusicTrack[]>([]);
   const [radioFilterGenre, setRadioFilterGenre] = useState<string>('All');
   const [musicCurrentPage, setMusicCurrentPage] = useState<number>(1);
   const CHUNK_SIZE = 12; // 12 tracks per chunk for progressive stream buffering
@@ -342,6 +346,42 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
   const toggleMute = usePlayerStore((s) => s.toggleMute);
 
   const activeAlbum = COVER_FLOW_ALBUMS[activeAlbumIdx] || COVER_FLOW_ALBUMS[0];
+
+  // Detect previously played music or media from recent history
+  const previouslyPlayed = useMemo(() => {
+    if (!recentMedia || recentMedia.length === 0) return null;
+    return (
+      recentMedia.find(
+        (m) =>
+          m.uri.includes('soundcloud') ||
+        (m.webDomain && m.webDomain.includes('soundcloud')) ||
+          m.webPlatform === 'cinema' ||
+          m.title.toLowerCase().includes('hindi') ||
+          m.title.toLowerCase().includes('dooriyan') ||
+          /\.(mp3|wav|flac|aac|m4a|ogg)/i.test(m.uri) ||
+          Boolean(m.thumbnailUri)
+      ) || recentMedia[0] || null
+    );
+  }, [recentMedia]);
+
+  // Live dynamic online search across iTunes & streaming APIs when user searches
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (!q) {
+      setLiveSearchedTracks([]);
+      return;
+    }
+    const timer = setTimeout(() => {
+      fetchOnlineMusicSearch(q, selectedMusicPlatform)
+        .then((tracks) => {
+          if (tracks && tracks.length > 0) {
+            setLiveSearchedTracks(tracks);
+          }
+        })
+        .catch(() => {});
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [searchQuery, selectedMusicPlatform]);
 
   // Determine effective section mode
   const effectiveSection: 'all' | 'movies' | 'series' | 'channels' | 'games' | 'music' | 'radio' | 'watchlist' = useMemo(() => {
@@ -437,6 +477,9 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
   // Filtered Online Music Discovery (Jamendo, SoundCloud, Bandcamp, Audiomack) with Live Online Search
   const filteredMusicTracks = useMemo(() => {
     if (searchQuery.trim()) {
+      if (liveSearchedTracks.length > 0) {
+        return liveSearchedTracks;
+      }
       return searchMusicOnline(searchQuery, selectedMusicPlatform);
     }
     let list = musicDiscoveryList;
@@ -444,7 +487,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
       list = list.filter((t) => t.platform === selectedMusicPlatform);
     }
     return list;
-  }, [musicDiscoveryList, selectedMusicPlatform, searchQuery]);
+  }, [musicDiscoveryList, selectedMusicPlatform, searchQuery, liveSearchedTracks]);
 
   // Reset pagination to page 1 whenever search query or platform changes
   useEffect(() => {
@@ -480,8 +523,9 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
 
   const liveSearchTracks = useMemo(() => {
     if (!searchQuery.trim()) return [];
+    if (liveSearchedTracks.length > 0) return liveSearchedTracks.slice(0, 8);
     return searchMusicOnline(searchQuery, 'all').slice(0, 8);
-  }, [searchQuery]);
+  }, [searchQuery, liveSearchedTracks]);
 
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
@@ -1171,11 +1215,24 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
 
               {/* Active Album Title & Artist Display */}
               <div className="text-center flex flex-col items-center gap-1 animate-in fade-in duration-300">
+                {previouslyPlayed ? (
+                  <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-[10px] font-bold text-emerald-300 mb-1">
+                    <Clock className="w-3 h-3 text-emerald-400" />
+                    <span>PREVIOUSLY PLAYED TRACK</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-500/20 border border-orange-500/30 text-[10px] font-bold text-orange-300 mb-1">
+                    <span className="w-2 h-2 rounded-full bg-orange-400 animate-pulse" />
+                    <span>DEFAULT SOUNDCLOUD TRACK</span>
+                  </div>
+                )}
                 <h2 className="text-xl font-bold text-white tracking-wide">
-                  {activeAlbum.title}
+                  {previouslyPlayed ? previouslyPlayed.title : activeAlbum.title}
                 </h2>
                 <p className="text-xs text-white/60 font-medium">
-                  {activeAlbum.artist} — {activeAlbum.album}
+                  {previouslyPlayed
+                    ? 'Resume Playback • Recent Media'
+                    : `${activeAlbum.artist} — ${activeAlbum.album}`}
                 </p>
               </div>
 
@@ -1192,7 +1249,21 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                   </button>
 
                   <button
-                    onClick={() => handlePlayAlbum(activeAlbumIdx)}
+                    onClick={() => {
+                      if (previouslyPlayed) {
+                        openMedia(
+                          previouslyPlayed.uri,
+                          previouslyPlayed.title,
+                          true,
+                          previouslyPlayed.lastPositionMs,
+                          previouslyPlayed.thumbnailUri
+                        );
+                        setIsCoverFlowPlaying(true);
+                        if (onOpenMusic) onOpenMusic();
+                      } else {
+                        handlePlayAlbum(activeAlbumIdx);
+                      }
+                    }}
                     className="p-2.5 rounded-full bg-white text-slate-950 hover:scale-105 transition-all cursor-pointer shadow-lg"
                   >
                     {isCoverFlowPlaying ? (
@@ -1221,20 +1292,22 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                 >
                   <div className="w-8 h-8 rounded-lg overflow-hidden bg-black/60 shrink-0">
                     <img
-                      src={activeAlbum.albumArt}
-                      alt={activeAlbum.title}
+                      src={previouslyPlayed?.thumbnailUri || activeAlbum.albumArt}
+                      alt={previouslyPlayed ? previouslyPlayed.title : activeAlbum.title}
                       className="w-full h-full object-cover"
                     />
                   </div>
                   <div className="flex flex-col min-w-0 flex-1">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-white truncate">
-                        {activeAlbum.title}
+                        {previouslyPlayed ? previouslyPlayed.title : activeAlbum.title}
                       </span>
-                      <span className="text-[10px] text-white/40 font-mono">3:38</span>
+                      <span className="text-[10px] text-white/40 font-mono">
+                        {previouslyPlayed ? 'Recent' : '3:38'}
+                      </span>
                     </div>
                     <div className="w-full h-1 bg-white/20 rounded-full overflow-hidden mt-1">
-                      <div className="w-2/5 h-full bg-gradient-to-r from-rose-500 to-cyan-400 rounded-full" />
+                      <div className="w-2/5 h-full bg-gradient-to-r from-orange-500 to-rose-400 rounded-full" />
                     </div>
                   </div>
                 </div>
