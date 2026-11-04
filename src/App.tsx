@@ -105,6 +105,9 @@ export const App: React.FC = () => {
   const activeSubtitleTrack = usePlayerStore((s) => s.activeSubtitleTrack);
   const isSubtitlesVisible = usePlayerStore((s) => s.isSubtitlesVisible);
   const subtitleStyle = usePlayerStore((s) => s.subtitleStyle);
+  const activePlaybackMode = usePlayerStore((s) => s.activePlaybackMode);
+  const isMusicPlayerOpen = usePlayerStore((s) => s.isMusicPlayerOpen);
+  const setMusicPlayerOpen = usePlayerStore((s) => s.setMusicPlayerOpen);
 
   const theme = PLAYER_THEMES[themeId] || PLAYER_THEMES.cyberpunk;
 
@@ -128,7 +131,6 @@ export const App: React.FC = () => {
   const [webBrowserUrl, setWebBrowserUrl] = useState('https://www.youtube.com');
   const [isGamesOpen, setIsGamesOpen] = useState(false);
   const [selectedGameId, setSelectedGameId] = useState<string | undefined>(undefined);
-  const [isMusicPlayerOpen, setIsMusicPlayerOpen] = useState(false);
   const [isDashboardOpen, setIsDashboardOpen] = useState(false);
   const [isChannelsOpen, setIsChannelsOpen] = useState(false);
   const [isSystemAccessOpen, setIsSystemAccessOpen] = useState(false);
@@ -645,7 +647,7 @@ export const App: React.FC = () => {
               if (gameId) setSelectedGameId(gameId);
               setIsGamesOpen(true);
             }}
-            onOpenMusic={() => setIsMusicPlayerOpen(true)}
+            onOpenMusic={() => setMusicPlayerOpen(true)}
             onOpenChannels={() => setIsChannelsOpen(true)}
           />
 
@@ -929,7 +931,7 @@ export const App: React.FC = () => {
                 if (gameId) setSelectedGameId(gameId);
                 setIsGamesOpen(true);
               }}
-              onOpenMusic={() => setIsMusicPlayerOpen(true)}
+              onOpenMusic={() => setMusicPlayerOpen(true)}
               onOpenWebBrowser={(url) => {
                 if (url) setWebBrowserUrl(url);
                 setIsWebBrowserOpen(true);
@@ -1006,7 +1008,13 @@ export const App: React.FC = () => {
           <ControlsOverlay
             onOpenEq={() => setIsEqOpen(true)}
             onOpenSettings={() => setIsSettingsOpen(true)}
-            onOpenFileBrowser={() => setIsDashboardOpen(true)}
+            onOpenFileBrowser={() => {
+              if (activePlaybackMode === 'music') {
+                setMusicPlayerOpen(true);
+              } else {
+                setIsDashboardOpen(true);
+              }
+            }}
             containerRef={containerRef}
             isVisible={areControlsVisible}
           />
@@ -1022,7 +1030,7 @@ export const App: React.FC = () => {
             if (gameId) setSelectedGameId(gameId);
             setIsGamesOpen(true);
           }}
-          onOpenMusic={() => setIsMusicPlayerOpen(true)}
+          onOpenMusic={() => setMusicPlayerOpen(true)}
           onOpenWebBrowser={(url) => {
             if (url) setWebBrowserUrl(url);
             setIsWebBrowserOpen(true);
@@ -1067,10 +1075,10 @@ export const App: React.FC = () => {
         />
       </ErrorBoundary>
 
-      <ErrorBoundary onReset={() => setIsMusicPlayerOpen(false)}>
+      <ErrorBoundary onReset={() => setMusicPlayerOpen(false)}>
         <FullWindowMusicPlayer
           isOpen={isMusicPlayerOpen}
-          onClose={() => setIsMusicPlayerOpen(false)}
+          onClose={() => setMusicPlayerOpen(false)}
           onOpenEq={() => setIsEqOpen(true)}
         />
       </ErrorBoundary>

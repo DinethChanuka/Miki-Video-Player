@@ -477,14 +477,14 @@ export class WebMediaEngine implements IPlayerEngine {
     }
 
     const resolvedUri = resolveMediaStreamUrl(uri);
-    const isRemote = resolvedUri.startsWith('http://') || resolvedUri.startsWith('https://');
     const isHls = HlsStreamController.isHlsUrl(resolvedUri);
 
-    // For remote streams without CORS headers, do not force crossOrigin to avoid MediaError rejection
-    if (isRemote) {
-      el.removeAttribute('crossOrigin');
-    } else {
+    // Enable crossOrigin = 'anonymous' so WebAudio createMediaElementSource receives authorized audio
+    // Adaptive CORS recovery in onerror will automatically remove crossOrigin if the remote server rejects it
+    try {
       el.crossOrigin = 'anonymous';
+    } catch {
+      el.removeAttribute('crossOrigin');
     }
 
     if (isHls) {
@@ -535,6 +535,10 @@ export class WebMediaEngine implements IPlayerEngine {
       await this.audioCtx.resume().catch(() => {});
     }
     if (el) {
+      if (this.currentVolumePercent > 0 && el.muted) {
+        // Enforce unmuted state for audible playback, clearing any prior NotAllowedError muted flag
+        el.muted = false;
+      }
       try {
         await el.play();
       } catch (err: unknown) {
@@ -567,6 +571,10 @@ export class WebMediaEngine implements IPlayerEngine {
     // VLC Overdrive range: 0% to 200%
     const clamped = Math.max(0, Math.min(200, volume));
     this.currentVolumePercent = clamped;
+
+    if (this.videoEl && clamped > 0 && this.videoEl.muted) {
+      this.videoEl.muted = false;
+    }
 
     if (this.dspBypass) {
       if (this.videoEl) {

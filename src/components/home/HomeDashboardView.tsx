@@ -45,6 +45,8 @@ import {
   LogIn,
   LogOut,
   Sparkles,
+  X,
+  RefreshCw,
 } from 'lucide-react';
 
 export type HomeViewCategory =
@@ -288,6 +290,8 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
   const [activeNav, setActiveNav] = useState<HomeNavTab>('browse');
   const [activeCategory, setActiveCategory] = useState<HomeViewCategory>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [isSearchFocused, setIsSearchFocused] = useState<boolean>(false);
+  const [isRefreshingMusic, setIsRefreshingMusic] = useState<boolean>(false);
   const [channelFilterCategory, setChannelFilterCategory] = useState<string>('All');
   const [gameFilterCategory, setGameFilterCategory] = useState<string>('All');
   const [isUserLoggedIn, setIsUserLoggedIn] = useState<boolean>(true);
@@ -473,12 +477,29 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
     return list;
   }, [radioFilterGenre, searchQuery]);
 
+  const liveSearchTracks = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    return searchMusicOnline(searchQuery, 'all').slice(0, 8);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.search-bar-container')) {
+        setIsSearchFocused(false);
+      }
+    };
+    window.addEventListener('mousedown', handleOutsideClick);
+    return () => window.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
+
   const handlePlayAlbum = (idx: number) => {
     setActiveAlbumIdx(idx);
     const track = COVER_FLOW_ALBUMS[idx];
     if (track) {
       openMedia(track.url, `${track.title} - ${track.artist}`, true, 0, track.albumArt);
       setIsCoverFlowPlaying(true);
+      if (onOpenMusic) onOpenMusic();
     }
   };
 
@@ -894,24 +915,123 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
               </button>
             </div>
 
-            {/* Search Bar */}
-            <div className="relative min-w-[260px] sm:min-w-[320px]">
+            {/* Search Bar with Live Results Dropdown */}
+            <div className="search-bar-container relative min-w-[260px] sm:min-w-[340px] z-50">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/40" />
               <input
                 type="text"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => setIsSearchFocused(true)}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setIsSearchFocused(true);
+                }}
                 placeholder="Search everything across movies, channels, games, music..."
-                className="w-full pl-9 pr-8 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder-white/40 focus:outline-none focus:border-rose-500/50 transition-all font-medium"
+                className="w-full pl-9 pr-14 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder-white/40 focus:outline-none focus:border-emerald-500/50 transition-all font-medium"
               />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  title="Clear search"
+                  className="absolute right-8 top-1/2 -translate-y-1/2 p-1 text-white/40 hover:text-white transition-colors cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
               <button
                 type="button"
                 onClick={onOpenEq}
                 title="Audio Equalizer & Spatial Audio"
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-white/30 hover:text-white transition-colors"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-white/30 hover:text-white transition-colors cursor-pointer"
               >
                 <Sliders className="w-3.5 h-3.5" />
               </button>
+
+              {/* Live Instant Search Dropdown */}
+              {searchQuery.trim().length > 0 && isSearchFocused && (
+                <div
+                  className="absolute left-0 right-0 top-full mt-2 bg-[#090d16]/95 backdrop-blur-2xl border border-white/15 rounded-2xl shadow-2xl p-3 flex flex-col gap-2 max-h-[440px] overflow-y-auto scrollbar-thin z-50 animate-in fade-in zoom-in-95 duration-150"
+                  onMouseDown={(e) => e.stopPropagation()}
+                >
+                  <div className="flex items-center justify-between px-1 pb-1 border-b border-white/10 text-[10px] font-bold text-white/50 tracking-wider">
+                    <span>LIVE MUSIC & ARTIST RESULTS ({liveSearchTracks.length})</span>
+                    <button
+                      onClick={() => {
+                        setActiveNav('music');
+                        setIsSearchFocused(false);
+                      }}
+                      className="text-emerald-400 hover:text-emerald-300 transition-colors font-medium cursor-pointer"
+                    >
+                      View in 3D Music
+                    </button>
+                  </div>
+
+                  {liveSearchTracks.length > 0 ? (
+                    <div className="flex flex-col gap-1.5 pt-1">
+                      {liveSearchTracks.map((track) => (
+                        <div
+                          key={track.id}
+                          onClick={() => {
+                            if (track.streamUrl) {
+                              openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl);
+                              if (onOpenMusic) onOpenMusic();
+                              setIsSearchFocused(false);
+                            }
+                          }}
+                          className="flex items-center justify-between gap-3 p-2 rounded-xl bg-white/5 hover:bg-emerald-500/15 border border-transparent hover:border-emerald-500/30 transition-all cursor-pointer group"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-9 h-9 rounded-lg overflow-hidden bg-black/60 shrink-0 border border-white/10 relative">
+                              <img
+                                src={track.coverUrl}
+                                alt={track.title}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                onError={(e) => {
+                                  (e.currentTarget as HTMLImageElement).src =
+                                    'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&auto=format&fit=crop&q=80';
+                                }}
+                              />
+                            </div>
+                            <div className="min-w-0 flex flex-col">
+                              <span className="text-xs font-bold text-white truncate group-hover:text-emerald-300 transition-colors">
+                                {track.title}
+                              </span>
+                              <span className="text-[10px] text-white/60 truncate">
+                                {track.artist}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/10 text-white/70">
+                              {track.genre.split('/')[0].trim()}
+                            </span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (track.streamUrl) {
+                                  openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl);
+                                  if (onOpenMusic) onOpenMusic();
+                                  setIsSearchFocused(false);
+                                }
+                              }}
+                              className="w-7 h-7 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 flex items-center justify-center font-bold shadow-md transition-transform hover:scale-110 active:scale-95 cursor-pointer"
+                              title="Play Track"
+                            >
+                              <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-4 text-center text-xs text-white/50">
+                      No matching songs found for "{searchQuery}".
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -1091,7 +1211,13 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                   </button>
                 </div>
 
-                <div className="flex-1 flex items-center gap-3 px-3 py-1.5 rounded-2xl bg-white/5 border border-white/10 min-w-0">
+                <div
+                  onClick={() => {
+                    if (onOpenMusic) onOpenMusic();
+                  }}
+                  className="flex-1 flex items-center gap-3 px-3 py-1.5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 min-w-0 cursor-pointer transition-colors"
+                  title="Open Full-Window Music Player"
+                >
                   <div className="w-8 h-8 rounded-lg overflow-hidden bg-black/60 shrink-0">
                     <img
                       src={activeAlbum.albumArt}
@@ -1201,6 +1327,23 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                         </button>
                       );
                     })}
+
+                    {/* Spotify-style Live Catalog Sync */}
+                    <button
+                      onClick={() => {
+                        setIsRefreshingMusic(true);
+                        fetchLiveMusicDiscovery()
+                          .then((tracks) => {
+                            if (tracks && tracks.length > 0) setMusicDiscoveryList(tracks);
+                          })
+                          .finally(() => setTimeout(() => setIsRefreshingMusic(false), 600));
+                      }}
+                      className="px-3 py-1 rounded-xl text-xs font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 transition-all cursor-pointer flex items-center gap-1.5"
+                      title="Sync & load latest fresh releases like Spotify"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingMusic ? 'animate-spin' : ''}`} />
+                      <span>Live Sync</span>
+                    </button>
                   </div>
                 </div>
 
@@ -1230,6 +1373,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                             onClick={() => {
                               if (track.streamUrl) {
                                 openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl);
+                                if (onOpenMusic) onOpenMusic();
                               }
                             }}
                             className="group relative flex flex-col rounded-2xl bg-white/5 border border-white/10 overflow-hidden hover:border-emerald-500/50 hover:bg-white/10 transition-all shadow-xl hover:shadow-2xl cursor-pointer"
@@ -1270,6 +1414,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                                     e.stopPropagation();
                                     if (track.streamUrl) {
                                       openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl);
+                                      if (onOpenMusic) onOpenMusic();
                                     }
                                   }}
                                   className="w-11 h-11 rounded-full bg-white text-black hover:scale-110 flex items-center justify-center shadow-xl transition-all cursor-pointer"
@@ -1306,6 +1451,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                                     e.stopPropagation();
                                     if (track.streamUrl) {
                                       openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl);
+                                      if (onOpenMusic) onOpenMusic();
                                     }
                                   }}
                                   className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-emerald-600/80 hover:bg-emerald-500 hover:scale-[1.02] text-white text-[10px] font-bold shadow-md transition-all cursor-pointer"
