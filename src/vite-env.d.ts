@@ -42,6 +42,8 @@ declare module 'lucide-react' {
   export const Camera: LucideIcon;
   export const Repeat: LucideIcon;
   export const Tv: LucideIcon;
+  export const Tv2: LucideIcon;
+  export const Clapperboard: LucideIcon;
   export const Sun: LucideIcon;
   export const Contrast: LucideIcon;
   export const Ratio: LucideIcon;

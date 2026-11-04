@@ -13,6 +13,7 @@ import {
   Play,
   Pause,
   Tv,
+  Tv2,
   Gamepad2,
   Music,
   Clock,
@@ -428,7 +429,37 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
               }`}
               title="Home (All Sections)"
             >
+              <Compass className="w-4 h-4" />
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveCategory('Movies');
+                setActiveNav('browse');
+              }}
+              className={`p-2.5 rounded-full transition-all cursor-pointer ${
+                effectiveSection === 'movies'
+                  ? 'bg-rose-600 text-white shadow-md shadow-rose-600/40'
+                  : 'text-white/50 hover:text-white hover:bg-white/10'
+              }`}
+              title="Movies & Cinema"
+            >
               <Film className="w-4 h-4" />
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveCategory('Tv series');
+                setActiveNav('browse');
+              }}
+              className={`p-2.5 rounded-full transition-all cursor-pointer ${
+                effectiveSection === 'series'
+                  ? 'bg-fuchsia-600 text-white shadow-md shadow-fuchsia-600/40'
+                  : 'text-white/50 hover:text-white hover:bg-white/10'
+              }`}
+              title="TV Series & Shows"
+            >
+              <Tv2 className="w-4 h-4" />
             </button>
 
             <button
@@ -564,6 +595,24 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
               )}
               <Film className="w-4 h-4 text-rose-400" />
               <span>Movies & Cinema</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveCategory('Tv series');
+                setActiveNav('browse');
+              }}
+              className={`relative flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all text-left cursor-pointer ${
+                effectiveSection === 'series'
+                  ? 'text-white bg-white/5 font-bold'
+                  : 'text-white/60 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              {effectiveSection === 'series' && (
+                <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-full bg-fuchsia-500 shadow-sm shadow-fuchsia-500" />
+              )}
+              <Tv2 className="w-4 h-4 text-fuchsia-400" />
+              <span>TV Series & Shows</span>
             </button>
 
             <button
