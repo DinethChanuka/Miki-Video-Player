@@ -45,7 +45,7 @@ interface WindowWithWebkit extends Window {
  * Resolves web URLs to embed-compatible formats to bypass X-Frame-Options blocking
  */
 export function resolveBrowserFrameUrl(url: string): string {
-  if (!url) return 'https://cinesubz.co';
+  if (!url) return 'https://cinesubz.lk';
   const trimmed = url.trim();
 
   // Convert YouTube links into embed format to prevent X-Frame-Options: SAMEORIGIN rejection
@@ -73,7 +73,7 @@ export function extractHostname(url: string): string {
 
 export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
   isOpen,
-  initialUrl = 'https://cinesubz.co',
+  initialUrl = 'https://cinesubz.lk',
   onClose,
   onPlayInNativePlayer,
   onStartWindowDrag,
@@ -556,7 +556,7 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
                 }
               }
             }}
-            placeholder="Jump to address (e.g. cinesubz.co) or search..."
+            placeholder="Jump to address (e.g. cinesubz.lk) or search..."
             className="flex-1 bg-transparent border-0 text-xs text-white placeholder-white/40 focus:outline-none"
           />
           <button
