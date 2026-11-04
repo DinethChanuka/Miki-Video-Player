@@ -180,6 +180,17 @@ export class ChunkedAudioStreamController {
       el.addEventListener('loadeddata', onLoadedData, { once: true });
       el.addEventListener('loadedmetadata', onLoadedData, { once: true });
 
+      // Fallback for CORS restriction on audio servers: strip crossOrigin and reload directly
+      const onMediaError = () => {
+        el.removeEventListener('error', onMediaError);
+        if (el.crossOrigin) {
+          el.removeAttribute('crossOrigin');
+          el.src = url;
+          el.load();
+        }
+      };
+      el.addEventListener('error', onMediaError, { once: true });
+
       // Fallback timeout: if loadeddata doesn't fire in 250ms, proceed anyway so play() kicks off stream
       setTimeout(() => {
         triggerReady();

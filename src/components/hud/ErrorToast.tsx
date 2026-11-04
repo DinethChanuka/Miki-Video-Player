@@ -11,11 +11,17 @@ export const ErrorToast: React.FC = () => {
   if (!lastError) return null;
 
   const isBookmark = lastError.code === 'BOOKMARK_SAVED';
+  const isLocalFile = Boolean(
+    currentUri &&
+      !currentUri.startsWith('http://') &&
+      !currentUri.startsWith('https://')
+  );
   const isMissingOrMoved =
-    lastError.code === 'MEDIA_NOT_FOUND' ||
-    (lastError.message && lastError.message.toLowerCase().includes('not found')) ||
-    (lastError.details && lastError.details.toLowerCase().includes('404')) ||
-    (lastError.code === 'CODEC_UNSUPPORTED' && currentUri && !currentUri.startsWith('http'));
+    isLocalFile &&
+    (lastError.code === 'MEDIA_NOT_FOUND' ||
+      (lastError.message && lastError.message.toLowerCase().includes('not found')) ||
+      (lastError.details && lastError.details.toLowerCase().includes('404')) ||
+      lastError.code === 'CODEC_UNSUPPORTED');
 
   const handleRemoveFromRecent = () => {
     if (currentUri) {

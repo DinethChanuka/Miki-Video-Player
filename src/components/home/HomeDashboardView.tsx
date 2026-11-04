@@ -108,7 +108,7 @@ const COVER_FLOW_ALBUMS: CoverFlowTrack[] = [
     artist: 'Vishal-Shekhar, Shafqat Amanat Ali',
     album: 'I Hate Luv Storys',
     albumArt: ALBUM_POSTERS.binTere,
-    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+    url: 'https://raw.githubusercontent.com/rafaelreis-hotmart/Audio-Sample-files/master/sample2.mp3',
     durationSec: 330,
   },
   {
@@ -117,7 +117,7 @@ const COVER_FLOW_ALBUMS: CoverFlowTrack[] = [
     artist: 'Raju Singh, Sonu Nigam, Shreya Ghoshal',
     album: 'Raaz: The Mystery Continues',
     albumArt: ALBUM_POSTERS.soniyo,
-    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
+    url: 'https://ice1.somafm.com/groovesalad-128-mp3',
     durationSec: 312,
   },
   {
@@ -136,7 +136,7 @@ const COVER_FLOW_ALBUMS: CoverFlowTrack[] = [
     artist: 'Mithoon, Arijit Singh, Sunidhi Chauhan',
     album: 'Shivaay',
     albumArt: ALBUM_POSTERS.darkhaast,
-    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3',
+    url: 'https://ice1.somafm.com/suburbsofgoa-128-mp3',
     durationSec: 374,
   },
   {
@@ -145,7 +145,7 @@ const COVER_FLOW_ALBUMS: CoverFlowTrack[] = [
     artist: 'Pritam, Mohit Chauhan',
     album: 'Crook',
     albumArt: ALBUM_POSTERS.tujhkoJoPaaya,
-    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3',
+    url: 'https://ice1.somafm.com/secretagent-128-mp3',
     durationSec: 290,
   },
 ];

@@ -1146,16 +1146,33 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     const resolvedArtwork = lookupArtwork(uri, resolvedTitle, artworkUrl);
     const isAudio =
       /\.(?:mp3|ogg|flac|wav|aac|m4a|weba|opus)(?:\?|$)/i.test(uri) ||
-      uri.includes('/mp3/') ||
+      uri.includes('/mp3') ||
+      uri.includes('-mp3') ||
+      uri.includes('format=mp3') ||
+      uri.includes('soundhelix') ||
+      uri.includes('soundcloud') ||
+      uri.includes('jamendo') ||
+      uri.includes('audiomack') ||
+      uri.includes('bandcamp') ||
       uri.includes('mythium') ||
       uri.includes('somafm.com') ||
+      uri.includes('icecast') ||
+      uri.includes('shoutcast') ||
+      get().activePlaybackMode === 'music' ||
+      get().activePlaybackMode === 'radio' ||
+      get().lastActiveCategory === 'Music' ||
+      get().lastActiveCategory === 'Radio' ||
+      get().lastActiveNav === 'music' ||
+      get().lastActiveNav === 'radio' ||
       Boolean(artworkUrl);
-    const playbackMode = isAudio ? 'music' : (get().activePlaybackMode === 'radio' ? 'radio' : 'video');
+    const playbackMode = (get().activePlaybackMode === 'radio' || get().lastActiveCategory === 'Radio' || get().lastActiveNav === 'radio' || uri.includes('somafm'))
+      ? 'radio'
+      : (isAudio ? 'music' : 'video');
 
     // Check if it's an external web stream (YouTube, TikTok, Instagram, Vimeo, Twitch, Dailymotion, Cinema portals or Web stream)
     const webStream = parseWebStream(uri);
     const isHttp = uri.startsWith('http://') || uri.startsWith('https://');
-    const activeWebStream = webStream || (isHttp && !isDirectMediaUrl(uri) ? {
+    const activeWebStream = webStream || (!isAudio && isHttp && !isDirectMediaUrl(uri) ? {
       platform: 'cinema' as const,
       id: `cinema_${Date.now()}`,
       embedUrl: uri,

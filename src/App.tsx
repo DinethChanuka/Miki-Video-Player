@@ -911,10 +911,21 @@ export const App: React.FC = () => {
                   severity = 'recoverable';
                   recovery = 'retry_software_decode';
                 } else if (err?.code === 4) {
-                  code = 'MEDIA_NOT_FOUND';
-                  message = 'Media file or stream not supported or source could not be found.';
-                  severity = 'critical';
-                  recovery = 'none';
+                  const isRemote = Boolean(
+                    currentUri &&
+                      (currentUri.startsWith('http://') || currentUri.startsWith('https://'))
+                  );
+                  if (isRemote || activePlaybackMode === 'music' || activePlaybackMode === 'radio') {
+                    code = 'STREAM_ERROR';
+                    message = 'Network stream or audio source currently unavailable.';
+                    severity = 'recoverable';
+                    recovery = 'retry_with_backoff';
+                  } else {
+                    code = 'MEDIA_NOT_FOUND';
+                    message = 'Media file or stream not supported or source could not be found.';
+                    severity = 'critical';
+                    recovery = 'none';
+                  }
                 }
                 usePlayerStore.getState().handleStreamError({
                   code,
