@@ -75,6 +75,7 @@ declare module 'lucide-react' {
   export const ChevronDown: LucideIcon;
   export const Share2: LucideIcon;
   export const User: LucideIcon;
+  export const LogIn: LucideIcon;
   export const LogOut: LucideIcon;
   export const Globe: LucideIcon;
   export const Shield: LucideIcon;
