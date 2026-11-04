@@ -3,10 +3,11 @@ import { usePlayerStore } from '../../store/playerStore';
 import { CURATED_CHANNELS, LiveChannel } from '../../utils/channelCatalog';
 import { GAMES_CATALOG, GameItem } from '../../utils/gamesCatalog';
 import { CINEMA_LINKS, CinemaSiteItem } from '../../utils/cinemaLinks';
-import { INTERNET_MUSIC_STREAMS, InternetMusicStation } from '../../utils/musicStreams';
+import { INTERNET_MUSIC_STREAMS } from '../../utils/musicStreams';
+import { RADIO_GARDEN_STATIONS, RadioGardenStation, searchRadioGardenStations } from '../../utils/radioGardenCatalog';
 import { MOVIE_POSTERS, ALBUM_POSTERS } from '../../utils/mediaPosters';
 import { HERO_ARTWORKS } from '../../utils/heroArtworks';
-import { CINESUBZ_MOVIES, fetchLatestCineSubzMovies, CineSubzMovie } from '../../utils/cinesubzService';
+import { CINESUBZ_MOVIES, fetchLatestCineSubzMovies, searchCineSubzLive, CineSubzMovie } from '../../utils/cinesubzService';
 import { CINESUBZ_TV_SHOWS, fetchLatestCineSubzTvShows, CineSubzTvShow } from '../../utils/cinesubzTvService';
 import {
   MUSIC_DISCOVERY_CATALOG,
@@ -54,6 +55,8 @@ import {
   FileAudio,
   FileImage,
   Eye,
+  Globe,
+  ExternalLink,
 } from 'lucide-react';
 
 export type HomeViewCategory =
@@ -600,6 +603,9 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
   const [selectedMusicPlatform, setSelectedMusicPlatform] = useState<MusicPlatform | 'all'>('all');
   const [musicDiscoveryList, setMusicDiscoveryList] = useState<MusicTrack[]>(MUSIC_DISCOVERY_CATALOG);
   const [liveSearchedTracks, setLiveSearchedTracks] = useState<MusicTrack[]>([]);
+  const [liveCinesubzMovies, setLiveCinesubzMovies] = useState<CineSubzMovie[]>([]);
+  const [isSearchingCinesubz, setIsSearchingCinesubz] = useState<boolean>(false);
+  const [radioViewMode, setRadioViewMode] = useState<'stations' | 'globe'>('stations');
   const [radioFilterGenre, setRadioFilterGenre] = useState<string>('All');
   const [musicCurrentPage, setMusicCurrentPage] = useState<number>(1);
   const CHUNK_SIZE = 12; // 12 tracks per chunk for progressive stream buffering
@@ -654,14 +660,20 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
     return (
       recentMedia.find(
         (m) =>
+          (m.uri && /\.(mp3|wav|flac|aac|m4a|ogg|opus)/i.test(m.uri)) ||
+          m.uri.includes('/mp3') ||
+          m.uri.includes('-mp3') ||
+          m.uri.includes('somafm') ||
           m.uri.includes('soundcloud') ||
-        (m.webDomain && m.webDomain.includes('soundcloud')) ||
-          m.webPlatform === 'cinema' ||
+          m.uri.includes('jamendo') ||
+          m.uri.includes('audiomack') ||
+          m.uri.includes('bandcamp') ||
           m.title.toLowerCase().includes('hindi') ||
           m.title.toLowerCase().includes('dooriyan') ||
-          /\.(mp3|wav|flac|aac|m4a|ogg)/i.test(m.uri) ||
-          Boolean(m.thumbnailUri)
-      ) || recentMedia[0] || null
+          m.title.toLowerCase().includes('saiyaara') ||
+          m.title.toLowerCase().includes('song') ||
+          m.title.toLowerCase().includes('track')
+      ) || null
     );
   }, [recentMedia]);
 
@@ -761,6 +773,30 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
     return () => clearTimeout(timer);
   }, [searchQuery, selectedMusicPlatform]);
 
+  // Live dynamic online search across CineSubz real movie database
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (!q || q.length < 2) {
+      setLiveCinesubzMovies([]);
+      setIsSearchingCinesubz(false);
+      return;
+    }
+    setIsSearchingCinesubz(true);
+    const timer = setTimeout(() => {
+      searchCineSubzLive(q)
+        .then((movies) => {
+          if (movies && movies.length > 0) {
+            setLiveCinesubzMovies(movies);
+          }
+        })
+        .catch(() => {})
+        .finally(() => {
+          setIsSearchingCinesubz(false);
+        });
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   // Determine effective section mode
   const effectiveSection: 'all' | 'my_files' | 'movies' | 'series' | 'channels' | 'games' | 'music' | 'radio' | 'watchlist' = useMemo(() => {
     if (activeNav === 'my_files' || activeCategory === 'My Files') return 'my_files';
@@ -828,17 +864,29 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
     );
   }, [searchQuery]);
 
-  // Filtered CineSubz Sinhala Subtitle Releases
+  // Filtered CineSubz Sinhala Subtitle Releases with Real Live Search Integration
   const filteredCinesubz = useMemo(() => {
     if (!searchQuery.trim()) return cinesubzList;
     const q = searchQuery.toLowerCase();
-    return cinesubzList.filter(
+    const localMatches = cinesubzList.filter(
       (m) =>
         m.title.toLowerCase().includes(q) ||
         m.sinhalaTitle.toLowerCase().includes(q) ||
         m.genres.some((g) => g.toLowerCase().includes(q))
     );
-  }, [cinesubzList, searchQuery]);
+    // Combine live results from cinesubz.lk with local matches, deduplicated by title
+    const combined = [...liveCinesubzMovies, ...localMatches];
+    const seen = new Set<string>();
+    const unique: CineSubzMovie[] = [];
+    for (const m of combined) {
+      const key = m.title.toLowerCase().trim();
+      if (!seen.has(key)) {
+        seen.add(key);
+        unique.push(m);
+      }
+    }
+    return unique;
+  }, [cinesubzList, liveCinesubzMovies, searchQuery]);
 
   // Filtered CineSubz Sinhala Subtitle TV Series
   const filteredCinesubzTv = useMemo(() => {
@@ -882,22 +930,25 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
     return filteredMusicTracks.slice(start, start + MUSIC_PAGE_SIZE);
   }, [filteredMusicTracks, musicCurrentPage]);
 
-  // Filtered 24/7 Live Internet Radio Stations
-  const filteredRadioStations = useMemo(() => {
-    let list = INTERNET_MUSIC_STREAMS;
-    if (radioFilterGenre !== 'All') {
-      list = list.filter((s) => s.genre.toLowerCase().includes(radioFilterGenre.toLowerCase()));
-    }
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      list = list.filter(
-        (s) =>
-          s.title.toLowerCase().includes(q) ||
-          s.artist.toLowerCase().includes(q) ||
-          s.genre.toLowerCase().includes(q)
-      );
-    }
-    return list;
+  // Filtered Radio Garden & Worldwide Live Stations
+  const filteredRadioStations = useMemo<RadioGardenStation[]>(() => {
+    const gardenStations = searchRadioGardenStations(searchQuery, radioFilterGenre);
+    if (gardenStations.length > 0) return gardenStations;
+    return INTERNET_MUSIC_STREAMS.map((s) => ({
+      id: s.id,
+      title: s.title,
+      city: 'Global Broadcast',
+      country: 'Worldwide',
+      countryCode: 'WW',
+      flag: '🌐',
+      genre: s.genre,
+      streamUrl: s.streamUrl,
+      radioGardenUrl: `https://radio.garden/visit/global/${s.id}`,
+      logoUrl: s.logoUrl,
+      description: s.description,
+      badge: s.badge,
+      accentColor: s.accentColor,
+    }));
   }, [radioFilterGenre, searchQuery]);
 
   const liveSearchTracks = useMemo(() => {
@@ -921,7 +972,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
     setActiveAlbumIdx(idx);
     const track = COVER_FLOW_ALBUMS[idx];
     if (track) {
-      openMedia(track.url, `${track.title} - ${track.artist}`, true, 0, track.albumArt);
+      openMedia(track.url, `${track.title} - ${track.artist}`, true, 0, track.albumArt, 'music');
       setIsCoverFlowPlaying(true);
     }
   };
@@ -1414,7 +1465,14 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                   {(filteredCinesubz.length > 0 || filteredCinesubzTv.length > 0) && (
                     <div className="flex flex-col gap-2">
                       <div className="flex items-center justify-between px-1 pb-1 border-b border-white/10 text-[10px] font-bold text-rose-400 tracking-wider">
-                        <span>CINESUBZ MOVIES & TV SERIES ({filteredCinesubz.length + filteredCinesubzTv.length})</span>
+                        <span className="flex items-center gap-1.5">
+                          <span>CINESUBZ LIVE RESULTS ({filteredCinesubz.length + filteredCinesubzTv.length})</span>
+                          {isSearchingCinesubz && (
+                            <span className="text-[9px] text-rose-400/80 animate-pulse font-normal">
+                              • Querying cinesubz.lk...
+                            </span>
+                          )}
+                        </span>
                         <button
                           onClick={() => {
                             setActiveNav('browse');
@@ -1428,7 +1486,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                       </div>
 
                       <div className="flex flex-col gap-1.5">
-                        {filteredCinesubz.slice(0, 4).map((movie) => (
+                        {filteredCinesubz.slice(0, 8).map((movie) => (
                           <div
                             key={movie.id}
                             onClick={() => {
@@ -1575,7 +1633,8 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                             key={track.id}
                             onClick={() => {
                               if (track.streamUrl) {
-                                openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl);
+                                openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl, 'music');
+                                usePlayerStore.setState({ isMusicPlayerOpen: true });
                                 setIsSearchFocused(false);
                               }
                             }}
@@ -1611,7 +1670,8 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   if (track.streamUrl) {
-                                    openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl);
+                                    openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl, 'music');
+                                    usePlayerStore.setState({ isMusicPlayerOpen: true });
                                     setIsSearchFocused(false);
                                   }
                                 }}
@@ -1859,7 +1919,8 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                           dimensions: file.resolution,
                         });
                       } else if (file.category === 'music') {
-                        openMedia(file.uri, file.title, true, file.lastPositionMs || 0, file.thumbnailUrl);
+                        openMedia(file.uri, file.title, true, file.lastPositionMs || 0, file.thumbnailUrl, 'music');
+                        usePlayerStore.setState({ isMusicPlayerOpen: true });
                       } else {
                         openMedia(file.uri, file.title, true, file.lastPositionMs || 0);
                       }
@@ -2090,7 +2151,8 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                           previouslyPlayed.title,
                           true,
                           previouslyPlayed.lastPositionMs,
-                          previouslyPlayed.thumbnailUri
+                          previouslyPlayed.thumbnailUri,
+                          'music'
                         );
                         setIsCoverFlowPlaying(true);
                       } else {
@@ -2279,7 +2341,8 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                             key={track.id}
                             onClick={() => {
                               if (track.streamUrl) {
-                                openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl);
+                                openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl, 'music');
+                                usePlayerStore.setState({ isMusicPlayerOpen: true });
                               }
                             }}
                             className="group relative flex flex-col rounded-2xl bg-white/5 border border-white/10 overflow-hidden hover:border-emerald-500/50 hover:bg-white/10 transition-all shadow-xl hover:shadow-2xl cursor-pointer"
@@ -2319,7 +2382,8 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     if (track.streamUrl) {
-                                      openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl);
+                                      openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl, 'music');
+                                      usePlayerStore.setState({ isMusicPlayerOpen: true });
                                     }
                                   }}
                                   className="w-11 h-11 rounded-full bg-white text-black hover:scale-110 flex items-center justify-center shadow-xl transition-all cursor-pointer"
@@ -2355,7 +2419,8 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     if (track.streamUrl) {
-                                      openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl);
+                                      openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl, 'music');
+                                      usePlayerStore.setState({ isMusicPlayerOpen: true });
                                     }
                                   }}
                                   className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-emerald-600/80 hover:bg-emerald-500 hover:scale-[1.02] text-white text-[10px] font-bold shadow-md transition-all cursor-pointer"
@@ -2443,99 +2508,191 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
             </div>
           ) : effectiveSection === 'radio' ? (
             /* ============================================================ */
-            /* A2. DYNAMIC SECTION: 24/7 MUSIC RADIO LIVE                   */
+            /* A2. DYNAMIC SECTION: RADIO GARDEN GLOBAL LIVE CHANNELS       */
             /* ============================================================ */
             <div className="flex flex-col gap-6 w-full">
-              {/* Radio Broadcast Hero Banner */}
-              <div className="relative w-full rounded-3xl overflow-hidden border border-cyan-500/20 bg-gradient-to-r from-cyan-950/70 via-slate-900 to-black p-8 sm:p-10 flex flex-col justify-between min-h-[280px] shadow-2xl">
+              {/* Radio Garden Broadcast Hero Banner */}
+              <div className="relative w-full rounded-3xl overflow-hidden border border-emerald-500/20 bg-gradient-to-r from-emerald-950/80 via-slate-900 to-black p-8 sm:p-10 flex flex-col justify-between min-h-[280px] shadow-2xl">
                 {/* Right Side Visual Artwork */}
                 <div className="absolute right-0 top-0 bottom-0 w-1/2 lg:w-3/5 pointer-events-none z-0 overflow-hidden flex items-center justify-end">
                   <img
                     src={HERO_ARTWORKS.audioSynthesizer}
-                    alt="Radio Broadcast Artwork"
+                    alt="Radio Garden Broadcast Artwork"
                     className="h-full w-full object-cover object-right opacity-80"
                   />
                   <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-transparent to-transparent pointer-events-none" />
                 </div>
 
                 <div className="relative z-10 flex flex-col gap-3 max-w-xl">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-xs font-semibold w-fit">
-                    <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-                    <span>24/7 Global Live Audio Streams</span>
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-semibold w-fit">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <span>Radio Garden Global Live Infrastructure</span>
                   </div>
-                  <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
-                    Music Radio Live
+                  <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight flex items-center gap-3">
+                    <span>Radio Garden Live</span>
+                    <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 font-mono font-bold border border-emerald-500/30">
+                      radio.garden
+                    </span>
                   </h1>
                   <p className="text-sm text-white/70 leading-relaxed">
-                    Commercial-free high-bitrate live radio stations broadcasting worldwide ambient, lo-fi, synthwave, electronic, indie, and classical streams.
+                    Tune into live radio broadcasts around the globe powered by Radio Garden. Explore cities and stations from London to Tokyo, Paris, New York, and Colombo in pristine audio.
                   </p>
-                  <div className="flex items-center gap-3 pt-2">
+
+                  <div className="flex items-center gap-3 pt-2 flex-wrap">
                     <button
                       onClick={() => {
-                        const station = INTERNET_MUSIC_STREAMS[0];
-                        if (station) openMedia(station.streamUrl, `${station.title} - ${station.artist}`, false, 0, station.logoUrl);
+                        const station = RADIO_GARDEN_STATIONS[0];
+                        if (station) openMedia(station.streamUrl, `${station.title} (${station.city}, ${station.country})`, false, 0, station.logoUrl, 'radio');
                       }}
-                      className="px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs flex items-center gap-2 shadow-lg shadow-cyan-500/30 transition-all cursor-pointer"
+                      className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center gap-2 shadow-lg shadow-emerald-500/30 transition-all cursor-pointer"
                     >
                       <Play className="w-4 h-4 fill-current" />
-                      <span>Listen to Groove Salad Live</span>
+                      <span>Play London Soho Radio</span>
                     </button>
-                    <span className="text-xs text-white/50">{INTERNET_MUSIC_STREAMS.length} Channels Broadcasting</span>
+
+                    {/* View Switcher: Stations vs 3D Globe */}
+                    <div className="flex items-center gap-1 p-1 rounded-xl bg-white/10 border border-white/15 backdrop-blur-md">
+                      <button
+                        onClick={() => setRadioViewMode('stations')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                          radioViewMode === 'stations'
+                            ? 'bg-emerald-500 text-slate-950 font-bold shadow-md shadow-emerald-500/30'
+                            : 'text-white/70 hover:text-white'
+                        }`}
+                      >
+                        <Radio className="w-3.5 h-3.5" />
+                        <span>Curated Stations</span>
+                      </button>
+                      <button
+                        onClick={() => setRadioViewMode('globe')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                          radioViewMode === 'globe'
+                            ? 'bg-emerald-500 text-slate-950 font-bold shadow-md shadow-emerald-500/30'
+                            : 'text-white/70 hover:text-white'
+                        }`}
+                      >
+                        <Globe className="w-3.5 h-3.5" />
+                        <span>3D Interactive Globe</span>
+                      </button>
+                    </div>
+
+                    <span className="text-xs text-white/50">{RADIO_GARDEN_STATIONS.length || INTERNET_MUSIC_STREAMS.length} Global Cities Live</span>
                   </div>
                 </div>
               </div>
 
-              {/* Radio Genre Filter Pills */}
-              <div className="flex items-center gap-2 flex-wrap">
-                {['All', 'Chillout', 'Ambient', 'Synthwave', 'Indie', 'Classical', 'Lo-Fi', 'Electronic'].map((genre) => {
-                  const isActive = radioFilterGenre === genre;
-                  return (
-                    <button
-                      key={genre}
-                      onClick={() => setRadioFilterGenre(genre)}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                        isActive
-                          ? 'bg-cyan-600 text-white font-bold shadow-md shadow-cyan-600/30'
-                          : 'bg-white/5 text-white/70 hover:bg-white/10 hover:text-white border border-white/10'
-                      }`}
+              {/* View 1: 3D Interactive Radio Garden Globe */}
+              {radioViewMode === 'globe' ? (
+                <div className="flex flex-col gap-3 w-full">
+                  <div className="flex items-center justify-between px-2 text-xs text-white/70">
+                    <span className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                      <span>Spin the interactive 3D globe to tune into thousands of stations on earth (radio.garden)</span>
+                    </span>
+                    <a
+                      href="https://radio.garden/"
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onOpenWebBrowser) onOpenWebBrowser('https://radio.garden/');
+                      }}
+                      className="text-emerald-400 hover:text-emerald-300 transition-colors flex items-center gap-1 font-semibold"
                     >
-                      {genre}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Stations Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {filteredRadioStations.map((station: InternetMusicStation) => (
-                  <div
-                    key={station.id}
-                    onClick={() => openMedia(station.streamUrl, `${station.title} - ${station.artist}`, false, 0, station.logoUrl)}
-                    className="group flex items-center gap-3.5 p-3.5 rounded-2xl bg-white/5 border border-white/10 hover:border-cyan-500/50 hover:bg-white/10 transition-all cursor-pointer shadow-lg"
-                  >
-                    <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0 bg-black/40 border border-white/10">
-                      <img src={station.logoUrl} alt={station.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
-                    </div>
-                    <div className="flex flex-col min-w-0 flex-1">
-                      <span className="text-xs font-bold text-white truncate group-hover:text-cyan-400 transition-colors">
-                        {station.title}
-                      </span>
-                      <span className="text-[11px] text-white/60 truncate">
-                        {station.genre} • {station.artist}
-                      </span>
-                      <span className="text-[9px] font-mono text-cyan-400/90 mt-1">
-                        {station.badge}
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      className="w-9 h-9 rounded-full bg-white/10 group-hover:bg-cyan-500 group-hover:text-black flex items-center justify-center text-white/70 transition-all shrink-0"
-                    >
-                      <Play className="w-4 h-4 fill-current ml-0.5" />
-                    </button>
+                      <span>Open in Browser</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
                   </div>
-                ))}
-              </div>
+                  <div className="relative w-full h-[660px] rounded-3xl overflow-hidden border border-emerald-500/30 bg-black/95 shadow-2xl">
+                    <iframe
+                      src="https://radio.garden/"
+                      title="Radio Garden Live Interactive 3D Globe"
+                      className="w-full h-full border-0 rounded-3xl"
+                      allow="autoplay; encrypted-media"
+                      sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+                    />
+                  </div>
+                </div>
+              ) : (
+                /* View 2: Curated Radio Garden Stations Directory */
+                <div className="flex flex-col gap-5 w-full">
+                  {/* Radio City & Genre Filter Pills */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {['All', 'London', 'Tokyo', 'Paris', 'New York', 'Amsterdam', 'Berlin', 'Colombo', 'Sydney', 'Rio', 'Ambient', 'Indie', 'Classical'].map((filterName) => {
+                      const isActive = radioFilterGenre === filterName;
+                      return (
+                        <button
+                          key={filterName}
+                          onClick={() => setRadioFilterGenre(filterName)}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                            isActive
+                              ? 'bg-emerald-600 text-white font-bold shadow-md shadow-emerald-600/30'
+                              : 'bg-white/5 text-white/70 hover:bg-white/10 hover:text-white border border-white/10'
+                          }`}
+                        >
+                          {filterName}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Radio Garden Stations Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {filteredRadioStations.map((station: RadioGardenStation) => (
+                      <div
+                        key={station.id}
+                        onClick={() => openMedia(station.streamUrl, `${station.title} (${station.city}, ${station.country})`, false, 0, station.logoUrl, 'radio')}
+                        className="group flex flex-col justify-between p-4 rounded-2xl bg-white/5 border border-white/10 hover:border-emerald-500/50 hover:bg-white/10 transition-all cursor-pointer shadow-lg relative overflow-hidden"
+                      >
+                        <div className="flex items-center gap-3.5">
+                          <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0 bg-black/40 border border-white/10">
+                            <img src={station.logoUrl} alt={station.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                          </div>
+                          <div className="flex flex-col min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-sm">{station.flag}</span>
+                              <span className="text-xs font-bold text-white truncate group-hover:text-emerald-400 transition-colors">
+                                {station.title}
+                              </span>
+                            </div>
+                            <span className="text-[11px] text-white/60 truncate">
+                              {station.city}, {station.country} • {station.genre}
+                            </span>
+                            <span className="text-[9px] font-mono text-emerald-400/90 mt-1 font-semibold">
+                              {station.badge}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-3 mt-3 border-t border-white/5 text-[11px]">
+                          <a
+                            href={station.radioGardenUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (onOpenWebBrowser) {
+                                onOpenWebBrowser(station.radioGardenUrl);
+                              }
+                            }}
+                            className="text-white/40 hover:text-emerald-400 transition-colors flex items-center gap-1 text-[10px]"
+                          >
+                            <span>radio.garden</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                          <button
+                            type="button"
+                            className="px-3 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 group-hover:bg-emerald-500 group-hover:text-black font-bold text-xs flex items-center gap-1 transition-all"
+                          >
+                            <Play className="w-3.5 h-3.5 fill-current" />
+                            <span>Play Live</span>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ) : effectiveSection === 'channels' ? (
             /* ============================================================ */
@@ -3387,7 +3544,8 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                             dimensions: file.resolution,
                           });
                         } else if (file.category === 'music') {
-                          openMedia(file.uri, file.title, true, file.lastPositionMs || 0, file.thumbnailUrl);
+                          openMedia(file.uri, file.title, true, file.lastPositionMs || 0, file.thumbnailUrl, 'music');
+                          usePlayerStore.setState({ isMusicPlayerOpen: true });
                         } else {
                           openMedia(file.uri, file.title, true, file.lastPositionMs || 0);
                         }
