@@ -2,6 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { isDirectMediaUrl } from '../src/utils/webStreamUtils.ts';
 
 describe('Open Music In Full-Window Hi-Fi Music Studio Audit', () => {
   const playerStoreFile = path.resolve('src/store/playerStore.ts');
@@ -52,11 +53,25 @@ describe('Open Music In Full-Window Hi-Fi Music Studio Audit', () => {
       /<FullWindowMusicPlayer[\s\S]*?isOpen=\{isMusicPlayerOpen\}/i,
       'App.tsx must connect FullWindowMusicPlayer to isMusicPlayerOpen state'
     );
+
+    // App.tsx fallbackToWebStream must never hijack music or radio streams
+    assert.match(
+      content,
+      /if\s*\(\s*currentMode === 'music' \|\| currentMode === 'radio'\s*\)\s*\{\s*return false;\s*\}/i,
+      'fallbackToWebStream must immediately abort for music and radio modes'
+    );
   });
 
-  it('verifies HomeDashboardView previouslyPlayed track resolution filters exclusively for audio/songs', () => {
+  it('verifies HomeDashboardView search result clicks immediately open Full-Window Music Studio', () => {
     assert.ok(fs.existsSync(homeDashboardFile), 'HomeDashboardView.tsx must exist');
     const content = fs.readFileSync(homeDashboardFile, 'utf8');
+
+    // liveSearchTracks items must call setMusicPlayerOpen(true)
+    assert.match(
+      content,
+      /setMusicPlayerOpen\(true\)/i,
+      'HomeDashboardView must invoke setMusicPlayerOpen(true) when search result track is clicked'
+    );
 
     // previouslyPlayed must not match webPlatform === 'cinema' or blindly fall back to recentMedia[0]
     assert.ok(
@@ -70,6 +85,13 @@ describe('Open Music In Full-Window Hi-Fi Music Studio Audit', () => {
       /openMedia\(track\.url,.*?'music'\)/i,
       'HomeDashboardView cover flow must pass music mediaType to openMedia'
     );
+  });
+
+  it('verifies isDirectMediaUrl recognizes audio extensions including .m4a and direct audio domains', () => {
+    assert.ok(isDirectMediaUrl('https://audio-ssl.itunes.apple.com/itunes-assets/sample.m4a'));
+    assert.ok(isDirectMediaUrl('https://example.com/stream.mp3'));
+    assert.ok(isDirectMediaUrl('https://example.com/audio.weba'));
+    assert.ok(isDirectMediaUrl('https://example.com/track.opus'));
   });
 
   it('verifies FullWindowMusicPlayer invokes openMedia with music mediaType', () => {

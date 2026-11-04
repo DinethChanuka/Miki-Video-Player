@@ -55,26 +55,30 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
   // Sync activeIndex with currentUri if playing a track from list or dynamic stream
   useEffect(() => {
     if (currentUri) {
-      const idx = tracks.findIndex((t) => t.url === currentUri);
-      if (idx !== -1) {
-        setActiveIndex(idx);
-      } else if (currentTitle) {
-        const parts = currentTitle.split(' - ');
-        const title = parts[0]?.trim() || currentTitle;
-        const artist = parts[1]?.trim() || 'Featured Artist';
-        const newTrack = {
-          id: `current-${Date.now()}`,
-          title,
-          artist,
-          url: currentUri,
-          durationSec: durationMs ? Math.floor(durationMs / 1000) : 210,
-          albumArt: currentArtwork || 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=500&auto=format&fit=crop&q=80',
-        };
-        setTracks((prev) => [newTrack, ...prev.filter((t) => t.url !== currentUri)]);
-        setActiveIndex(0);
-      }
+      setTracks((prev) => {
+        const idx = prev.findIndex((t) => t.url === currentUri);
+        if (idx !== -1) {
+          setActiveIndex(idx);
+          return prev;
+        } else if (currentTitle) {
+          const parts = currentTitle.split(' - ');
+          const title = parts[0]?.trim() || currentTitle;
+          const artist = parts[1]?.trim() || 'Featured Artist';
+          const newTrack = {
+            id: `current-${Date.now()}`,
+            title,
+            artist,
+            url: currentUri,
+            durationSec: durationMs ? Math.floor(durationMs / 1000) : 210,
+            albumArt: currentArtwork || 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=500&auto=format&fit=crop&q=80',
+          };
+          setActiveIndex(0);
+          return [newTrack, ...prev.filter((t) => t.url !== currentUri)];
+        }
+        return prev;
+      });
     }
-  }, [currentUri, currentTitle, currentArtwork, durationMs, tracks]);
+  }, [currentUri, currentTitle, currentArtwork, durationMs]);
 
   const activeTrack = tracks[activeIndex] || tracks[0];
 

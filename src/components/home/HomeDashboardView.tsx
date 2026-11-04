@@ -571,6 +571,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
   const setLastActiveNav = usePlayerStore((s) => s.setLastActiveNav);
   const lastActiveCategory = usePlayerStore((s) => s.lastActiveCategory);
   const setLastActiveCategory = usePlayerStore((s) => s.setLastActiveCategory);
+  const setMusicPlayerOpen = usePlayerStore((s) => s.setMusicPlayerOpen);
 
   const [activeNav, setActiveNavState] = useState<HomeNavTab>(
     ((lastActiveNav as HomeNavTab) || 'browse')
@@ -1634,7 +1635,8 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                             onClick={() => {
                               if (track.streamUrl) {
                                 openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl, 'music');
-                                usePlayerStore.setState({ isMusicPlayerOpen: true });
+                                setMusicPlayerOpen(true);
+                                if (onOpenMusic) onOpenMusic();
                                 setIsSearchFocused(false);
                               }
                             }}
@@ -1671,7 +1673,8 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                                   e.stopPropagation();
                                   if (track.streamUrl) {
                                     openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl, 'music');
-                                    usePlayerStore.setState({ isMusicPlayerOpen: true });
+                                    setMusicPlayerOpen(true);
+                                    if (onOpenMusic) onOpenMusic();
                                     setIsSearchFocused(false);
                                   }
                                 }}
@@ -2082,7 +2085,21 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                   return (
                     <div
                       key={album.id}
-                      onClick={() => handlePlayAlbum(idx)}
+                      onClick={() => {
+                        if (isCenter && previouslyPlayed) {
+                          openMedia(
+                            previouslyPlayed.uri,
+                            previouslyPlayed.title,
+                            true,
+                            previouslyPlayed.lastPositionMs,
+                            previouslyPlayed.thumbnailUri,
+                            'music'
+                          );
+                          setIsCoverFlowPlaying(true);
+                        } else {
+                          handlePlayAlbum(idx);
+                        }
+                      }}
                       className="absolute w-52 h-52 rounded-2xl overflow-hidden cursor-pointer transition-all duration-500 ease-out shadow-2xl border border-white/20 select-none group"
                       style={{
                         transform,
@@ -2342,7 +2359,8 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                             onClick={() => {
                               if (track.streamUrl) {
                                 openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl, 'music');
-                                usePlayerStore.setState({ isMusicPlayerOpen: true });
+                                setMusicPlayerOpen(true);
+                                if (onOpenMusic) onOpenMusic();
                               }
                             }}
                             className="group relative flex flex-col rounded-2xl bg-white/5 border border-white/10 overflow-hidden hover:border-emerald-500/50 hover:bg-white/10 transition-all shadow-xl hover:shadow-2xl cursor-pointer"
@@ -2383,7 +2401,8 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                                     e.stopPropagation();
                                     if (track.streamUrl) {
                                       openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl, 'music');
-                                      usePlayerStore.setState({ isMusicPlayerOpen: true });
+                                      setMusicPlayerOpen(true);
+                                      if (onOpenMusic) onOpenMusic();
                                     }
                                   }}
                                   className="w-11 h-11 rounded-full bg-white text-black hover:scale-110 flex items-center justify-center shadow-xl transition-all cursor-pointer"
@@ -2420,7 +2439,8 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                                     e.stopPropagation();
                                     if (track.streamUrl) {
                                       openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl, 'music');
-                                      usePlayerStore.setState({ isMusicPlayerOpen: true });
+                                      setMusicPlayerOpen(true);
+                                      if (onOpenMusic) onOpenMusic();
                                     }
                                   }}
                                   className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-emerald-600/80 hover:bg-emerald-500 hover:scale-[1.02] text-white text-[10px] font-bold shadow-md transition-all cursor-pointer"
@@ -3622,7 +3642,25 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                     recentMedia.slice(0, 6).map((item) => (
                       <div
                         key={item.uri}
-                        onClick={() => openMedia(item.uri, item.title, true, item.lastPositionMs)}
+                        onClick={() => {
+                          const isItemAudio =
+                            (item.uri && /\.(mp3|wav|flac|aac|m4a|ogg|opus)/i.test(item.uri)) ||
+                            item.uri.includes('/mp3') ||
+                            item.uri.includes('somafm') ||
+                            item.uri.includes('soundcloud') ||
+                            item.uri.includes('jamendo') ||
+                            item.uri.includes('audiomack') ||
+                            item.uri.includes('bandcamp') ||
+                            item.uri.includes('apple.com') ||
+                            item.uri.includes('itunes') ||
+                            item.title.toLowerCase().includes('song') ||
+                            item.title.toLowerCase().includes('track') ||
+                            item.title.toLowerCase().includes('hindi') ||
+                            item.title.toLowerCase().includes('dooriyan') ||
+                            item.title.toLowerCase().includes('saiyaara');
+                          openMedia(item.uri, item.title, true, item.lastPositionMs, item.thumbnailUri, isItemAudio ? 'music' : 'video');
+                          if (isItemAudio) setMusicPlayerOpen(true);
+                        }}
                         className="group relative flex flex-col rounded-2xl overflow-hidden bg-white/5 border border-white/10 hover:border-rose-400/50 hover:bg-white/10 transition-all cursor-pointer shadow-lg"
                       >
                         <div className="relative aspect-video w-full overflow-hidden bg-black/60">

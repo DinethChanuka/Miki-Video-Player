@@ -276,6 +276,10 @@ export const App: React.FC = () => {
   }, [currentUri]);
 
   const fallbackToWebStream = useCallback((uri: string) => {
+    const currentMode = usePlayerStore.getState().activePlaybackMode;
+    if (currentMode === 'music' || currentMode === 'radio') {
+      return false;
+    }
     if (uri && (uri.startsWith('http://') || uri.startsWith('https://'))) {
       const isCinema = /cinesubz|fmovies|123movies|bflix|vidsrc|streamtape/i.test(uri);
       setFallbackWebEmbed({
@@ -877,9 +881,11 @@ export const App: React.FC = () => {
               onLoadedData={() => usePlayerStore.setState({ isBuffering: false, lastError: null })}
               onLoadStart={() => usePlayerStore.setState({ isBuffering: true })}
               onError={(e) => {
-                // Auto-fallback to resilient WebEmbedPlayer only for web sites, never for direct media/HLS streams
+                // Auto-fallback to resilient WebEmbedPlayer only for web sites, never for direct media/HLS streams or audio/music tracks
                 if (
                   currentUri &&
+                  activePlaybackMode !== 'music' &&
+                  activePlaybackMode !== 'radio' &&
                   (currentUri.startsWith('http://') || currentUri.startsWith('https://')) &&
                   !isDirectMediaUrl(currentUri) &&
                   !HlsStreamController.isHlsUrl(currentUri)

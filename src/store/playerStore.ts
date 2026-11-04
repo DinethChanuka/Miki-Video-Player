@@ -1104,7 +1104,7 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     if (error.recovery === 'fallback_to_web_engine' && get().activeEngineType !== 'web-media') {
       await get().bootEngine('web-media');
       const uri = get().currentUri;
-      if (uri) await get().openMedia(uri, get().currentTitle);
+      if (uri) await get().openMedia(uri, get().currentTitle, true, get().positionMs, get().currentArtwork || undefined, get().activePlaybackMode);
     } else if (error.recovery === 'retry_with_backoff' && get().retryCount < 3) {
       const nextRetry = get().retryCount + 1;
       set({ retryCount: nextRetry });
@@ -1183,6 +1183,10 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
         uri.includes('mythium') ||
         uri.includes('icecast') ||
         uri.includes('shoutcast') ||
+        uri.includes('apple.com') ||
+        uri.includes('itunes') ||
+        uri.includes('audio-ssl') ||
+        (resolvedTitle && /(?:song|track|feat\.|audio|remix|acoustic|original mix|lo-fi|session|saiyaara|dooriyan|hindi)/i.test(resolvedTitle)) ||
         Boolean(artworkUrl) ||
         get().lastActiveCategory === 'Music' ||
         get().lastActiveNav === 'music'
@@ -1356,7 +1360,7 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
         const savedPos = session.history?.lastPositionMs ?? 0;
         startPos = autoResume ? savedPos : 0;
 
-        const autoOpenStudio = playbackMode === 'music';
+        const autoOpenStudio = playbackMode === 'music' || (get().isMusicPlayerOpen && playbackMode !== 'video');
         set({
           currentMediaId: session.mediaId,
           currentUri: uri,
@@ -1391,7 +1395,7 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     }
 
     // Web / Standalone mode
-    const autoOpenStudio = playbackMode === 'music';
+    const autoOpenStudio = playbackMode === 'music' || (get().isMusicPlayerOpen && playbackMode !== 'video');
     set({
       currentUri: uri,
       currentTitle: resolvedTitle,
