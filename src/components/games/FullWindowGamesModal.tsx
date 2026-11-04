@@ -13,6 +13,8 @@ import {
   Sliders,
   AlertCircle,
   ExternalLink,
+  Star,
+  Clock,
 } from 'lucide-react';
 
 interface FullWindowGamesModalProps {
@@ -21,8 +23,10 @@ interface FullWindowGamesModalProps {
   initialGameId?: string;
 }
 
-const CATEGORIES: ('All' | GameCategory)[] = [
+const CATEGORIES: ('All' | 'Favorites' | 'Recent' | GameCategory)[] = [
   'All',
+  'Favorites',
+  'Recent',
   'Arcade',
   'Puzzle',
   'Retro',
@@ -55,7 +59,7 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
     return GAMES_CATALOG[0];
   });
 
-  const [activeCategory, setActiveCategory] = useState<'All' | GameCategory>('All');
+  const [activeCategory, setActiveCategory] = useState<'All' | 'Favorites' | 'Recent' | GameCategory>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [gameMode, setGameMode] = useState<'level' | 'infinity'>('infinity');
@@ -65,6 +69,62 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
   const [gameKey, setGameKey] = useState<number>(0);
   const [iframeError, setIframeError] = useState<boolean>(false);
   const [isLoadingIframe, setIsLoadingIframe] = useState<boolean>(false);
+
+  // Favorite games state persisted in localStorage
+  const [favoriteGameIds, setFavoriteGameIds] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem('miki_favorite_games');
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Recently played games state persisted in localStorage
+  const [recentGameIds, setRecentGameIds] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem('miki_recent_games');
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Native Gamepad API connection status
+  const [isGamepadConnected, setIsGamepadConnected] = useState<boolean>(() => {
+    if (typeof navigator !== 'undefined' && navigator.getGamepads) {
+      return Array.from(navigator.getGamepads()).some((gp) => gp !== null);
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    const onConnect = () => setIsGamepadConnected(true);
+    const onDisconnect = () => {
+      if (typeof navigator !== 'undefined' && navigator.getGamepads) {
+        setIsGamepadConnected(Array.from(navigator.getGamepads()).some((gp) => gp !== null));
+      } else {
+        setIsGamepadConnected(false);
+      }
+    };
+    window.addEventListener('gamepadconnected', onConnect);
+    window.addEventListener('gamepaddisconnected', onDisconnect);
+    return () => {
+      window.removeEventListener('gamepadconnected', onConnect);
+      window.removeEventListener('gamepaddisconnected', onDisconnect);
+    };
+  }, []);
+
+  const handleToggleFavorite = (gameId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setFavoriteGameIds((prev) => {
+      const next = prev.includes(gameId) ? prev.filter((id) => id !== gameId) : [...prev, gameId];
+      try {
+        localStorage.setItem('miki_favorite_games', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
 
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -101,18 +161,28 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
 
   // Category counts
   const categoryCounts = useMemo(() => {
-    const counts: Record<string, number> = { All: GAMES_CATALOG.length };
+    const counts: Record<string, number> = {
+      All: GAMES_CATALOG.length,
+      Favorites: favoriteGameIds.length,
+      Recent: recentGameIds.length,
+    };
     for (const g of GAMES_CATALOG) {
       counts[g.category] = (counts[g.category] || 0) + 1;
     }
     return counts;
-  }, []);
+  }, [favoriteGameIds.length, recentGameIds.length]);
 
   // Filtered games
   const filteredGames = useMemo(() => {
     return GAMES_CATALOG.filter((game) => {
       const matchesCategory =
-        activeCategory === 'All' || game.category === activeCategory;
+        activeCategory === 'All'
+          ? true
+          : activeCategory === 'Favorites'
+          ? favoriteGameIds.includes(game.id)
+          : activeCategory === 'Recent'
+          ? recentGameIds.includes(game.id)
+          : game.category === activeCategory;
       const q = searchQuery.trim().toLowerCase();
       const matchesSearch =
         q === '' ||
@@ -122,7 +192,7 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
         game.controlsHint.toLowerCase().includes(q);
       return matchesCategory && matchesSearch;
     });
-  }, [activeCategory, searchQuery]);
+  }, [activeCategory, searchQuery, favoriteGameIds, recentGameIds]);
 
   // Live Keyboard & Mouse HUD and key isolation from media player
   const handleKeyDown = useCallback(
@@ -293,6 +363,15 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
     setPreviewGame(game);
     setIsPlayingGame(true);
     setGameKey((k) => k + 1);
+
+    // Persist to recently played games
+    setRecentGameIds((prev) => {
+      const next = [game.id, ...prev.filter((id) => id !== game.id)].slice(0, 15);
+      try {
+        localStorage.setItem('miki_recent_games', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
   };
 
   const handleOpenInBrowser = useCallback(
@@ -511,6 +590,13 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
 
         {/* Right Actions */}
         <div className="flex items-center gap-2 shrink-0">
+          {isGamepadConnected && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[10px] font-mono shadow-sm">
+              <Gamepad2 className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+              <span className="hidden sm:inline">GAMEPAD</span>
+            </div>
+          )}
+
           {isPlayingGame && (
             <button
               onClick={() => handleOpenInBrowser(selectedGame)}
@@ -578,6 +664,8 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
                     : 'bg-white/5 text-white/60 hover:text-white hover:bg-white/10 border border-white/5'
                 }`}
               >
+                {cat === 'Favorites' && <Star className="w-3 h-3 text-amber-400 fill-amber-400" />}
+                {cat === 'Recent' && <Clock className="w-3 h-3 text-cyan-400" />}
                 <span>{cat}</span>
                 <span
                   className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
@@ -749,6 +837,20 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
                               </span>
                             )}
                           </div>
+                          <button
+                            type="button"
+                            onClick={(e) => handleToggleFavorite(game.id, e)}
+                            className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/60 hover:bg-black/90 backdrop-blur-md border border-white/10 text-white/50 hover:text-amber-400 transition-colors z-10 cursor-pointer"
+                            title={favoriteGameIds.includes(game.id) ? 'Remove from favorites' : 'Add to favorites'}
+                          >
+                            <Star
+                              className={`w-3.5 h-3.5 ${
+                                favoriteGameIds.includes(game.id)
+                                  ? 'fill-amber-400 text-amber-400'
+                                  : 'text-white/60 hover:text-amber-300'
+                              }`}
+                            />
+                          </button>
                           <div className="absolute bottom-2 right-2 p-1.5 rounded-lg bg-black/70 backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity text-cyan-400 z-10">
                             <Play className="w-3.5 h-3.5 fill-current" />
                           </div>
@@ -842,6 +944,29 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
                 >
                   <Play className="w-4 h-4 fill-white" />
                   <span>Launch Game in Viewport</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={(e) => handleToggleFavorite(previewGame.id, e)}
+                  className={`w-full py-2 rounded-xl border flex items-center justify-center gap-1.5 font-semibold text-xs transition-all cursor-pointer ${
+                    favoriteGameIds.includes(previewGame.id)
+                      ? 'bg-amber-500/20 border-amber-500/40 text-amber-300 hover:bg-amber-500/30'
+                      : 'bg-white/5 hover:bg-white/10 border-white/10 text-white/80 hover:text-white'
+                  }`}
+                >
+                  <Star
+                    className={`w-3.5 h-3.5 ${
+                      favoriteGameIds.includes(previewGame.id)
+                        ? 'fill-amber-400 text-amber-400'
+                        : 'text-white/60'
+                    }`}
+                  />
+                  <span>
+                    {favoriteGameIds.includes(previewGame.id)
+                      ? 'Starred in Favorites'
+                      : 'Add to Favorites'}
+                  </span>
                 </button>
 
                 {!previewGame.srcDoc && (
