@@ -60,3 +60,4 @@ describe('Music Discovery & Search UI Integration Audit', () => {
     );
   });
 });
+
