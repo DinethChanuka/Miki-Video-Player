@@ -271,6 +271,51 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
     setGameKey((k) => k + 1);
   };
 
+  const handleOpenInBrowser = useCallback(
+    (game: GameItem) => {
+      let targetUrl = game.url;
+
+      // For self-contained engines with srcDoc, generate an offline-ready Blob URL or data URI
+      if (game.srcDoc) {
+        try {
+          const blob = new Blob([game.srcDoc], { type: 'text/html;charset=utf-8' });
+          targetUrl = URL.createObjectURL(blob);
+        } catch {
+          targetUrl = `data:text/html;charset=utf-8,${encodeURIComponent(game.srcDoc)}`;
+        }
+      }
+
+      // Eliminate any potential .local or invalid protocol that causes origin errors
+      if (
+        !targetUrl ||
+        targetUrl.includes('.local') ||
+        (!targetUrl.startsWith('http') &&
+          !targetUrl.startsWith('blob:') &&
+          !targetUrl.startsWith('data:'))
+      ) {
+        targetUrl = 'https://html5games.com';
+      }
+
+      try {
+        if (
+          typeof window !== 'undefined' &&
+          (window as unknown as { webkit?: { messageHandlers?: { browserViewAction?: { postMessage: (msg: unknown) => void } } } }).webkit?.messageHandlers?.browserViewAction
+        ) {
+          (window as unknown as { webkit: { messageHandlers: { browserViewAction: { postMessage: (msg: unknown) => void } } } }).webkit.messageHandlers.browserViewAction.postMessage({
+            action: 'open',
+            url: targetUrl,
+          });
+          onClose();
+        } else if (typeof window !== 'undefined') {
+          window.open(targetUrl, '_blank', 'noopener,noreferrer');
+        }
+      } catch (err) {
+        console.warn('Failed to launch external browser for game:', err);
+      }
+    },
+    [onClose]
+  );
+
   if (!isOpen) return null;
 
   return (
@@ -442,22 +487,9 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
 
         {/* Right Actions */}
         <div className="flex items-center gap-2 shrink-0">
-          {isPlayingGame && !selectedGame.srcDoc && (
+          {isPlayingGame && (
             <button
-              onClick={() => {
-                if (
-                  typeof window !== 'undefined' &&
-                  (window as any).webkit?.messageHandlers?.browserViewAction
-                ) {
-                  (window as any).webkit.messageHandlers.browserViewAction.postMessage({
-                    action: 'open',
-                    url: selectedGame.url,
-                  });
-                  onClose();
-                } else {
-                  window.open(selectedGame.url, '_blank');
-                }
-              }}
+              onClick={() => handleOpenInBrowser(selectedGame)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-400/30 text-cyan-300 text-xs font-semibold transition-all cursor-pointer"
               title="Open Game in Full Web Browser"
             >
@@ -614,20 +646,7 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
                       <span>Play Inbuilt Alternative</span>
                     </button>
                     <button
-                      onClick={() => {
-                        if (
-                          typeof window !== 'undefined' &&
-                          (window as unknown as { webkit?: { messageHandlers?: { browserViewAction?: { postMessage: (msg: unknown) => void } } } }).webkit?.messageHandlers?.browserViewAction
-                        ) {
-                          (window as unknown as { webkit: { messageHandlers: { browserViewAction: { postMessage: (msg: unknown) => void } } } }).webkit.messageHandlers.browserViewAction.postMessage({
-                            action: 'open',
-                            url: selectedGame.url,
-                          });
-                          onClose();
-                        } else {
-                          window.open(selectedGame.url, '_blank');
-                        }
-                      }}
+                      onClick={() => handleOpenInBrowser(selectedGame)}
                       className="flex-1 w-full py-2.5 px-4 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs border border-white/10 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       <ExternalLink className="w-4 h-4 text-cyan-400" />
