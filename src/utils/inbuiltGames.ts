@@ -39,8 +39,11 @@ const UNIVERSAL_INPUT_BRIDGE_SCRIPT = `
 </script>
 `;
 
+import { getExpandedInbuiltGameSrcDoc } from './inbuiltExpandedEngines.ts';
+
 export function getInbuiltGameSrcDoc(id: string): string {
-  const rawDoc = getRawInbuiltGameSrcDoc(id);
+  const expanded = getExpandedInbuiltGameSrcDoc(id);
+  const rawDoc = expanded || getRawInbuiltGameSrcDoc(id);
   if (!rawDoc) return '';
   return rawDoc.replace('</body>', `${UNIVERSAL_INPUT_BRIDGE_SCRIPT}</body>`);
 }
