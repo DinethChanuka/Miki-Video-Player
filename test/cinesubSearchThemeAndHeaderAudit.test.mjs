@@ -82,3 +82,4 @@ describe('CineSubz Search, Theme Visual Previews, Background Removal & Header Cl
     );
   });
 });
+

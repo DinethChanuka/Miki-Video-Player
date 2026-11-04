@@ -48,10 +48,17 @@ import {
   Sparkles,
   X,
   RefreshCw,
+  Image as ImageIcon,
+  HardDrive,
+  FileVideo,
+  FileAudio,
+  FileImage,
+  Eye,
 } from 'lucide-react';
 
 export type HomeViewCategory =
   | 'All'
+  | 'My Files'
   | 'Movies'
   | 'Tv series'
   | 'Animation'
@@ -63,6 +70,7 @@ export type HomeViewCategory =
 
 export type HomeNavTab =
   | 'browse'
+  | 'my_files'
   | 'watchlist'
   | 'coming_soon'
   | 'channels'
@@ -282,6 +290,272 @@ const ADZE_PARTIES: PartyItem[] = [
   },
 ];
 
+// Local media item interface and classifications
+export type LocalMediaCategory = 'video' | 'movie' | 'music' | 'image';
+
+export interface LocalMediaItem {
+  id: string;
+  title: string;
+  uri: string;
+  category: LocalMediaCategory;
+  extension: string;
+  durationMs?: number;
+  lastPositionMs?: number;
+  progressPercent?: number;
+  thumbnailUrl?: string;
+  sizeFormatted?: string;
+  resolution?: string;
+  lastPlayedAt: number;
+  isLocalOrigin?: boolean;
+}
+
+export function classifyLocalMedia(uri: string, title: string): LocalMediaCategory {
+  const lower = (uri + ' ' + title).toLowerCase();
+  if (
+    lower.endsWith('.png') ||
+    lower.endsWith('.jpg') ||
+    lower.endsWith('.jpeg') ||
+    lower.endsWith('.webp') ||
+    lower.endsWith('.bmp') ||
+    lower.endsWith('.gif') ||
+    lower.includes('snapshot') ||
+    lower.includes('screenshot') ||
+    lower.includes('miki_')
+  ) {
+    return 'image';
+  }
+  if (
+    lower.endsWith('.mp3') ||
+    lower.endsWith('.flac') ||
+    lower.endsWith('.wav') ||
+    lower.endsWith('.aac') ||
+    lower.endsWith('.m4a') ||
+    lower.endsWith('.ogg') ||
+    lower.endsWith('.opus') ||
+    lower.includes('audio') ||
+    lower.includes('song') ||
+    lower.includes('track')
+  ) {
+    return 'music';
+  }
+  if (
+    lower.includes('movie') ||
+    lower.includes('cinema') ||
+    lower.includes('remux') ||
+    lower.includes('bluray') ||
+    lower.includes('1080p') ||
+    lower.includes('2160p') ||
+    lower.includes('4k')
+  ) {
+    return 'movie';
+  }
+  return 'video';
+}
+
+export function extractFileExtension(pathStr: string): string {
+  const clean = pathStr.split('?')[0].split('#')[0];
+  const lastDot = clean.lastIndexOf('.');
+  if (lastDot !== -1 && lastDot < clean.length - 1) {
+    return clean.slice(lastDot + 1).slice(0, 5).toUpperCase();
+  }
+  return 'FILE';
+}
+
+export function formatMediaRelativeTime(timestamp: number): string {
+  const diffSec = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
+  if (diffSec < 60) return 'Just now';
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHours = Math.floor(diffMin / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays === 1) return 'Yesterday';
+  return `${diffDays}d ago`;
+}
+
+export function formatMediaDurationMs(ms?: number): string {
+  if (!ms || ms <= 0) return '';
+  const totalSec = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSec / 3600);
+  const minutes = Math.floor((totalSec % 3600) / 60);
+  const seconds = totalSec % 60;
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
+const SAMPLE_LOCAL_FILES: LocalMediaItem[] = [
+  {
+    id: 'sample-local-movie-1',
+    title: 'Interstellar (2014) IMAX 4K Remux.mkv',
+    uri: '/Users/d/Movies/Interstellar.2014.IMAX.2160p.UHD.Remux.mkv',
+    category: 'movie',
+    extension: 'MKV',
+    durationMs: 169 * 60 * 1000,
+    lastPositionMs: 48 * 60 * 1000,
+    progressPercent: 28,
+    thumbnailUrl: 'https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?w=600&auto=format&fit=crop&q=80',
+    sizeFormatted: '48.2 GB',
+    resolution: '4K UHD • HDR10',
+    lastPlayedAt: Date.now() - 1000 * 60 * 35,
+    isLocalOrigin: true,
+  },
+  {
+    id: 'sample-local-movie-2',
+    title: 'Spider-Man Across the Spider-Verse (2023).mp4',
+    uri: '/Users/d/Movies/Spider-Man.Across.the.Spider-Verse.2023.1080p.mp4',
+    category: 'movie',
+    extension: 'MP4',
+    durationMs: 140 * 60 * 1000,
+    lastPositionMs: 95 * 60 * 1000,
+    progressPercent: 68,
+    thumbnailUrl: HERO_ARTWORKS.spiderMan,
+    sizeFormatted: '6.4 GB',
+    resolution: '1080p • Dolby Atmos',
+    lastPlayedAt: Date.now() - 1000 * 60 * 180,
+    isLocalOrigin: true,
+  },
+  {
+    id: 'sample-local-video-1',
+    title: 'Cyberpunk Edgerunners - Episode 01.mkv',
+    uri: '/Users/d/Videos/Anime/Cyberpunk.Edgerunners.S01E01.1080p.mkv',
+    category: 'video',
+    extension: 'MKV',
+    durationMs: 24 * 60 * 1000,
+    lastPositionMs: 22 * 60 * 1000,
+    progressPercent: 92,
+    thumbnailUrl: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=600&auto=format&fit=crop&q=80',
+    sizeFormatted: '1.2 GB',
+    resolution: '1080p • 60 FPS',
+    lastPlayedAt: Date.now() - 1000 * 60 * 60 * 20,
+    isLocalOrigin: true,
+  },
+  {
+    id: 'sample-local-video-2',
+    title: 'Planet Earth III - Extreme Deserts 4K.mp4',
+    uri: '/Users/d/Videos/Nature/Planet.Earth.III.Deserts.2160p.mp4',
+    category: 'video',
+    extension: 'MP4',
+    durationMs: 58 * 60 * 1000,
+    lastPositionMs: 15 * 60 * 1000,
+    progressPercent: 26,
+    thumbnailUrl: 'https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?w=600&auto=format&fit=crop&q=80',
+    sizeFormatted: '9.8 GB',
+    resolution: '4K HDR • 60 FPS',
+    lastPlayedAt: Date.now() - 1000 * 60 * 60 * 48,
+    isLocalOrigin: true,
+  },
+  {
+    id: 'sample-local-music-1',
+    title: 'Pritam, Mohit Chauhan - Dooriyan (Studio Master).flac',
+    uri: '/Users/d/Music/Hi-Res/Dooriyan_Studio_Master_24bit_96k.flac',
+    category: 'music',
+    extension: 'FLAC',
+    durationMs: 326 * 1000,
+    lastPositionMs: 145 * 1000,
+    progressPercent: 44,
+    thumbnailUrl: ALBUM_POSTERS.dooriyan,
+    sizeFormatted: '94 MB',
+    resolution: '24-bit / 96 kHz Hi-Res',
+    lastPlayedAt: Date.now() - 1000 * 60 * 15,
+    isLocalOrigin: true,
+  },
+  {
+    id: 'sample-local-music-2',
+    title: 'Vishal-Shekhar - Bin Tere (Acoustic Vinyl Rip).wav',
+    uri: '/Users/d/Music/Vinyl/Bin_Tere_Acoustic_Rip.wav',
+    category: 'music',
+    extension: 'WAV',
+    durationMs: 330 * 1000,
+    lastPositionMs: 210 * 1000,
+    progressPercent: 63,
+    thumbnailUrl: ALBUM_POSTERS.binTere,
+    sizeFormatted: '58 MB',
+    resolution: '16-bit / 44.1 kHz PCM',
+    lastPlayedAt: Date.now() - 1000 * 60 * 90,
+    isLocalOrigin: true,
+  },
+  {
+    id: 'sample-local-music-3',
+    title: 'The Weeknd - Blinding Lights (Spatial Audio Master).flac',
+    uri: '/Users/d/Music/Lossless/Blinding_Lights_Master.flac',
+    category: 'music',
+    extension: 'FLAC',
+    durationMs: 200 * 1000,
+    lastPositionMs: 180 * 1000,
+    progressPercent: 90,
+    thumbnailUrl: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&auto=format&fit=crop&q=80',
+    sizeFormatted: '46 MB',
+    resolution: '24-bit / 48 kHz FLAC',
+    lastPlayedAt: Date.now() - 1000 * 60 * 60 * 24,
+    isLocalOrigin: true,
+  },
+  {
+    id: 'sample-local-music-4',
+    title: 'Lofi Girl - Chill Beats Late Night Session.mp3',
+    uri: '/Users/d/Music/Lofi/Lofi_Girl_Late_Night.mp3',
+    category: 'music',
+    extension: 'MP3',
+    durationMs: 2890 * 1000,
+    lastPositionMs: 820 * 1000,
+    progressPercent: 28,
+    thumbnailUrl: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop&q=80',
+    sizeFormatted: '112 MB',
+    resolution: '320 kbps Stereo',
+    lastPlayedAt: Date.now() - 1000 * 60 * 60 * 36,
+    isLocalOrigin: true,
+  },
+  {
+    id: 'sample-local-image-1',
+    title: 'Miki_Player_Interstellar_4K_Snapshot.png',
+    uri: '/Users/d/Pictures/Miki_Player/Miki_Interstellar_4K_Snapshot.png',
+    category: 'image',
+    extension: 'PNG',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=800&auto=format&fit=crop&q=80',
+    sizeFormatted: '6.4 MB',
+    resolution: '3840 × 2160 (4K UHD)',
+    lastPlayedAt: Date.now() - 1000 * 60 * 10,
+    isLocalOrigin: true,
+  },
+  {
+    id: 'sample-local-image-2',
+    title: 'Cyberpunk_Neon_Street_Wallpaper.jpg',
+    uri: '/Users/d/Pictures/Wallpapers/Cyberpunk_Neon_Street.jpg',
+    category: 'image',
+    extension: 'JPG',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=800&auto=format&fit=crop&q=80',
+    sizeFormatted: '3.8 MB',
+    resolution: '2560 × 1440 (QHD)',
+    lastPlayedAt: Date.now() - 1000 * 60 * 75,
+    isLocalOrigin: true,
+  },
+  {
+    id: 'sample-local-image-3',
+    title: 'Studio_Sound_Visualizer_Waveform_Capture.png',
+    uri: '/Users/d/Pictures/Miki_Player/Miki_Visualizer_Waveform.png',
+    category: 'image',
+    extension: 'PNG',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&auto=format&fit=crop&q=80',
+    sizeFormatted: '2.1 MB',
+    resolution: '1920 × 1080 (FHD)',
+    lastPlayedAt: Date.now() - 1000 * 60 * 60 * 5,
+    isLocalOrigin: true,
+  },
+  {
+    id: 'sample-local-image-4',
+    title: 'Cinematic_Film_Grade_Color_LUT_Sample.webp',
+    uri: '/Users/d/Pictures/LUTs/Cinematic_LUT_Sample.webp',
+    category: 'image',
+    extension: 'WEBP',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=800&auto=format&fit=crop&q=80',
+    sizeFormatted: '850 KB',
+    resolution: '1920 × 1080',
+    lastPlayedAt: Date.now() - 1000 * 60 * 60 * 72,
+    isLocalOrigin: true,
+  },
+];
+
 export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
   onOpenGames,
   onOpenMusic,
@@ -330,6 +604,14 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
   const [musicCurrentPage, setMusicCurrentPage] = useState<number>(1);
   const CHUNK_SIZE = 12; // 12 tracks per chunk for progressive stream buffering
   const MUSIC_PAGE_SIZE = CHUNK_SIZE;
+
+  const [myFilesFilter, setMyFilesFilter] = useState<'all' | 'videos' | 'music' | 'images'>('all');
+  const [previewImage, setPreviewImage] = useState<{
+    title: string;
+    url: string;
+    size?: string;
+    dimensions?: string;
+  } | null>(null);
 
   // Background auto-refresh for latest CineSubz & Music Discovery releases
   useEffect(() => {
@@ -383,6 +665,83 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
     );
   }, [recentMedia]);
 
+  // Extract and categorize local files from recent media + sample local media
+  const localMediaList: LocalMediaItem[] = useMemo(() => {
+    const list: LocalMediaItem[] = [];
+
+    // 1. Process recentMedia from player store
+    if (recentMedia && recentMedia.length > 0) {
+      for (const item of recentMedia) {
+        // Local if no webPlatform, not youtube, and uri doesn't start with external http (or is file:// or localhost)
+        const isExternalWeb = Boolean(
+          item.webPlatform ||
+            item.isYouTube ||
+            (item.uri.startsWith('http://') && !item.uri.includes('localhost') && !item.uri.includes('127.0.0.1')) ||
+            (item.uri.startsWith('https://') && !item.uri.includes('localhost') && !item.uri.includes('127.0.0.1'))
+        );
+        if (!isExternalWeb || item.uri.startsWith('file://')) {
+          const category = classifyLocalMedia(item.uri, item.title);
+          const ext = extractFileExtension(item.uri || item.title);
+          list.push({
+            id: item.mediaId || item.uri,
+            title: item.title,
+            uri: item.uri,
+            category,
+            extension: ext,
+            durationMs: item.durationMs,
+            lastPositionMs: item.lastPositionMs,
+            progressPercent: item.progressPercent,
+            thumbnailUrl: item.thumbnailUri,
+            lastPlayedAt: item.lastPlayedAt || Date.now(),
+            isLocalOrigin: true,
+          });
+        }
+      }
+    }
+
+    // 2. Include sample local files (filter out if same uri already present)
+    for (const sample of SAMPLE_LOCAL_FILES) {
+      if (!list.some((existing) => existing.uri === sample.uri || existing.title === sample.title)) {
+        list.push(sample);
+      }
+    }
+
+    return list;
+  }, [recentMedia]);
+
+  const filteredLocalFiles = useMemo(() => {
+    let list = localMediaList;
+
+    if (myFilesFilter === 'videos') {
+      list = list.filter((f) => f.category === 'video' || f.category === 'movie');
+    } else if (myFilesFilter === 'music') {
+      list = list.filter((f) => f.category === 'music');
+    } else if (myFilesFilter === 'images') {
+      list = list.filter((f) => f.category === 'image');
+    }
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(
+        (f) =>
+          f.title.toLowerCase().includes(q) ||
+          f.extension.toLowerCase().includes(q) ||
+          (f.resolution && f.resolution.toLowerCase().includes(q))
+      );
+    }
+
+    return list;
+  }, [localMediaList, myFilesFilter, searchQuery]);
+
+  const localFileCounts = useMemo(() => {
+    return {
+      all: localMediaList.length,
+      videos: localMediaList.filter((f) => f.category === 'video' || f.category === 'movie').length,
+      music: localMediaList.filter((f) => f.category === 'music').length,
+      images: localMediaList.filter((f) => f.category === 'image').length,
+    };
+  }, [localMediaList]);
+
   // Live dynamic online search across iTunes & streaming APIs when user searches
   useEffect(() => {
     const q = searchQuery.trim();
@@ -403,7 +762,8 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
   }, [searchQuery, selectedMusicPlatform]);
 
   // Determine effective section mode
-  const effectiveSection: 'all' | 'movies' | 'series' | 'channels' | 'games' | 'music' | 'radio' | 'watchlist' = useMemo(() => {
+  const effectiveSection: 'all' | 'my_files' | 'movies' | 'series' | 'channels' | 'games' | 'music' | 'radio' | 'watchlist' = useMemo(() => {
+    if (activeNav === 'my_files' || activeCategory === 'My Files') return 'my_files';
     if (activeNav === 'watchlist') return 'watchlist';
     if (activeNav === 'channels' || activeCategory === 'Live TV') return 'channels';
     if (activeNav === 'games' || activeCategory === 'Games') return 'games';
@@ -595,6 +955,21 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
 
             <button
               onClick={() => {
+                setActiveNav('my_files');
+                setActiveCategory('My Files');
+              }}
+              className={`p-2.5 rounded-full transition-all cursor-pointer ${
+                effectiveSection === 'my_files'
+                  ? 'bg-cyan-600 text-white shadow-md shadow-cyan-600/40'
+                  : 'text-white/50 hover:text-white hover:bg-white/10'
+              }`}
+              title="My Files (Videos, Movies, Music, Images)"
+            >
+              <FolderOpen className="w-4 h-4" />
+            </button>
+
+            <button
+              onClick={() => {
                 setActiveCategory('Movies');
                 setActiveNav('browse');
               }}
@@ -747,6 +1122,24 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
               )}
               <Compass className="w-4 h-4 text-rose-500" />
               <span>Browse All</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveNav('my_files');
+                setActiveCategory('My Files');
+              }}
+              className={`relative flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all text-left cursor-pointer ${
+                effectiveSection === 'my_files'
+                  ? 'text-white bg-white/5 font-bold'
+                  : 'text-white/60 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              {effectiveSection === 'my_files' && (
+                <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-full bg-cyan-500 shadow-sm shadow-cyan-500" />
+              )}
+              <FolderOpen className="w-4 h-4 text-cyan-400" />
+              <span>My Files</span>
             </button>
 
             <button
@@ -1248,13 +1641,14 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
 
           {/* Top Category Pills */}
           <div className="hidden lg:flex items-center gap-1.5">
-            {(['All', 'Movies', 'Tv series', 'Animation', 'Live TV', 'Games', 'Music', 'Radio'] as HomeViewCategory[]).map(
+            {(['All', 'My Files', 'Movies', 'Tv series', 'Animation', 'Live TV', 'Games', 'Music', 'Radio'] as HomeViewCategory[]).map(
               (cat) => (
                 <button
                   key={cat}
                   onClick={() => {
                     setActiveCategory(cat);
-                    if (cat === 'Live TV') setActiveNav('channels');
+                    if (cat === 'My Files') setActiveNav('my_files');
+                    else if (cat === 'Live TV') setActiveNav('channels');
                     else if (cat === 'Games') setActiveNav('games');
                     else if (cat === 'Music') setActiveNav('music');
                     else if (cat === 'Radio') setActiveNav('radio');
@@ -1319,9 +1713,270 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
         {/* SCROLLABLE HOME VIEWPORT */}
         <div ref={scrollViewportRef} className="flex-1 overflow-y-auto p-6 sm:p-8 flex flex-col gap-8 scrollbar-thin">
           {/* ============================================================ */}
-          {/* A. DYNAMIC SECTION: MUSIC & APPLE COVER FLOW 3D              */}
+          {/* 0. DYNAMIC SECTION: MY FILES & LOCAL MEDIA HUB               */}
           {/* ============================================================ */}
-          {effectiveSection === 'music' ? (
+          {effectiveSection === 'my_files' ? (
+            <div className="flex flex-col gap-6 w-full pt-1 pb-12">
+              {/* Header: Title, Description, and Open Local File Action */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-white/5">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-cyan-600 via-teal-600 to-blue-600 flex items-center justify-center text-white shadow-xl shadow-cyan-600/30">
+                    <FolderOpen className="w-6 h-6" />
+                  </div>
+                  <div className="flex flex-col">
+                    <div className="flex items-center gap-2">
+                      <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                        My Files & Local Media Hub
+                      </h1>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-bold">
+                        {localMediaList.length} Files
+                      </span>
+                    </div>
+                    <p className="text-xs text-white/60">
+                      Quickly access, resume, and manage your recently played local videos, movies, music, and images.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2.5">
+                  <button
+                    onClick={() => {
+                      if (onOpenLocalFile) onOpenLocalFile();
+                      const input = document.getElementById('miki-main-file-input');
+                      input?.click();
+                    }}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold transition-all shadow-lg shadow-cyan-600/30 cursor-pointer active:scale-95"
+                    title="Open local media file from your computer"
+                  >
+                    <FolderOpen className="w-4 h-4" />
+                    <span>Open Local File...</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Filter Tabs: All Files, Videos & Movies, Music & Audio, Images & Snapshots */}
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => setMyFilesFilter('all')}
+                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                    myFilesFilter === 'all'
+                      ? 'bg-cyan-600 text-white font-bold shadow-md shadow-cyan-600/30'
+                      : 'bg-white/5 text-white/60 hover:text-white hover:bg-white/10'
+                  }`}
+                >
+                  <HardDrive className="w-3.5 h-3.5" />
+                  <span>All Files</span>
+                  <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-black/40 text-cyan-300 font-bold">
+                    {localFileCounts.all}
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setMyFilesFilter('videos')}
+                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                    myFilesFilter === 'videos'
+                      ? 'bg-rose-600 text-white font-bold shadow-md shadow-rose-600/30'
+                      : 'bg-white/5 text-white/60 hover:text-white hover:bg-white/10'
+                  }`}
+                >
+                  <Film className="w-3.5 h-3.5" />
+                  <span>Videos & Movies</span>
+                  <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-black/40 text-rose-300 font-bold">
+                    {localFileCounts.videos}
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setMyFilesFilter('music')}
+                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                    myFilesFilter === 'music'
+                      ? 'bg-emerald-600 text-white font-bold shadow-md shadow-emerald-600/30'
+                      : 'bg-white/5 text-white/60 hover:text-white hover:bg-white/10'
+                  }`}
+                >
+                  <Music className="w-3.5 h-3.5" />
+                  <span>Music & Audio</span>
+                  <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-black/40 text-emerald-300 font-bold">
+                    {localFileCounts.music}
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setMyFilesFilter('images')}
+                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                    myFilesFilter === 'images'
+                      ? 'bg-amber-600 text-white font-bold shadow-md shadow-amber-600/30'
+                      : 'bg-white/5 text-white/60 hover:text-white hover:bg-white/10'
+                  }`}
+                >
+                  <ImageIcon className="w-3.5 h-3.5" />
+                  <span>Images & Snapshots</span>
+                  <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-black/40 text-amber-300 font-bold">
+                    {localFileCounts.images}
+                  </span>
+                </button>
+              </div>
+
+              {/* Drag & Drop File Selector Banner */}
+              <div
+                onClick={() => {
+                  if (onOpenLocalFile) onOpenLocalFile();
+                  const input = document.getElementById('miki-main-file-input');
+                  input?.click();
+                }}
+                className="w-full rounded-2xl border-2 border-dashed border-cyan-500/30 hover:border-cyan-500/60 bg-gradient-to-r from-cyan-950/25 via-blue-950/15 to-transparent p-4 flex items-center justify-between gap-4 transition-all cursor-pointer group shadow-inner"
+              >
+                <div className="flex items-center gap-3.5">
+                  <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 group-hover:scale-110 group-hover:bg-cyan-500/20 transition-all">
+                    <FolderOpen className="w-5 h-5" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-xs font-bold text-white group-hover:text-cyan-300 transition-colors">
+                      Drag & Drop or Click to Open Local Media
+                    </span>
+                    <span className="text-[10px] text-white/50">
+                      Instant playback for Videos (.mkv, .mp4, .mov, .avi), Music (.flac, .mp3, .wav), and Images (.png, .jpg)
+                    </span>
+                  </div>
+                </div>
+
+                <span className="text-[11px] font-semibold text-cyan-400 px-3 py-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/20 group-hover:bg-cyan-500 group-hover:text-black transition-all">
+                  Browse Files
+                </span>
+              </div>
+
+              {/* File Cards Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                {filteredLocalFiles.map((file) => (
+                  <div
+                    key={file.id + '-' + file.uri}
+                    onClick={() => {
+                      if (file.category === 'image') {
+                        setPreviewImage({
+                          title: file.title,
+                          url: file.thumbnailUrl || file.uri,
+                          size: file.sizeFormatted,
+                          dimensions: file.resolution,
+                        });
+                      } else if (file.category === 'music') {
+                        openMedia(file.uri, file.title, true, file.lastPositionMs || 0, file.thumbnailUrl);
+                      } else {
+                        openMedia(file.uri, file.title, true, file.lastPositionMs || 0);
+                      }
+                    }}
+                    className="group relative flex flex-col rounded-2xl overflow-hidden bg-white/5 border border-white/10 hover:border-cyan-400/50 hover:bg-white/10 transition-all cursor-pointer shadow-lg"
+                  >
+                    <div className="relative aspect-video w-full overflow-hidden bg-black/60">
+                      {file.thumbnailUrl ? (
+                        <img
+                          src={file.thumbnailUrl}
+                          alt={file.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 text-white/40 gap-2 p-3">
+                          {file.category === 'video' || file.category === 'movie' ? (
+                            <FileVideo className="w-8 h-8 text-rose-400" />
+                          ) : file.category === 'music' ? (
+                            <FileAudio className="w-8 h-8 text-emerald-400" />
+                          ) : (
+                            <FileImage className="w-8 h-8 text-amber-400" />
+                          )}
+                        </div>
+                      )}
+
+                      {/* Extension and Category Badges */}
+                      <div className="absolute top-2 left-2 flex items-center gap-1.5">
+                        <span
+                          className={`text-[8px] font-bold uppercase tracking-wider px-2 py-0.5 rounded shadow-md ${
+                            file.category === 'movie'
+                              ? 'bg-rose-600 text-white'
+                              : file.category === 'video'
+                              ? 'bg-blue-600 text-white'
+                              : file.category === 'music'
+                              ? 'bg-emerald-600 text-white'
+                              : 'bg-amber-600 text-white'
+                          }`}
+                        >
+                          {file.category}
+                        </span>
+                        <span className="text-[8px] font-mono font-bold px-1.5 py-0.5 rounded bg-black/70 text-white/90 border border-white/10">
+                          .{file.extension}
+                        </span>
+                      </div>
+
+                      {file.resolution && (
+                        <div className="absolute top-2 right-2">
+                          <span className="text-[8px] font-mono px-1.5 py-0.5 rounded bg-black/70 text-cyan-300 border border-white/10">
+                            {file.resolution.split('•')[0].trim()}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Hover Overlay Button */}
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="w-10 h-10 rounded-full bg-cyan-500 hover:bg-cyan-400 text-slate-950 flex items-center justify-center shadow-xl shadow-cyan-500/40 transition-transform group-hover:scale-110">
+                          {file.category === 'image' ? (
+                            <Eye className="w-5 h-5 text-slate-950" />
+                          ) : (
+                            <Play className="w-5 h-5 fill-slate-950 ml-0.5 text-slate-950" />
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Progress Bar for Videos & Music */}
+                      {file.progressPercent !== undefined && file.progressPercent > 0 && file.category !== 'image' && (
+                        <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/20">
+                          <div
+                            className={`h-full ${
+                              file.category === 'music' ? 'bg-emerald-500' : 'bg-rose-500'
+                            }`}
+                            style={{ width: `${Math.min(100, Math.max(5, file.progressPercent))}%` }}
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="p-3 flex flex-col gap-1.5">
+                      <span
+                        className="text-xs font-bold text-white truncate group-hover:text-cyan-300 transition-colors"
+                        title={file.title}
+                      >
+                        {file.title}
+                      </span>
+
+                      <div className="flex items-center justify-between text-[10px] text-white/50">
+                        <div className="flex items-center gap-1.5">
+                          <Clock className="w-3 h-3 text-cyan-400" />
+                          <span>{formatMediaRelativeTime(file.lastPlayedAt)}</span>
+                        </div>
+                        {file.durationMs ? (
+                          <span className="font-mono text-white/70">{formatMediaDurationMs(file.durationMs)}</span>
+                        ) : file.sizeFormatted ? (
+                          <span className="font-mono text-white/70">{file.sizeFormatted}</span>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {filteredLocalFiles.length === 0 && (
+                <div className="p-12 text-center flex flex-col items-center justify-center gap-3 rounded-2xl bg-white/5 border border-white/10">
+                  <FolderOpen className="w-10 h-10 text-white/30" />
+                  <span className="text-sm font-semibold text-white/70">
+                    No files found in {myFilesFilter} category
+                  </span>
+                  <p className="text-xs text-white/40 max-w-sm">
+                    Open a local file from your system to have it indexed and displayed here.
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : effectiveSection === 'music' ? (
             <div className="flex flex-col gap-6 items-center w-full pt-2 pb-12">
               {/* 3D Perspective Carousel Container */}
               <div
@@ -2695,6 +3350,95 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                 </div>
               </section>
 
+              {/* 2.5 MY RECENT LOCAL FILES SHELF */}
+              <section className="flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <FolderOpen className="w-4 h-4 text-cyan-400" />
+                    <h2 className="text-base font-bold text-white tracking-wide">
+                      My Recent Local Files
+                    </h2>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                      Videos, Movies, Music & Images
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setActiveNav('my_files');
+                      setActiveCategory('My Files');
+                    }}
+                    className="text-xs font-semibold text-cyan-400 hover:text-cyan-300 transition-colors flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>See all in My Files</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                  {localMediaList.slice(0, 6).map((file) => (
+                    <div
+                      key={'browse-local-' + file.id}
+                      onClick={() => {
+                        if (file.category === 'image') {
+                          setPreviewImage({
+                            title: file.title,
+                            url: file.thumbnailUrl || file.uri,
+                            size: file.sizeFormatted,
+                            dimensions: file.resolution,
+                          });
+                        } else if (file.category === 'music') {
+                          openMedia(file.uri, file.title, true, file.lastPositionMs || 0, file.thumbnailUrl);
+                        } else {
+                          openMedia(file.uri, file.title, true, file.lastPositionMs || 0);
+                        }
+                      }}
+                      className="group relative flex flex-col rounded-2xl overflow-hidden bg-white/5 border border-white/10 hover:border-cyan-400/50 hover:bg-white/10 transition-all cursor-pointer shadow-lg"
+                    >
+                      <div className="relative aspect-video w-full overflow-hidden bg-black/60">
+                        {file.thumbnailUrl ? (
+                          <img
+                            src={file.thumbnailUrl}
+                            alt={file.title}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLImageElement).style.display = 'none';
+                            }}
+                          />
+                        ) : (
+                          <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 text-white/40 gap-1.5 p-2">
+                            <FolderOpen className="w-6 h-6 text-cyan-400" />
+                          </div>
+                        )}
+                        <div className="absolute top-1.5 left-1.5 flex items-center gap-1">
+                          <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-black/70 text-cyan-300 border border-white/10">
+                            .{file.extension}
+                          </span>
+                        </div>
+                        <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="w-8 h-8 rounded-full bg-cyan-500 flex items-center justify-center shadow-lg shadow-cyan-500/40 text-black">
+                            {file.category === 'image' ? (
+                              <Eye className="w-4 h-4 text-slate-950" />
+                            ) : (
+                              <Play className="w-4 h-4 fill-slate-950 ml-0.5 text-slate-950" />
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="p-2.5 flex flex-col gap-0.5">
+                        <span className="text-xs font-bold text-white truncate group-hover:text-cyan-300">
+                          {file.title}
+                        </span>
+                        <div className="flex items-center justify-between text-[10px] text-white/50">
+                          <span>{formatMediaRelativeTime(file.lastPlayedAt)}</span>
+                          <span className="font-mono capitalize text-cyan-400/80">{file.category}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
               {/* 3. CONTINUE WATCHING CAROUSEL */}
               <section className="flex flex-col gap-3">
                 <div className="flex items-center justify-between">
@@ -3044,6 +3788,66 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
           )}
         </div>
       </main>
+
+      {/* Lightbox / Fullscreen Preview Modal for Images & Snapshots */}
+      {previewImage && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 sm:p-8 animate-in fade-in duration-200"
+          onClick={() => setPreviewImage(null)}
+        >
+          <div
+            className="relative max-w-5xl max-h-[90vh] bg-[#0c101b] border border-white/15 rounded-3xl p-4 sm:p-6 flex flex-col gap-4 shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <FileImage className="w-5 h-5 text-amber-400 shrink-0" />
+                <h3 className="text-sm font-bold text-white truncate">
+                  {previewImage.title}
+                </h3>
+                {previewImage.dimensions && (
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-white/10 text-cyan-300">
+                    {previewImage.dimensions}
+                  </span>
+                )}
+                {previewImage.size && (
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-white/10 text-white/60">
+                    {previewImage.size}
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <a
+                  href={previewImage.url}
+                  download={previewImage.title}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all cursor-pointer"
+                  title="Download / Open Fullscreen"
+                >
+                  <Download className="w-4 h-4" />
+                </a>
+                <button
+                  onClick={() => setPreviewImage(null)}
+                  className="p-2 rounded-xl bg-white/10 hover:bg-rose-600/80 text-white transition-all cursor-pointer"
+                  title="Close Preview"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 flex items-center justify-center overflow-hidden rounded-2xl bg-black/60 max-h-[70vh]">
+              <img
+                src={previewImage.url}
+                alt={previewImage.title}
+                className="max-w-full max-h-[70vh] object-contain rounded-xl"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

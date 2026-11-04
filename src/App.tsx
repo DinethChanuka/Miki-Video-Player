@@ -119,6 +119,7 @@ export const App: React.FC = () => {
   const currentSectionName = useMemo(() => {
     if (activePlaybackMode === 'video' && currentUri) return 'Video Player';
     if (activePlaybackMode === 'music' && isMusicPlayerOpen) return 'Hi-Fi Music Studio';
+    if (lastActiveCategory === 'My Files' || lastActiveNav === 'my_files') return 'My Files';
     if (lastActiveCategory === 'Movies') return 'Movies & Cinema';
     if (lastActiveCategory === 'Tv series') return 'TV Series & Shows';
     if (lastActiveCategory === 'Live TV' || lastActiveNav === 'channels') return 'Live TV (100+)';
@@ -1079,7 +1080,7 @@ export const App: React.FC = () => {
               id="miki-main-file-input"
               type="file"
               className="hidden"
-              accept="video/*,audio/*,.mkv,.mp4,.avi,.mov,.webm,.m3u8"
+              accept="video/*,audio/*,image/*,.mkv,.mp4,.avi,.mov,.webm,.m3u8,.png,.jpg,.jpeg,.webp"
               onChange={handleNativeFileSelect}
             />
           </div>

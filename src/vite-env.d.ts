@@ -98,6 +98,12 @@ declare module 'lucide-react' {
   export const EyeOff: LucideIcon;
   export const ChevronLeft: LucideIcon;
   export const ChevronRight: LucideIcon;
+  export const Image: LucideIcon;
+  export const HardDrive: LucideIcon;
+  export const FileVideo: LucideIcon;
+  export const FileAudio: LucideIcon;
+  export const FileImage: LucideIcon;
+  export const File: LucideIcon;
 
   // Fallback index signature so any other Lucide icon is also typed
   const icons: { [key: string]: LucideIcon };
