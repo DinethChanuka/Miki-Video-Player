@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { usePlayerStore } from '../../store/playerStore';
 import { CURATED_CHANNELS, LiveChannel } from '../../utils/channelCatalog';
 import { GAMES_CATALOG, GameItem } from '../../utils/gamesCatalog';
@@ -323,6 +323,13 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
     if (activeCategory === 'Tv series' || activeCategory === 'Animation') return 'series';
     return 'all';
   }, [activeNav, activeCategory]);
+
+  const scrollViewportRef = useRef<HTMLDivElement>(null);
+
+  // Automatically reset scroll position to top when switching sections
+  useEffect(() => {
+    scrollViewportRef.current?.scrollTo({ top: 0, behavior: 'instant' });
+  }, [effectiveSection]);
 
   // Filtered Channels
   const filteredChannels = useMemo(() => {
@@ -881,15 +888,15 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
         </header>
 
         {/* SCROLLABLE HOME VIEWPORT */}
-        <div className="flex-1 overflow-y-auto p-6 sm:p-8 flex flex-col gap-8 scrollbar-thin">
+        <div ref={scrollViewportRef} className="flex-1 overflow-y-auto p-6 sm:p-8 flex flex-col gap-8 scrollbar-thin">
           {/* ============================================================ */}
           {/* A. DYNAMIC SECTION: MUSIC & APPLE COVER FLOW 3D              */}
           {/* ============================================================ */}
           {effectiveSection === 'music' ? (
-            <div className="flex flex-col gap-8 items-center justify-center min-h-[500px]">
+            <div className="flex flex-col gap-6 items-center w-full pt-2 pb-12">
               {/* 3D Perspective Carousel Container */}
               <div
-                className="relative w-full max-w-4xl h-72 flex items-center justify-center"
+                className="relative w-full max-w-4xl h-72 sm:h-80 flex items-center justify-center pt-4 pb-2"
                 style={{ perspective: '1200px' }}
               >
                 {COVER_FLOW_ALBUMS.map((album, idx) => {
