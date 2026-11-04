@@ -58,6 +58,8 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
   const [activeCategory, setActiveCategory] = useState<'All' | GameCategory>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const [gameMode, setGameMode] = useState<'level' | 'infinity'>('infinity');
+  const [selectedLevel, setSelectedLevel] = useState<number>(1);
   const [activeKeys, setActiveKeys] = useState<{ [key: string]: boolean }>({});
   const [mouseActive, setMouseActive] = useState<boolean>(false);
   const [gameKey, setGameKey] = useState<number>(0);
@@ -191,6 +193,29 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
     return () => window.removeEventListener('message', handleMessage);
   }, []);
 
+  const syncGameMode = useCallback((mode: 'level' | 'infinity', level: number) => {
+    if (iframeRef.current && iframeRef.current.contentWindow) {
+      try {
+        iframeRef.current.contentWindow.postMessage(
+          { type: 'miki:set-game-mode', mode, level },
+          '*'
+        );
+      } catch (err) {}
+    }
+  }, []);
+
+  const handleToggleInfinity = () => {
+    const nextMode = gameMode === 'infinity' ? 'level' : 'infinity';
+    setGameMode(nextMode);
+    syncGameMode(nextMode, selectedLevel);
+  };
+
+  const handleSelectLevel = (lvl: number) => {
+    setSelectedLevel(lvl);
+    setGameMode('level');
+    syncGameMode('level', lvl);
+  };
+
   const handleMouseMove = useCallback(() => {
     if (!isOpen) return;
     setMouseActive(true);
@@ -297,61 +322,99 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
           </div>
         </div>
 
-        {/* Center: In-Game Live HUD OR Single Gallery Search Input */}
+        {/* Center: In-Game Live HUD & Level / Infinity Selector OR Single Gallery Search Input */}
         {isPlayingGame ? (
-          <div className="hidden lg:flex items-center gap-1.5 px-3 py-1 rounded-xl bg-black/60 border border-white/10 text-[10px] font-mono">
-            <Sliders className="w-3.5 h-3.5 text-white/40 mr-1" />
-            <span
-              className={`px-1.5 py-0.5 rounded transition-colors ${
-                activeKeys['KeyW'] || activeKeys['ArrowUp']
-                  ? 'bg-emerald-500 text-black font-bold shadow-sm shadow-emerald-500/50'
-                  : 'text-white/40'
-              }`}
-            >
-              W/↑
-            </span>
-            <span
-              className={`px-1.5 py-0.5 rounded transition-colors ${
-                activeKeys['KeyA'] || activeKeys['ArrowLeft']
-                  ? 'bg-emerald-500 text-black font-bold shadow-sm shadow-emerald-500/50'
-                  : 'text-white/40'
-              }`}
-            >
-              A/←
-            </span>
-            <span
-              className={`px-1.5 py-0.5 rounded transition-colors ${
-                activeKeys['KeyS'] || activeKeys['ArrowDown']
-                  ? 'bg-emerald-500 text-black font-bold shadow-sm shadow-emerald-500/50'
-                  : 'text-white/40'
-              }`}
-            >
-              S/↓
-            </span>
-            <span
-              className={`px-1.5 py-0.5 rounded transition-colors ${
-                activeKeys['KeyD'] || activeKeys['ArrowRight']
-                  ? 'bg-emerald-500 text-black font-bold shadow-sm shadow-emerald-500/50'
-                  : 'text-white/40'
-              }`}
-            >
-              D/→
-            </span>
-            <span
-              className={`px-2 py-0.5 rounded transition-colors ${
-                activeKeys['Space']
-                  ? 'bg-emerald-500 text-black font-bold shadow-sm shadow-emerald-500/50'
-                  : 'text-white/40'
-              }`}
-            >
-              SPACE
-            </span>
-            <div className="h-3 w-px bg-white/20 mx-1" />
-            <MousePointer
-              className={`w-3.5 h-3.5 transition-colors ${
-                mouseActive ? 'text-cyan-400 animate-pulse' : 'text-white/30'
-              }`}
-            />
+          <div className="flex items-center gap-2">
+            {/* Level Selection (1-10) & Infinity Mode */}
+            <div className="flex items-center gap-1.5 p-1 rounded-xl bg-black/60 border border-white/10">
+              <button
+                type="button"
+                onClick={handleToggleInfinity}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  gameMode === 'infinity'
+                    ? 'bg-gradient-to-r from-purple-600 via-pink-600 to-rose-600 text-white shadow-md shadow-pink-500/40 ring-1 ring-white/30'
+                    : 'bg-white/5 hover:bg-white/10 text-white/60 hover:text-white'
+                }`}
+                title="Toggle Endless Infinity Mode (∞)"
+              >
+                <span className="text-sm font-black">∞</span>
+                <span className="hidden sm:inline">Infinity Mode</span>
+              </button>
+
+              <div className="flex items-center gap-1 pl-1 border-l border-white/10">
+                <span className="text-[10px] text-white/50 uppercase font-mono hidden md:inline">
+                  Level:
+                </span>
+                <select
+                  value={selectedLevel}
+                  onChange={(e) => handleSelectLevel(Number(e.target.value))}
+                  className="bg-white/10 hover:bg-white/15 text-cyan-400 font-bold rounded-lg px-2 py-1 text-xs border border-white/10 focus:outline-none focus:ring-1 focus:ring-cyan-400 cursor-pointer"
+                  title="Select Stage Level (1-10)"
+                >
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((lvl) => (
+                    <option key={lvl} value={lvl} className="bg-slate-900 text-white">
+                      Level {lvl}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* In-Game Key HUD */}
+            <div className="hidden xl:flex items-center gap-1.5 px-3 py-1 rounded-xl bg-black/60 border border-white/10 text-[10px] font-mono">
+              <Sliders className="w-3.5 h-3.5 text-white/40 mr-1" />
+              <span
+                className={`px-1.5 py-0.5 rounded transition-colors ${
+                  activeKeys['KeyW'] || activeKeys['ArrowUp']
+                    ? 'bg-emerald-500 text-black font-bold shadow-sm shadow-emerald-500/50'
+                    : 'text-white/40'
+                }`}
+              >
+                W/↑
+              </span>
+              <span
+                className={`px-1.5 py-0.5 rounded transition-colors ${
+                  activeKeys['KeyA'] || activeKeys['ArrowLeft']
+                    ? 'bg-emerald-500 text-black font-bold shadow-sm shadow-emerald-500/50'
+                    : 'text-white/40'
+                }`}
+              >
+                A/←
+              </span>
+              <span
+                className={`px-1.5 py-0.5 rounded transition-colors ${
+                  activeKeys['KeyS'] || activeKeys['ArrowDown']
+                    ? 'bg-emerald-500 text-black font-bold shadow-sm shadow-emerald-500/50'
+                    : 'text-white/40'
+                }`}
+              >
+                S/↓
+              </span>
+              <span
+                className={`px-1.5 py-0.5 rounded transition-colors ${
+                  activeKeys['KeyD'] || activeKeys['ArrowRight']
+                    ? 'bg-emerald-500 text-black font-bold shadow-sm shadow-emerald-500/50'
+                    : 'text-white/40'
+                }`}
+              >
+                D/→
+              </span>
+              <span
+                className={`px-2 py-0.5 rounded transition-colors ${
+                  activeKeys['Space']
+                    ? 'bg-emerald-500 text-black font-bold shadow-sm shadow-emerald-500/50'
+                    : 'text-white/40'
+                }`}
+              >
+                SPACE
+              </span>
+              <div className="h-3 w-px bg-white/20 mx-1" />
+              <MousePointer
+                className={`w-3.5 h-3.5 transition-colors ${
+                  mouseActive ? 'text-cyan-400 animate-pulse' : 'text-white/30'
+                }`}
+              />
+            </div>
           </div>
         ) : (
           <div className="flex-1 max-w-md mx-2 hidden sm:block">
@@ -501,6 +564,7 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
               onLoad={() => {
                 setIsLoadingIframe(false);
                 setIframeError(false);
+                syncGameMode(gameMode, selectedLevel);
               }}
               onError={() => {
                 setIsLoadingIframe(false);

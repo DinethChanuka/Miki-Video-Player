@@ -7,8 +7,12 @@
 const UNIVERSAL_INPUT_BRIDGE_SCRIPT = `
 <script>
 (function() {
+  window.__MIKI_GAME_MODE = 'level';
+  window.__MIKI_GAME_LEVEL = 1;
+
   window.addEventListener('message', function(ev) {
-    if (ev.data && ev.data.type === 'miki:game-input') {
+    if (!ev.data) return;
+    if (ev.data.type === 'miki:game-input') {
       try {
         var synthetic = new KeyboardEvent(ev.data.action === 'down' ? 'keydown' : 'keyup', {
           key: ev.data.key,
@@ -17,6 +21,20 @@ const UNIVERSAL_INPUT_BRIDGE_SCRIPT = `
           cancelable: true
         });
         window.dispatchEvent(synthetic);
+      } catch(err) {}
+    } else if (ev.data.type === 'miki:set-game-mode') {
+      if (ev.data.mode) {
+        window.__MIKI_GAME_MODE = ev.data.mode;
+      }
+      if (typeof ev.data.level === 'number') {
+        window.__MIKI_GAME_LEVEL = Math.max(1, Math.min(10, ev.data.level));
+      }
+      try {
+        var customEv = new CustomEvent('miki:mode-change', {
+          detail: { mode: window.__MIKI_GAME_MODE, level: window.__MIKI_GAME_LEVEL }
+        });
+        window.dispatchEvent(customEv);
+        document.dispatchEvent(customEv);
       } catch(err) {}
     }
   });
