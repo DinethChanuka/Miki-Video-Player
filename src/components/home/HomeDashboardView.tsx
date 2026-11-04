@@ -552,16 +552,10 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
       </div>
 
       {/* ============================================================ */}
-      {/* 2. ADZE.DESIGN & NETFLIX LEFT SIDEBAR NAVIGATION             */}
+      {/* 2. LEFT SIDEBAR NAVIGATION                                   */}
       {/* ============================================================ */}
       <aside className="w-60 bg-[#090c14]/90 border-r border-white/5 flex flex-col justify-between p-4 shrink-0 backdrop-blur-2xl">
-        <div className="flex flex-col gap-6">
-          {/* Brand Logo (Adze.DESIGN red accent + Netflix bold) */}
-          <div className="flex items-center gap-2 px-2 pt-1">
-            <span className="text-lg font-black tracking-tight text-white">Adze.</span>
-            <span className="text-lg font-black tracking-tight text-rose-500">DESIGN</span>
-          </div>
-
+        <div className="flex flex-col gap-6 pt-1">
           {/* Section: Navigation Feeds */}
           <div className="flex flex-col gap-1">
             <span className="px-3 text-[10px] font-bold text-white/40 uppercase tracking-wider mb-1">
