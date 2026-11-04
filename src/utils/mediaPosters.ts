@@ -94,25 +94,25 @@ export function createAlbumCoverSvg(title: string, artist: string, movie: string
 }
 
 export const MOVIE_POSTERS = {
-  spiderMan: createMoviePosterSvg('Spider-Man', 'Across the Spider-Verse', '8.9', '#7f1d1d', '#180202', '#ef4444'),
-  soulConductor: createMoviePosterSvg('The SOUL CONDUCTOR', 'Paranormal Sci-Fi Thriller', '7.8', '#172554', '#020617', '#38bdf8'),
-  harryPotter: createMoviePosterSvg('Harry Potter', 'Deathly Hallows Part 2', '8.1', '#14532d', '#052e16', '#22c55e'),
-  interstellar: createMoviePosterSvg('Interstellar', 'Christopher Nolan Epic', '8.7', '#1e1b4b', '#030712', '#818cf8'),
-  inception: createMoviePosterSvg('Inception', 'Your Mind Is The Scene', '8.8', '#312e81', '#090d16', '#6366f1'),
-  tenet: createMoviePosterSvg('Tenet', 'Time Runs Out', '7.3', '#042f2e', '#021815', '#14b8a6'),
-  wonderWoman: createMoviePosterSvg('Wonder Woman', 'DC Superhero Action', '7.4', '#831843', '#1e040f', '#ec4899'),
-  mortalEngines: createMoviePosterSvg('Mortal Engines', 'Predator Cities Collide', '6.5', '#78350f', '#1c0c03', '#f59e0b'),
-  rampage: createMoviePosterSvg('Rampage', 'Big Meets Bigger', '6.1', '#374151', '#111827', '#9ca3af'),
-  moneyHeist: createMoviePosterSvg('Money Heist', 'La Casa de Papel Part 5', '8.2', '#991b1b', '#200505', '#f87171'),
-  wednesday: createMoviePosterSvg('Wednesday', 'Nevermore Academy Mystery', '8.1', '#2e1065', '#0f0422', '#c084fc'),
-  neverHaveIEver: createMoviePosterSvg('Never Have I Ever', 'Final Senior Year', '7.9', '#065f46', '#022118', '#34d399'),
-  lucifer: createMoviePosterSvg('Lucifer', 'The Devil Has Arrived', '8.1', '#881337', '#1d040c', '#fb7185'),
+  spiderMan: '/posters/spiderman.jpg',
+  soulConductor: '/posters/soulconductor.jpg',
+  harryPotter: '/posters/harrypotter.jpg',
+  interstellar: '/posters/interstellar.jpg',
+  inception: '/posters/inception.jpg',
+  tenet: '/posters/tenet.jpg',
+  wonderWoman: '/posters/wonderwoman.jpg',
+  mortalEngines: '/posters/mortalengines.jpg',
+  rampage: '/posters/rampage.jpg',
+  moneyHeist: '/posters/moneyheist.jpg',
+  wednesday: '/posters/wednesday.jpg',
+  neverHaveIEver: '/posters/neverhaveiever.jpg',
+  lucifer: '/posters/lucifer.jpg',
 };
 
 export const ALBUM_POSTERS = {
-  dooriyan: createAlbumCoverSvg('Dooriyan', 'Pritam, Mohit Chauhan', 'Love Aaj Kal', '#1e3a8a', '#0f172a'),
-  soniyo: createAlbumCoverSvg('Soniyo', 'Raju Singh, Sonu Nigam', 'Raaz: The Mystery Continues', '#581c87', '#180728'),
-  binTere: createAlbumCoverSvg('Bin Tere', 'Vishal-Shekhar, Shafqat Amanat Ali', 'I Hate Luv Storys', '#be123c', '#270915'),
-  darkhaast: createAlbumCoverSvg('Darkhaast', 'Mithoon, Arijit Singh', 'Shivaay', '#0f766e', '#042f2e'),
-  tujhkoJoPaaya: createAlbumCoverSvg('Tujhko Jo Paaya', 'Pritam, Mohit Chauhan', 'Crook', '#854d0e', '#291804'),
+  dooriyan: '/posters/albums/dooriyan.jpg',
+  soniyo: '/posters/albums/soniyo.jpg',
+  binTere: '/posters/albums/bintere.jpg',
+  darkhaast: '/posters/albums/darkhaast.jpg',
+  tujhkoJoPaaya: '/posters/albums/tujhko.jpg',
 };

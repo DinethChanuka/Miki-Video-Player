@@ -857,6 +857,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                       <img
                         src={album.albumArt}
                         alt={album.title}
+                        referrerPolicy="no-referrer"
                         className="w-full h-full object-cover"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex items-end p-3">
@@ -1338,6 +1339,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                           <img
                             src={party.image}
                             alt={party.title}
+                            referrerPolicy="no-referrer"
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                           />
                         </div>
@@ -1378,7 +1380,8 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                         <img
                           src={movie.image}
                           alt={movie.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          referrerPolicy="no-referrer"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         />
                         <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
                           <span className="text-[9px] font-mono px-2 py-0.5 rounded-md bg-black/70 backdrop-blur-md text-white/90 border border-white/10">
@@ -1430,8 +1433,15 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                         <img
                           src={movie.posterUrl}
                           alt={movie.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          referrerPolicy="no-referrer"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                           loading="lazy"
+                          onError={(e) => {
+                            const img = e.currentTarget;
+                            if (movie.remotePosterUrl && img.src !== movie.remotePosterUrl) {
+                              img.src = movie.remotePosterUrl;
+                            }
+                          }}
                         />
                         <div className="absolute top-2 left-2 flex flex-col gap-1">
                           <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-black/80 backdrop-blur-md text-amber-400 font-bold border border-white/10">
@@ -1681,6 +1691,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                           <img
                             src={party.image}
                             alt={party.title}
+                            referrerPolicy="no-referrer"
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                           />
                         </div>
@@ -1824,7 +1835,8 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                         <img
                           src={movie.image}
                           alt={movie.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          referrerPolicy="no-referrer"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         />
                         <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
                           <span className="text-[9px] font-mono px-2 py-0.5 rounded-md bg-black/70 backdrop-blur-md text-white/90 border border-white/10">
