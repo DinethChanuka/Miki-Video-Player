@@ -27,14 +27,13 @@ import { HomeDashboardView } from './components/home/HomeDashboardView';
 import { parseWebStream, isDirectMediaUrl, WebPlatform } from './utils/webStreamUtils';
 import { HlsStreamController } from './core/HlsStreamController';
 import {
-  FolderOpen,
-  Settings,
   ArrowLeft,
   Camera,
   RefreshCw,
   Music,
   Sliders,
   Sparkles,
+  Wifi,
 } from 'lucide-react';
 
 export function parseYouTubeId(url: string | null): string | null {
@@ -114,6 +113,22 @@ export const App: React.FC = () => {
   const isPaused = usePlayerStore((s) => s.isPaused);
   const isMusicPlayerOpen = usePlayerStore((s) => s.isMusicPlayerOpen);
   const setMusicPlayerOpen = usePlayerStore((s) => s.setMusicPlayerOpen);
+  const lastActiveNav = usePlayerStore((s) => s.lastActiveNav);
+  const lastActiveCategory = usePlayerStore((s) => s.lastActiveCategory);
+
+  const currentSectionName = useMemo(() => {
+    if (activePlaybackMode === 'video' && currentUri) return 'Video Player';
+    if (activePlaybackMode === 'music' && isMusicPlayerOpen) return 'Hi-Fi Music Studio';
+    if (lastActiveCategory === 'Movies') return 'Movies & Cinema';
+    if (lastActiveCategory === 'Tv series') return 'TV Series & Shows';
+    if (lastActiveCategory === 'Live TV' || lastActiveNav === 'channels') return 'Live TV (100+)';
+    if (lastActiveCategory === 'Games' || lastActiveNav === 'games') return 'Game Arcade (219+)';
+    if (lastActiveCategory === 'Music' || lastActiveNav === 'music') return '3D Music';
+    if (lastActiveCategory === 'Radio' || lastActiveNav === 'radio') return 'Music Radio Live';
+    if (lastActiveNav === 'watchlist') return 'Watchlist';
+    if (lastActiveNav === 'coming_soon') return 'Coming Soon';
+    return 'Browse All';
+  }, [activePlaybackMode, currentUri, isMusicPlayerOpen, lastActiveCategory, lastActiveNav]);
 
   const theme = PLAYER_THEMES[themeId] || PLAYER_THEMES.cyberpunk;
 
@@ -671,29 +686,52 @@ export const App: React.FC = () => {
           )}
         </div>
 
-        {/* Right Navigation & Window Controls */}
+        {/* Right Navigation, Network Strength & Logged User Profile */}
         <div
-          className="flex items-center gap-2"
+          className="flex items-center gap-2.5"
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
-          <button
-            onClick={() => setIsDashboardOpen(true)}
-            className="text-xs text-white/80 hover:text-white px-3 py-1.5 rounded-2xl bg-white/5 hover:bg-white/15 border border-white/10 transition-colors font-medium flex items-center gap-1.5 active:scale-95 cursor-pointer"
-          >
-            <FolderOpen className="w-3.5 h-3.5 text-cyan-400" />
-            <span>Library</span>
-          </button>
+          {/* Current Section Name Badge */}
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white/5 border border-white/10 text-white shadow-sm">
+            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+            <span className="text-xs font-bold tracking-tight text-white/90">
+              {currentSectionName}
+            </span>
+          </div>
 
-          <button
-            onClick={() => setIsSettingsOpen(true)}
-            className="text-xs text-white/80 hover:text-white p-2 rounded-2xl bg-white/5 hover:bg-white/15 border border-white/10 transition-colors active:scale-95"
-            title="Themes, 3D Sound, Clarity & Settings"
+          {/* Network Strength Indicator */}
+          <div
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs font-mono font-semibold"
+            title="Network Strength: 100% (Ultra HD 4K Ready)"
           >
-            <Settings className="w-3.5 h-3.5 text-fuchsia-400" />
-          </button>
+            <Wifi className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="text-[10px] hidden sm:inline">100%</span>
+          </div>
+
+          {/* Logged User Profile (Suriya Sharma) */}
+          <div
+            className="flex items-center gap-2 pl-1 pr-2.5 py-1 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-colors cursor-pointer select-none"
+            title="Logged in as Suriya Sharma • Online"
+            onClick={() => setIsSettingsOpen(true)}
+          >
+            <div className="relative">
+              <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-cyan-500 to-purple-600 flex items-center justify-center text-[10px] font-extrabold text-white shadow-sm">
+                SS
+              </div>
+              <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 border border-[#07090e]" />
+            </div>
+            <div className="hidden md:flex flex-col text-left">
+              <span className="text-xs font-semibold text-white/95 leading-none">
+                Suriya Sharma
+              </span>
+              <span className="text-[9px] text-emerald-400 font-mono leading-none mt-0.5">
+                Online
+              </span>
+            </div>
+          </div>
 
           {/* Custom Window Controls (Pure Undecorated Frame) */}
-          <div className="flex items-center gap-1 ml-1 pl-2 border-l border-white/10">
+          <div className="flex items-center gap-1 ml-0.5 pl-2 border-l border-white/10">
             <button
               onClick={handleWindowMinimize}
               className="w-7 h-7 rounded-xl hover:bg-white/10 text-white/70 hover:text-white flex items-center justify-center transition-colors text-xs font-bold"

@@ -109,3 +109,4 @@ describe('Persistent Music Control Hub, Cover Art Fix, Window Dragging & Nav His
     );
   });
 });
+

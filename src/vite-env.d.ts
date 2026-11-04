@@ -94,6 +94,8 @@ declare module 'lucide-react' {
   export const Heart: LucideIcon;
   export const Download: LucideIcon;
   export const Bell: LucideIcon;
+  export const Wifi: LucideIcon;
+  export const EyeOff: LucideIcon;
   export const ChevronLeft: LucideIcon;
   export const ChevronRight: LucideIcon;
 

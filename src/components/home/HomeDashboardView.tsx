@@ -1014,83 +1014,233 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
               {/* Live Instant Search Dropdown */}
               {searchQuery.trim().length > 0 && isSearchFocused && (
                 <div
-                  className="absolute left-0 right-0 top-full mt-2 bg-[#090d16]/95 backdrop-blur-2xl border border-white/15 rounded-2xl shadow-2xl p-3 flex flex-col gap-2 max-h-[440px] overflow-y-auto scrollbar-thin z-50 animate-in fade-in zoom-in-95 duration-150"
+                  className="absolute left-0 right-0 top-full mt-2 bg-[#090d16]/95 backdrop-blur-2xl border border-white/15 rounded-2xl shadow-2xl p-3 flex flex-col gap-3 max-h-[460px] overflow-y-auto scrollbar-thin z-50 animate-in fade-in zoom-in-95 duration-150"
                   onMouseDown={(e) => e.stopPropagation()}
                 >
-                  <div className="flex items-center justify-between px-1 pb-1 border-b border-white/10 text-[10px] font-bold text-white/50 tracking-wider">
-                    <span>LIVE MUSIC & ARTIST RESULTS ({liveSearchTracks.length})</span>
-                    <button
-                      onClick={() => {
-                        setActiveNav('music');
-                        setIsSearchFocused(false);
-                      }}
-                      className="text-emerald-400 hover:text-emerald-300 transition-colors font-medium cursor-pointer"
-                    >
-                      View in 3D Music
-                    </button>
-                  </div>
-
-                  {liveSearchTracks.length > 0 ? (
-                    <div className="flex flex-col gap-1.5 pt-1">
-                      {liveSearchTracks.map((track) => (
-                        <div
-                          key={track.id}
+                  {/* CineSubz Movies & TV Shows Section */}
+                  {(filteredCinesubz.length > 0 || filteredCinesubzTv.length > 0) && (
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center justify-between px-1 pb-1 border-b border-white/10 text-[10px] font-bold text-rose-400 tracking-wider">
+                        <span>CINESUBZ MOVIES & TV SERIES ({filteredCinesubz.length + filteredCinesubzTv.length})</span>
+                        <button
                           onClick={() => {
-                            if (track.streamUrl) {
-                              openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl);
-                              setIsSearchFocused(false);
-                            }
+                            setActiveNav('browse');
+                            setActiveCategory('Movies');
+                            setIsSearchFocused(false);
                           }}
-                          className="flex items-center justify-between gap-3 p-2 rounded-xl bg-white/5 hover:bg-emerald-500/15 border border-transparent hover:border-emerald-500/30 transition-all cursor-pointer group"
+                          className="text-rose-400 hover:text-rose-300 transition-colors font-medium cursor-pointer"
                         >
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <div className="w-9 h-9 rounded-lg overflow-hidden bg-black/60 shrink-0 border border-white/10 relative">
-                              <img
-                                src={track.coverUrl}
-                                alt={track.title}
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                                onError={(e) => {
-                                  (e.currentTarget as HTMLImageElement).src =
-                                    'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&auto=format&fit=crop&q=80';
-                                }}
-                              />
-                            </div>
-                            <div className="min-w-0 flex flex-col">
-                              <span className="text-xs font-bold text-white truncate group-hover:text-emerald-300 transition-colors">
-                                {track.title}
-                              </span>
-                              <span className="text-[10px] text-white/60 truncate">
-                                {track.artist}
-                              </span>
-                            </div>
-                          </div>
+                          View in Movies & Cinema
+                        </button>
+                      </div>
 
-                          <div className="flex items-center gap-2 shrink-0">
-                            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/10 text-white/70">
-                              {track.genre.split('/')[0].trim()}
-                            </span>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (track.streamUrl) {
-                                  openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl);
+                      <div className="flex flex-col gap-1.5">
+                        {filteredCinesubz.slice(0, 4).map((movie) => (
+                          <div
+                            key={movie.id}
+                            onClick={() => {
+                              if (onOpenWebBrowser) {
+                                onOpenWebBrowser(movie.watchUrl || 'https://cinesubz.lk');
+                              } else {
+                                openMedia(movie.watchUrl || 'https://cinesubz.lk', movie.title);
+                              }
+                              setIsSearchFocused(false);
+                            }}
+                            className="flex items-center justify-between gap-3 p-2 rounded-xl bg-white/5 hover:bg-rose-500/15 border border-transparent hover:border-rose-500/30 transition-all cursor-pointer group"
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className="w-9 h-12 rounded-lg overflow-hidden bg-black/60 shrink-0 border border-white/10 relative">
+                                <img
+                                  src={movie.posterUrl}
+                                  alt={movie.title}
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                  onError={(e) => {
+                                    (e.currentTarget as HTMLImageElement).src =
+                                      'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=500&auto=format&fit=crop&q=80';
+                                  }}
+                                />
+                              </div>
+                              <div className="min-w-0 flex flex-col">
+                                <span className="text-xs font-bold text-white truncate group-hover:text-rose-300 transition-colors">
+                                  {movie.title}
+                                </span>
+                                <span className="text-[10px] text-white/60 truncate">
+                                  {movie.sinhalaTitle} • {movie.year}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 font-bold">
+                                {movie.quality || 'HD'}
+                              </span>
+                              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                {movie.rating}
+                              </span>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (onOpenWebBrowser) {
+                                    onOpenWebBrowser(movie.watchUrl || 'https://cinesubz.lk');
+                                  } else {
+                                    openMedia(movie.watchUrl || 'https://cinesubz.lk', movie.title);
+                                  }
                                   setIsSearchFocused(false);
-                                }
-                              }}
-                              className="w-7 h-7 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 flex items-center justify-center font-bold shadow-md transition-transform hover:scale-110 active:scale-95 cursor-pointer"
-                              title="Play Track"
-                            >
-                              <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
-                            </button>
+                                }}
+                                className="w-7 h-7 rounded-lg bg-rose-600 hover:bg-rose-500 text-white flex items-center justify-center font-bold shadow-md transition-transform hover:scale-110 active:scale-95 cursor-pointer"
+                                title="Watch Movie"
+                              >
+                                <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="p-4 text-center text-xs text-white/50">
-                      No matching songs found for "{searchQuery}".
+                        ))}
+
+                        {filteredCinesubzTv.slice(0, 3).map((show) => (
+                          <div
+                            key={show.id}
+                            onClick={() => {
+                              if (onOpenWebBrowser) {
+                                onOpenWebBrowser(show.watchUrl || 'https://cinesubz.lk/tvshows/');
+                              } else {
+                                openMedia(show.watchUrl || 'https://cinesubz.lk/tvshows/', show.title);
+                              }
+                              setIsSearchFocused(false);
+                            }}
+                            className="flex items-center justify-between gap-3 p-2 rounded-xl bg-white/5 hover:bg-fuchsia-500/15 border border-transparent hover:border-fuchsia-500/30 transition-all cursor-pointer group"
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className="w-9 h-12 rounded-lg overflow-hidden bg-black/60 shrink-0 border border-white/10 relative">
+                                <img
+                                  src={show.posterUrl}
+                                  alt={show.title}
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                  onError={(e) => {
+                                    (e.currentTarget as HTMLImageElement).src =
+                                      'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=500&auto=format&fit=crop&q=80';
+                                  }}
+                                />
+                              </div>
+                              <div className="min-w-0 flex flex-col">
+                                <span className="text-xs font-bold text-white truncate group-hover:text-fuchsia-300 transition-colors">
+                                  {show.title}
+                                </span>
+                                <span className="text-[10px] text-white/60 truncate">
+                                  {show.sinhalaTitle} • {show.season}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-fuchsia-500/20 text-fuchsia-300 border border-fuchsia-500/30 font-bold">
+                                TV Series
+                              </span>
+                              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                {show.rating}
+                              </span>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (onOpenWebBrowser) {
+                                    onOpenWebBrowser(show.watchUrl || 'https://cinesubz.lk/tvshows/');
+                                  } else {
+                                    openMedia(show.watchUrl || 'https://cinesubz.lk/tvshows/', show.title);
+                                  }
+                                  setIsSearchFocused(false);
+                                }}
+                                className="w-7 h-7 rounded-lg bg-fuchsia-600 hover:bg-fuchsia-500 text-white flex items-center justify-center font-bold shadow-md transition-transform hover:scale-110 active:scale-95 cursor-pointer"
+                                title="Watch TV Series"
+                              >
+                                <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
+
+                  {/* Live Music & Tracks Section */}
+                  {liveSearchTracks.length > 0 && (
+                    <div className="flex flex-col gap-2 pt-1">
+                      <div className="flex items-center justify-between px-1 pb-1 border-b border-white/10 text-[10px] font-bold text-emerald-400 tracking-wider">
+                        <span>ONLINE MUSIC DISCOVERY ({liveSearchTracks.length})</span>
+                        <button
+                          onClick={() => {
+                            setActiveNav('music');
+                            setIsSearchFocused(false);
+                          }}
+                          className="text-emerald-400 hover:text-emerald-300 transition-colors font-medium cursor-pointer"
+                        >
+                          View in 3D Music
+                        </button>
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        {liveSearchTracks.map((track) => (
+                          <div
+                            key={track.id}
+                            onClick={() => {
+                              if (track.streamUrl) {
+                                openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl);
+                                setIsSearchFocused(false);
+                              }
+                            }}
+                            className="flex items-center justify-between gap-3 p-2 rounded-xl bg-white/5 hover:bg-emerald-500/15 border border-transparent hover:border-emerald-500/30 transition-all cursor-pointer group"
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className="w-9 h-9 rounded-lg overflow-hidden bg-black/60 shrink-0 border border-white/10 relative">
+                                <img
+                                  src={track.coverUrl}
+                                  alt={track.title}
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                  onError={(e) => {
+                                    (e.currentTarget as HTMLImageElement).src =
+                                      'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&auto=format&fit=crop&q=80';
+                                  }}
+                                />
+                              </div>
+                              <div className="min-w-0 flex flex-col">
+                                <span className="text-xs font-bold text-white truncate group-hover:text-emerald-300 transition-colors">
+                                  {track.title}
+                                </span>
+                                <span className="text-[10px] text-white/60 truncate">
+                                  {track.artist}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/10 text-white/70">
+                                {track.genre.split('/')[0].trim()}
+                              </span>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (track.streamUrl) {
+                                    openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl);
+                                    setIsSearchFocused(false);
+                                  }
+                                }}
+                                className="w-7 h-7 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 flex items-center justify-center font-bold shadow-md transition-transform hover:scale-110 active:scale-95 cursor-pointer"
+                                title="Play Track"
+                              >
+                                <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {filteredCinesubz.length === 0 &&
+                    filteredCinesubzTv.length === 0 &&
+                    liveSearchTracks.length === 0 && (
+                      <div className="p-4 text-center text-xs text-white/50">
+                        No movies, TV shows, or songs found matching "{searchQuery}".
+                      </div>
+                    )}
                 </div>
               )}
             </div>
