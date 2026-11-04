@@ -4,6 +4,9 @@
  * Features automated stream healing, fallback mirror chains, and 60+ verified channels.
  */
 
+import { generateChannelLogoSvg } from './channelLogos.ts';
+export { generateChannelLogoSvg } from './channelLogos.ts';
+
 export type ChannelCategory =
   | 'News'
   | 'Movies'
@@ -27,7 +30,7 @@ export interface LiveChannel {
   isLive: boolean;
 }
 
-export const CURATED_CHANNELS: LiveChannel[] = [
+const RAW_CURATED_CHANNELS: LiveChannel[] = [
   // --- NEWS ---
   { id: 'france-24-en',
     name: 'France 24 English Live',
@@ -1599,6 +1602,11 @@ export const CURATED_CHANNELS: LiveChannel[] = [
     isLive: true,
   },
 ];
+
+export const CURATED_CHANNELS: LiveChannel[] = RAW_CURATED_CHANNELS.map((ch) => ({
+  ...ch,
+  logo: generateChannelLogoSvg(ch.id, ch.name, ch.category, ch.country, ch.quality),
+}));
 
 /**
  * Retrieves a channel by its primary streamUrl or any of its backupUrls.
