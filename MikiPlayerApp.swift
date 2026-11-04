@@ -456,7 +456,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
     }
 
     @objc func openCinemaPortal() {
-        let js = "window.dispatchEvent(new CustomEvent('miki:open-web-browser', { detail: { url: 'https://cinesubz.co' } }));"
+        let js = "window.dispatchEvent(new CustomEvent('miki:open-web-browser', { detail: { url: 'https://cinesubz.lk' } }));"
         webView.evaluateJavaScript(js, completionHandler: nil)
     }
 
@@ -894,7 +894,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
                 if let dict = message.body as? [String: Any], let action = dict["action"] as? String {
                     switch action {
                     case "open":
-                        let targetUrl = dict["url"] as? String ?? "https://cinesubz.co"
+                        let targetUrl = dict["url"] as? String ?? "https://cinesubz.lk"
                         let bView = self.setupBrowserWebView()
                         bView.isHidden = false
                         bView.alphaValue = 1.0

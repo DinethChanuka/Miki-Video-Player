@@ -39,21 +39,16 @@ describe('Task 1: Verified Streams and Channels Catalog Audit', () => {
     );
   });
 
-  it('verifies DEMO_STREAMS has reliable Archive.org or Akamai open movie links', () => {
-    assert.match(
-      fileBrowserModalCode,
-      /archive\.org\/download\/BigBuckBunny/,
-      'Must contain verified Big Buck Bunny stream'
+  it('verifies DEMO_STREAMS is purged from FileBrowserModal', () => {
+    assert.strictEqual(
+      fileBrowserModalCode.includes("activeTab === 'demos'"),
+      false,
+      'FileBrowserModal must not have demos tab'
     );
-    assert.match(
-      fileBrowserModalCode,
-      /archive\.org\/download\/Sintel/,
-      'Must contain verified Sintel stream'
-    );
-    assert.match(
-      fileBrowserModalCode,
-      /archive\.org\/download\/Tears-of-Steel/,
-      'Must contain verified Tears of Steel stream'
+    assert.strictEqual(
+      fileBrowserModalCode.includes('demo-bbb'),
+      false,
+      'FileBrowserModal must not contain demo-bbb'
     );
   });
 });

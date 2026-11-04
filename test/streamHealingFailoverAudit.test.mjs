@@ -4,10 +4,12 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 describe('Global Stream Healing & Channel Failover Engine Audit', () => {
+  const hlsControllerPath = resolve(process.cwd(), 'src/core/HlsStreamController.ts');
+  const hlsControllerSource = readFileSync(hlsControllerPath, 'utf-8');
   const playerEngineSource = readFileSync(
     resolve(process.cwd(), 'src/core/PlayerEngine.ts'),
     'utf-8'
-  );
+  ) + '\n' + hlsControllerSource;
   const playerStoreSource = readFileSync(
     resolve(process.cwd(), 'src/store/playerStore.ts'),
     'utf-8'

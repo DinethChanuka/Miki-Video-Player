@@ -33,16 +33,16 @@ describe('Normal User Journey End-to-End Simulation Audit', () => {
     );
   });
 
-  it('Simulation 2: User plays any Demo Stream -> 100% verified non-403 stream loaded', () => {
+  it('Simulation 2: User opens library -> zero demo cartoons or mock streams present', () => {
     assert.strictEqual(
       fileBrowserModalCode.includes('commondatastorage.googleapis.com'),
       false,
-      'No 403 Google Cloud common data storage bucket links remain in DEMO_STREAMS'
+      'No 403 Google Cloud common data storage bucket links remain'
     );
-    assert.match(
-      fileBrowserModalCode,
-      /archive\.org\/download\/BigBuckBunny/,
-      'Big Buck Bunny must use verified open archive master'
+    assert.strictEqual(
+      fileBrowserModalCode.includes("activeTab === 'demos'"),
+      false,
+      'Demo section completely removed from library'
     );
   });
 

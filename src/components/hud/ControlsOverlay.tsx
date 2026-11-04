@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { usePlayerStore } from '../../store/playerStore';
 import { PLAYER_THEMES } from '../../types/theme';
 import { TimelineScrubber } from './TimelineScrubber';
+import { VideoQualitySelector } from '../player/VideoQualitySelector';
 import {
   Play,
   Pause,
@@ -330,6 +331,9 @@ export const ControlsOverlay: React.FC<ControlsOverlayProps> = ({
             >
               <Repeat className="w-4 h-4" />
             </button>
+
+            {/* Stream Video Quality Selector */}
+            <VideoQualitySelector />
 
             {/* Playback Speed Selector */}
             <div className="relative">

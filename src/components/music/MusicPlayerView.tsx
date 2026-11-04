@@ -15,9 +15,9 @@ import {
   FolderOpen,
 } from 'lucide-react';
 
-export const DEMO_MUSIC_TRACKS: MusicTrack[] = [
+export const FEATURED_MUSIC_TRACKS: MusicTrack[] = [
   {
-    id: 'demo-1',
+    id: 'music-synth-odyssey',
     title: 'Ambient Cyberpunk Synth Odyssey',
     artist: 'Miki Hi-Fi Studio',
     url: 'https://cdn.freesound.org/previews/612/612627_5674468-lq.mp3',
@@ -25,7 +25,7 @@ export const DEMO_MUSIC_TRACKS: MusicTrack[] = [
     albumArt: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=400&q=80',
   },
   {
-    id: 'demo-2',
+    id: 'music-analog-chillwave',
     title: 'Deep Analog Chillwave Groove',
     artist: 'Antigravity Resonance',
     url: 'https://cdn.freesound.org/previews/615/615483_11861866-lq.mp3',
@@ -33,7 +33,7 @@ export const DEMO_MUSIC_TRACKS: MusicTrack[] = [
     albumArt: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=400&q=80',
   },
   {
-    id: 'demo-3',
+    id: 'music-neon-retrowave',
     title: 'Neon Horizon Retrowave Drive',
     artist: 'Aether Audio Lab',
     url: 'https://cdn.freesound.org/previews/530/530704_11861866-lq.mp3',
@@ -47,7 +47,7 @@ export const MusicPlayerView: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const animFrameRef = useRef<number | null>(null);
 
-  const [tracks, setTracks] = useState<MusicTrack[]>(DEMO_MUSIC_TRACKS);
+  const [tracks, setTracks] = useState<MusicTrack[]>(FEATURED_MUSIC_TRACKS);
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);

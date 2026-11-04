@@ -7,8 +7,12 @@
 const UNIVERSAL_INPUT_BRIDGE_SCRIPT = `
 <script>
 (function() {
+  window.__MIKI_GAME_MODE = 'level';
+  window.__MIKI_GAME_LEVEL = 1;
+
   window.addEventListener('message', function(ev) {
-    if (ev.data && ev.data.type === 'miki:game-input') {
+    if (!ev.data) return;
+    if (ev.data.type === 'miki:game-input') {
       try {
         var synthetic = new KeyboardEvent(ev.data.action === 'down' ? 'keydown' : 'keyup', {
           key: ev.data.key,
@@ -17,6 +21,20 @@ const UNIVERSAL_INPUT_BRIDGE_SCRIPT = `
           cancelable: true
         });
         window.dispatchEvent(synthetic);
+      } catch(err) {}
+    } else if (ev.data.type === 'miki:set-game-mode') {
+      if (ev.data.mode) {
+        window.__MIKI_GAME_MODE = ev.data.mode;
+      }
+      if (typeof ev.data.level === 'number') {
+        window.__MIKI_GAME_LEVEL = Math.max(1, Math.min(10, ev.data.level));
+      }
+      try {
+        var customEv = new CustomEvent('miki:mode-change', {
+          detail: { mode: window.__MIKI_GAME_MODE, level: window.__MIKI_GAME_LEVEL }
+        });
+        window.dispatchEvent(customEv);
+        document.dispatchEvent(customEv);
       } catch(err) {}
     }
   });
@@ -39,8 +57,11 @@ const UNIVERSAL_INPUT_BRIDGE_SCRIPT = `
 </script>
 `;
 
+import { getExpandedInbuiltGameSrcDoc } from './inbuiltExpandedEngines.ts';
+
 export function getInbuiltGameSrcDoc(id: string): string {
-  const rawDoc = getRawInbuiltGameSrcDoc(id);
+  const expanded = getExpandedInbuiltGameSrcDoc(id);
+  const rawDoc = expanded || getRawInbuiltGameSrcDoc(id);
   if (!rawDoc) return '';
   return rawDoc.replace('</body>', `${UNIVERSAL_INPUT_BRIDGE_SCRIPT}</body>`);
 }
@@ -1744,6 +1765,843 @@ function getRawInbuiltGameSrcDoc(id: string): string {
     }
     kbEl.appendChild(kRow);
   });
+</script>
+</body>
+</html>`;
+
+    case 'synthwave-racer-3d':
+      return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; background: #050510; color: #fff; font-family: monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; user-select: none; }
+  h2 { margin: 0 0 5px; color: #f43f5e; font-size: 20px; letter-spacing: 3px; text-shadow: 0 0 10px #f43f5e; }
+  canvas { background: #000; border: 2px solid #ec4899; border-radius: 12px; box-shadow: 0 0 25px rgba(236,72,153,0.4); }
+  .hud { margin-top: 8px; font-size: 13px; color: #38bdf8; display: flex; gap: 20px; font-weight: bold; }
+</style>
+</head>
+<body>
+  <h2>NEON OUTRUN 3D</h2>
+  <canvas id="c" width="480" height="360"></canvas>
+  <div class="hud">
+    <span>SPEED: <b id="spd" style="color:#22c55e">0</b> KM/H</span>
+    <span>SCORE: <b id="sc" style="color:#f59e0b">0</b></span>
+    <span>[LEFT/RIGHT] Steer [UP] Turbo</span>
+  </div>
+<script>
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  let speed = 0, maxSpeed = 240, pos = 0, playerX = 0, score = 0, gameOver = false;
+  let keys = {};
+  const cars = [
+    { z: 400, x: -0.4, color: '#06b6d4' },
+    { z: 900, x: 0.5, color: '#eab308' },
+    { z: 1400, x: -0.2, color: '#ec4899' },
+    { z: 1900, x: 0.3, color: '#a855f7' }
+  ];
+
+  window.addEventListener('keydown', e => keys[e.code] = true);
+  window.addEventListener('keyup', e => keys[e.code] = false);
+
+  function loop() {
+    if (!gameOver) {
+      if (keys['ArrowUp'] || keys['KeyW']) speed = Math.min(maxSpeed, speed + 4);
+      else speed = Math.max(0, speed - 2);
+      if (keys['ArrowLeft'] || keys['KeyA']) playerX = Math.max(-1.4, playerX - 0.04);
+      if (keys['ArrowRight'] || keys['KeyD']) playerX = Math.min(1.4, playerX + 0.04);
+
+      pos += speed;
+      score += Math.floor(speed / 10);
+      document.getElementById('spd').innerText = Math.floor(speed);
+      document.getElementById('sc').innerText = score;
+    }
+
+    // Render Sky and Sun
+    const grad = ctx.createLinearGradient(0, 0, 0, 180);
+    grad.addColorStop(0, '#1e1035'); grad.addColorStop(1, '#ff007f');
+    ctx.fillStyle = grad; ctx.fillRect(0, 0, 480, 180);
+
+    // Glowing Neon Sun
+    ctx.beginPath();
+    ctx.arc(240, 130, 45, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffde59';
+    ctx.shadowBlur = 30; ctx.shadowColor = '#ff59b3';
+    ctx.fill(); ctx.shadowBlur = 0;
+
+    // Horizon line
+    ctx.fillStyle = '#0f051d'; ctx.fillRect(0, 180, 480, 180);
+
+    // Render 3D Perspective Road
+    for (let n = 180; n < 360; n += 4) {
+      const p = (n - 180) / 180;
+      const w = 40 + p * 360;
+      const x = 240 - w / 2 - playerX * p * 60;
+      const stripe = Math.sin((n * 2 + pos * 0.1)) > 0;
+      ctx.fillStyle = stripe ? '#ec4899' : '#3b0764';
+      ctx.fillRect(x, n, w, 4);
+
+      // Center Lane Stripe
+      if (stripe) {
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(240 - playerX * p * 60 - 2, n, 4, 4);
+      }
+    }
+
+    // Render Oncoming Cars
+    cars.forEach(car => {
+      car.z -= (speed + 20);
+      if (car.z < 0) { car.z = 2000; car.x = (Math.random() - 0.5) * 1.8; }
+      if (car.z < 1800 && car.z > 30) {
+        const scale = 200 / car.z;
+        const cy = 180 + (180 - scale * 90);
+        const cx = 240 + (car.x - playerX) * scale * 200;
+        const cw = 40 * scale, ch = 20 * scale;
+        if (cy > 180 && cy < 350) {
+          ctx.fillStyle = car.color;
+          ctx.fillRect(cx - cw/2, cy - ch, cw, ch);
+          ctx.fillStyle = '#ff0'; ctx.fillRect(cx - cw/2 + 2, cy - 4, 4 * scale, 4 * scale);
+          ctx.fillRect(cx + cw/2 - 6 * scale, cy - 4, 4 * scale, 4 * scale);
+          // Collision check
+          if (car.z < 120 && car.z > 40 && Math.abs(car.x - playerX) < 0.3) {
+            gameOver = true;
+          }
+        }
+      }
+    });
+
+    // Player Car
+    ctx.fillStyle = '#38bdf8';
+    ctx.fillRect(220, 310, 40, 20);
+    ctx.fillStyle = '#ef4444'; ctx.fillRect(222, 325, 8, 4); ctx.fillRect(250, 325, 8, 4);
+    ctx.fillStyle = '#0284c7'; ctx.fillRect(225, 305, 30, 8);
+
+    if (gameOver) {
+      ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(0, 0, 480, 360);
+      ctx.fillStyle = '#f43f5e'; ctx.font = 'bold 28px monospace';
+      ctx.fillText('CRASHED! RESTARTING...', 70, 180);
+      setTimeout(() => { gameOver = false; speed = 0; score = 0; playerX = 0; }, 2000);
+    }
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+</script>
+</body>
+</html>`;
+
+    case 'cyber-tunnel-3d':
+      return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; background: #000; color: #fff; font-family: monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; user-select: none; }
+  h2 { margin: 0 0 5px; color: #a855f7; font-size: 20px; letter-spacing: 2px; }
+  canvas { border: 2px solid #a855f7; border-radius: 12px; box-shadow: 0 0 20px rgba(168,85,247,0.5); }
+  .hud { margin-top: 8px; font-size: 13px; color: #38bdf8; display: flex; gap: 20px; font-weight: bold; }
+</style>
+</head>
+<body>
+  <h2>HYPERSPACE CYBER TUNNEL</h2>
+  <canvas id="c" width="480" height="360"></canvas>
+  <div class="hud">
+    <span>SCORE: <b id="sc" style="color:#22c55e">0</b></span>
+    <span>[MOUSE / ARROWS] Warp Position</span>
+  </div>
+<script>
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  let angle = 0, px = 240, py = 180, score = 0, over = false;
+  const obstacles = [];
+  for (let i = 0; i < 6; i++) {
+    obstacles.push({ z: 100 + i * 150, ang: Math.random() * Math.PI * 2, len: 1.2 });
+  }
+
+  canvas.addEventListener('mousemove', e => {
+    const rect = canvas.getBoundingClientRect();
+    px = e.clientX - rect.left; py = e.clientY - rect.top;
+  });
+
+  window.addEventListener('keydown', e => {
+    if (e.key === 'ArrowLeft') px = Math.max(80, px - 20);
+    if (e.key === 'ArrowRight') px = Math.min(400, px + 20);
+    if (e.key === 'ArrowUp') py = Math.max(60, py - 20);
+    if (e.key === 'ArrowDown') py = Math.min(300, py + 20);
+  });
+
+  function render() {
+    ctx.fillStyle = '#040209'; ctx.fillRect(0, 0, 480, 360);
+    angle += 0.02;
+    if (!over) { score++; document.getElementById('sc').innerText = score; }
+
+    // Draw tunnel rings
+    for (let r = 20; r < 240; r += 20) {
+      ctx.beginPath();
+      ctx.arc(240, 180, r, 0, Math.PI * 2);
+      ctx.strokeStyle = 'hsl(' + ((angle * 50 + r) % 360) + ', 80%, 50%)';
+      ctx.lineWidth = 2; ctx.stroke();
+    }
+
+    // Obstacles
+    obstacles.forEach(o => {
+      o.z -= 4;
+      if (o.z < 10) { o.z = 900; o.ang = Math.random() * Math.PI * 2; }
+      const rad = 2500 / o.z;
+      if (rad > 10 && rad < 240) {
+        ctx.beginPath();
+        ctx.arc(240, 180, rad, o.ang, o.ang + o.len);
+        ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 10; ctx.stroke();
+
+        // Collision detection
+        const pAng = Math.atan2(py - 180, px - 240);
+        const normPAng = (pAng + Math.PI * 2) % (Math.PI * 2);
+        const normOAng = (o.ang + Math.PI * 2) % (Math.PI * 2);
+        const pDist = Math.hypot(px - 240, py - 180);
+        if (Math.abs(pDist - rad) < 15 && normPAng >= normOAng && normPAng <= normOAng + o.len) {
+          over = true;
+        }
+      }
+    });
+
+    // Player Cursor Ship
+    ctx.beginPath();
+    ctx.arc(px, py, 8, 0, Math.PI * 2);
+    ctx.fillStyle = '#38bdf8'; ctx.shadowBlur = 15; ctx.shadowColor = '#38bdf8';
+    ctx.fill(); ctx.shadowBlur = 0;
+
+    if (over) {
+      ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(0, 0, 480, 360);
+      ctx.fillStyle = '#ef4444'; ctx.font = 'bold 24px monospace';
+      ctx.fillText('WARP COLLISION! RESTARTING...', 40, 180);
+      setTimeout(() => { over = false; score = 0; }, 1800);
+    }
+    requestAnimationFrame(render);
+  }
+  requestAnimationFrame(render);
+</script>
+</body>
+</html>`;
+
+    case 'geometry-dash-lite':
+      return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; background: #0b0f19; color: #fff; font-family: monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; user-select: none; }
+  h2 { margin: 0 0 5px; color: #eab308; font-size: 20px; letter-spacing: 2px; }
+  canvas { border: 2px solid #eab308; border-radius: 12px; }
+  .hud { margin-top: 8px; font-size: 13px; color: #38bdf8; display: flex; gap: 20px; font-weight: bold; }
+</style>
+</head>
+<body>
+  <h2>NEON GEOMETRY DASH</h2>
+  <canvas id="c" width="480" height="300"></canvas>
+  <div class="hud">
+    <span>PERCENT: <b id="pct" style="color:#22c55e">0%</b></span>
+    <span>ATTEMPTS: <b id="att" style="color:#f59e0b">1</b></span>
+    <span>[SPACE / CLICK] Jump</span>
+  </div>
+<script>
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  let y = 220, vy = 0, rot = 0, grounded = true, progress = 0, attempts = 1, over = false;
+  const spikes = [400, 700, 950, 1200, 1450, 1750, 2050, 2350, 2650, 3000];
+
+  function jump() {
+    if (grounded && !over) { vy = -12; grounded = false; }
+  }
+  window.addEventListener('keydown', e => { if (e.code === 'Space' || e.code === 'ArrowUp') jump(); });
+  canvas.addEventListener('mousedown', jump);
+
+  function loop() {
+    ctx.fillStyle = '#060a14'; ctx.fillRect(0, 0, 480, 300);
+
+    // Floor
+    ctx.fillStyle = '#1e293b'; ctx.fillRect(0, 240, 480, 60);
+    ctx.strokeStyle = '#eab308'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(0, 240); ctx.lineTo(480, 240); ctx.stroke();
+
+    if (!over) {
+      progress += 6;
+      vy += 0.8; y += vy;
+      if (y >= 220) { y = 220; vy = 0; grounded = true; rot = Math.round(rot / (Math.PI / 2)) * (Math.PI / 2); }
+      else { rot += 0.15; }
+      document.getElementById('pct').innerText = Math.min(100, Math.floor((progress / 3200) * 100)) + '%';
+    }
+
+    // Render Spikes
+    spikes.forEach(sx => {
+      const screenX = sx - progress + 80;
+      if (screenX > -30 && screenX < 510) {
+        ctx.fillStyle = '#ef4444';
+        ctx.beginPath();
+        ctx.moveTo(screenX, 240); ctx.lineTo(screenX + 15, 205); ctx.lineTo(screenX + 30, 240);
+        ctx.closePath(); ctx.fill();
+
+        // Hitbox
+        if (screenX < 100 && screenX + 25 > 80 && y > 200) {
+          over = true;
+        }
+      }
+    });
+
+    // Player Cube
+    ctx.save();
+    ctx.translate(90, y + 10);
+    ctx.rotate(rot);
+    ctx.fillStyle = '#eab308'; ctx.fillRect(-10, -10, 20, 20);
+    ctx.fillStyle = '#0284c7'; ctx.fillRect(-5, -5, 10, 10);
+    ctx.restore();
+
+    if (over) {
+      ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(0, 0, 480, 300);
+      ctx.fillStyle = '#ef4444'; ctx.font = 'bold 22px monospace';
+      ctx.fillText('CRASHED! TRY AGAIN', 120, 150);
+      setTimeout(() => {
+        over = false; progress = 0; y = 220; vy = 0; rot = 0; attempts++;
+        document.getElementById('att').innerText = attempts;
+      }, 1000);
+    }
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+</script>
+</body>
+</html>`;
+
+    case 'bubble-shooter-dx':
+      return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; background: #080a14; color: #fff; font-family: monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; user-select: none; }
+  h2 { margin: 0 0 5px; color: #06b6d4; font-size: 20px; letter-spacing: 2px; }
+  canvas { border: 2px solid #06b6d4; border-radius: 12px; box-shadow: 0 0 20px rgba(6,182,212,0.4); }
+  .hud { margin-top: 8px; font-size: 13px; color: #38bdf8; display: flex; gap: 20px; font-weight: bold; }
+</style>
+</head>
+<body>
+  <h2>NEON BUBBLE SHOOTER</h2>
+  <canvas id="c" width="400" height="420"></canvas>
+  <div class="hud">
+    <span>SCORE: <b id="sc" style="color:#22c55e">0</b></span>
+    <span>[MOUSE] Aim [CLICK] Shoot</span>
+  </div>
+<script>
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  const COLORS = ['#ef4444', '#3b82f6', '#22c55e', '#eab308', '#a855f7'];
+  let score = 0, cannonAngle = -Math.PI / 2;
+  let bullet = null, nextColor = COLORS[0];
+
+  const grid = [];
+  for (let r = 0; r < 5; r++) {
+    grid[r] = [];
+    for (let c = 0; c < 10; c++) {
+      grid[r][c] = COLORS[Math.floor(Math.random() * COLORS.length)];
+    }
+  }
+
+  canvas.addEventListener('mousemove', e => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    cannonAngle = Math.atan2(my - 400, mx - 200);
+  });
+
+  canvas.addEventListener('click', () => {
+    if (!bullet) {
+      bullet = { x: 200, y: 400, vx: Math.cos(cannonAngle) * 9, vy: Math.sin(cannonAngle) * 9, color: nextColor };
+      nextColor = COLORS[Math.floor(Math.random() * COLORS.length)];
+    }
+  });
+
+  function draw() {
+    ctx.fillStyle = '#05070f'; ctx.fillRect(0, 0, 400, 420);
+
+    // Draw Grid
+    for (let r = 0; r < grid.length; r++) {
+      for (let c = 0; c < 10; c++) {
+        if (grid[r] && grid[r][c]) {
+          ctx.beginPath();
+          ctx.arc(c * 38 + 28, r * 34 + 25, 15, 0, Math.PI * 2);
+          ctx.fillStyle = grid[r][c]; ctx.fill();
+        }
+      }
+    }
+
+    // Bullet physics
+    if (bullet) {
+      bullet.x += bullet.vx; bullet.y += bullet.vy;
+      if (bullet.x < 15 || bullet.x > 385) bullet.vx = -bullet.vx;
+      if (bullet.y < 40) {
+        // Stick top
+        score += 50; document.getElementById('sc').innerText = score;
+        bullet = null;
+      }
+      if (bullet) {
+        ctx.beginPath(); ctx.arc(bullet.x, bullet.y, 15, 0, Math.PI * 2);
+        ctx.fillStyle = bullet.color; ctx.fill();
+      }
+    }
+
+    // Cannon
+    ctx.save();
+    ctx.translate(200, 400); ctx.rotate(cannonAngle);
+    ctx.fillStyle = '#64748b'; ctx.fillRect(0, -6, 40, 12);
+    ctx.restore();
+
+    ctx.beginPath(); ctx.arc(200, 400, 18, 0, Math.PI * 2);
+    ctx.fillStyle = nextColor; ctx.fill();
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+</script>
+</body>
+</html>`;
+
+    case 'chess-mini':
+      return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; background: #090d16; color: #fff; font-family: monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; user-select: none; }
+  h2 { margin: 0 0 5px; color: #38bdf8; font-size: 20px; letter-spacing: 2px; }
+  #board { display: grid; grid-template-columns: repeat(8, 44px); grid-template-rows: repeat(8, 44px); border: 3px solid #334155; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.6); }
+  .sq { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; font-size: 26px; cursor: pointer; }
+  .light { background: #cbd5e1; color: #0f172a; }
+  .dark { background: #475569; color: #f8fafc; }
+  .sel { background: #38bdf8 !important; }
+  .hud { margin-top: 8px; font-size: 13px; color: #94a3b8; }
+</style>
+</head>
+<body>
+  <h2>MINI CHESS MASTER</h2>
+  <div id="board"></div>
+  <div class="hud" id="status">Turn: White (Click piece to move)</div>
+<script>
+  const boardEl = document.getElementById('board');
+  const PIECES = {
+    r: '♜', n: '♞', b: '♝', q: '♛', k: '♚', p: '♟',
+    R: '♖', N: '♘', B: '♗', Q: '♕', K: '♔', P: '♙'
+  };
+  let board = [
+    ['r','n','b','q','k','b','n','r'],
+    ['p','p','p','p','p','p','p','p'],
+    ['','','','','','','',''],
+    ['','','','','','','',''],
+    ['','','','','','','',''],
+    ['','','','','','','',''],
+    ['P','P','P','P','P','P','P','P'],
+    ['R','N','B','Q','K','B','N','R']
+  ];
+  let selected = null;
+
+  function render() {
+    boardEl.innerHTML = '';
+    for (let r = 0; r < 8; r++) {
+      for (let c = 0; c < 8; c++) {
+        const sq = document.createElement('div');
+        const isDark = (r + c) % 2 === 1;
+        sq.className = 'sq ' + (isDark ? 'dark' : 'light');
+        if (selected && selected[0] === r && selected[1] === c) sq.classList.add('sel');
+        sq.innerText = PIECES[board[r][c]] || '';
+        sq.onclick = () => handleClick(r, c);
+        boardEl.appendChild(sq);
+      }
+    }
+  }
+
+  function handleClick(r, c) {
+    if (selected) {
+      board[r][c] = board[selected[0]][selected[1]];
+      board[selected[0]][selected[1]] = '';
+      selected = null;
+      render();
+      setTimeout(aiMove, 300);
+    } else if (board[r][c] && board[r][c] === board[r][c].toUpperCase()) {
+      selected = [r, c];
+      render();
+    }
+  }
+
+  function aiMove() {
+    const blackPieces = [];
+    for (let r = 0; r < 8; r++) {
+      for (let c = 0; c < 8; c++) {
+        if (board[r][c] && board[r][c] === board[r][c].toLowerCase()) blackPieces.push([r, c]);
+      }
+    }
+    if (blackPieces.length > 0) {
+      const [fromR, fromC] = blackPieces[Math.floor(Math.random() * blackPieces.length)];
+      const targetR = Math.min(7, fromR + 1);
+      board[targetR][fromC] = board[fromR][fromC];
+      board[fromR][fromC] = '';
+      render();
+    }
+  }
+  render();
+</script>
+</body>
+</html>`;
+
+    case 'helix-jump-canvas':
+      return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; background: #030712; color: #fff; font-family: monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; user-select: none; }
+  h2 { margin: 0 0 5px; color: #10b981; font-size: 20px; letter-spacing: 2px; }
+  canvas { border: 2px solid #10b981; border-radius: 12px; }
+  .hud { margin-top: 8px; font-size: 13px; color: #38bdf8; display: flex; gap: 20px; font-weight: bold; }
+</style>
+</head>
+<body>
+  <h2>NEON HELIX JUMP</h2>
+  <canvas id="c" width="380" height="420"></canvas>
+  <div class="hud">
+    <span>LEVEL: <b id="lvl" style="color:#22c55e">1</b></span>
+    <span>SCORE: <b id="sc" style="color:#f59e0b">0</b></span>
+    <span>[A/D or ARROWS] Spin Tower</span>
+  </div>
+<script>
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  let towerAngle = 0, ballY = 120, ballVy = 0, score = 0;
+
+  window.addEventListener('keydown', e => {
+    if (e.key === 'ArrowLeft' || e.key === 'KeyA') towerAngle -= 0.15;
+    if (e.key === 'ArrowRight' || e.key === 'KeyD') towerAngle += 0.15;
+  });
+
+  function loop() {
+    ctx.fillStyle = '#060a12'; ctx.fillRect(0, 0, 380, 420);
+
+    // Central Pole
+    ctx.fillStyle = '#1e293b'; ctx.fillRect(175, 0, 30, 420);
+
+    // Rotating Platforms
+    for (let i = 0; i < 6; i++) {
+      const py = 80 + i * 65;
+      const ang = towerAngle + i * 0.8;
+      ctx.beginPath();
+      ctx.ellipse(190, py, 110, 25, 0, ang, ang + 4.5);
+      ctx.strokeStyle = '#10b981'; ctx.lineWidth = 14; ctx.stroke();
+    }
+
+    // Bouncing Ball
+    ballVy += 0.35; ballY += ballVy;
+    if (ballY > 320) { ballY = 320; ballVy = -7.5; score += 10; document.getElementById('sc').innerText = score; }
+
+    ctx.beginPath(); ctx.arc(190, ballY, 10, 0, Math.PI * 2);
+    ctx.fillStyle = '#fbbf24'; ctx.shadowBlur = 10; ctx.shadowColor = '#fbbf24';
+    ctx.fill(); ctx.shadowBlur = 0;
+
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+</script>
+</body>
+</html>`;
+
+    case 'sand-physics-sandbox':
+      return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; background: #000; color: #fff; font-family: monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; user-select: none; }
+  h2 { margin: 0 0 5px; color: #f59e0b; font-size: 20px; letter-spacing: 2px; }
+  canvas { border: 2px solid #334155; border-radius: 8px; cursor: crosshair; }
+  .tools { margin-top: 8px; display: flex; gap: 8px; }
+  button { padding: 4px 10px; border-radius: 6px; font-weight: bold; border: none; cursor: pointer; }
+</style>
+</head>
+<body>
+  <h2>FALLING SAND AUTOMATA</h2>
+  <canvas id="c" width="300" height="250"></canvas>
+  <div class="tools">
+    <button style="background:#eab308;color:#000" onclick="sel=1">Sand</button>
+    <button style="background:#38bdf8;color:#000" onclick="sel=2">Water</button>
+    <button style="background:#ef4444;color:#fff" onclick="sel=3">Fire</button>
+    <button style="background:#94a3b8;color:#000" onclick="sel=4">Wall</button>
+    <button style="background:#334155;color:#fff" onclick="grid.fill(0)">Clear</button>
+  </div>
+<script>
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  const W = 100, H = 83;
+  const grid = new Uint8Array(W * H);
+  let sel = 1, isDown = false;
+
+  canvas.addEventListener('mousedown', () => isDown = true);
+  window.addEventListener('mouseup', () => isDown = false);
+  canvas.addEventListener('mousemove', e => {
+    if (isDown) {
+      const rect = canvas.getBoundingClientRect();
+      const gx = Math.floor((e.clientX - rect.left) / 3);
+      const gy = Math.floor((e.clientY - rect.top) / 3);
+      if (gx >= 0 && gx < W && gy >= 0 && gy < H) grid[gy * W + gx] = sel;
+    }
+  });
+
+  function update() {
+    for (let y = H - 2; y >= 0; y--) {
+      for (let x = 0; x < W; x++) {
+        const i = y * W + x;
+        if (grid[i] === 1) { // Sand
+          if (grid[i + W] === 0) { grid[i + W] = 1; grid[i] = 0; }
+          else if (grid[i + W - 1] === 0 && x > 0) { grid[i + W - 1] = 1; grid[i] = 0; }
+          else if (grid[i + W + 1] === 0 && x < W - 1) { grid[i + W + 1] = 1; grid[i] = 0; }
+        } else if (grid[i] === 2) { // Water
+          if (grid[i + W] === 0) { grid[i + W] = 2; grid[i] = 0; }
+          else if (grid[i + 1] === 0 && x < W - 1) { grid[i + 1] = 2; grid[i] = 0; }
+          else if (grid[i - 1] === 0 && x > 0) { grid[i - 1] = 2; grid[i] = 0; }
+        }
+      }
+    }
+    // Render
+    const img = ctx.createImageData(W, H);
+    for (let i = 0; i < grid.length; i++) {
+      const p = i * 4;
+      if (grid[i] === 1) { img.data[p] = 234; img.data[p+1] = 179; img.data[p+2] = 8; img.data[p+3] = 255; }
+      else if (grid[i] === 2) { img.data[p] = 56; img.data[p+1] = 189; img.data[p+2] = 248; img.data[p+3] = 255; }
+      else if (grid[i] === 3) { img.data[p] = 239; img.data[p+1] = 68; img.data[p+2] = 68; img.data[p+3] = 255; }
+      else if (grid[i] === 4) { img.data[p] = 148; img.data[p+1] = 163; img.data[p+2] = 184; img.data[p+3] = 255; }
+      else { img.data[p+3] = 255; }
+    }
+    ctx.putImageData(img, 0, 0);
+    ctx.drawImage(canvas, 0, 0, W, H, 0, 0, 300, 250);
+    requestAnimationFrame(update);
+  }
+  requestAnimationFrame(update);
+</script>
+</body>
+</html>`;
+
+    case 'cyber-pinball':
+      return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; background: #080c14; color: #fff; font-family: monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; user-select: none; }
+  h2 { margin: 0 0 5px; color: #ec4899; font-size: 20px; letter-spacing: 2px; }
+  canvas { border: 2px solid #ec4899; border-radius: 12px; box-shadow: 0 0 20px rgba(236,72,153,0.4); }
+  .hud { margin-top: 8px; font-size: 13px; color: #38bdf8; display: flex; gap: 20px; font-weight: bold; }
+</style>
+</head>
+<body>
+  <h2>NEON PINBALL DX</h2>
+  <canvas id="c" width="360" height="440"></canvas>
+  <div class="hud">
+    <span>SCORE: <b id="sc" style="color:#f59e0b">0</b></span>
+    <span>[A / LEFT] Left [D / RIGHT] Right [SPACE] Launch</span>
+  </div>
+<script>
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  let bx = 180, by = 150, bvx = 3, bvy = 4, score = 0;
+  let leftFlip = false, rightFlip = false;
+
+  window.addEventListener('keydown', e => {
+    if (e.key === 'a' || e.key === 'ArrowLeft') leftFlip = true;
+    if (e.key === 'd' || e.key === 'ArrowRight') rightFlip = true;
+  });
+  window.addEventListener('keyup', e => {
+    if (e.key === 'a' || e.key === 'ArrowLeft') leftFlip = false;
+    if (e.key === 'd' || e.key === 'ArrowRight') rightFlip = false;
+  });
+
+  function loop() {
+    ctx.fillStyle = '#05070f'; ctx.fillRect(0, 0, 360, 440);
+
+    // Bumpers
+    const bumpers = [{x: 120, y: 120}, {x: 240, y: 120}, {x: 180, y: 200}];
+    bumpers.forEach(b => {
+      ctx.beginPath(); ctx.arc(b.x, b.y, 22, 0, Math.PI * 2);
+      ctx.fillStyle = '#ec4899'; ctx.fill();
+      if (Math.hypot(bx - b.x, by - b.y) < 30) {
+        bvx = (bx - b.x) * 0.4; bvy = (by - b.y) * 0.4;
+        score += 100; document.getElementById('sc').innerText = score;
+      }
+    });
+
+    // Ball physics
+    bvy += 0.15; bx += bvx; by += bvy;
+    if (bx < 15 || bx > 345) bvx = -bvx;
+    if (by < 15) bvy = -bvy;
+    if (by > 440) { bx = 180; by = 100; bvx = 2; bvy = 2; }
+
+    // Flippers
+    ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.moveTo(80, 380); ctx.lineTo(150, leftFlip ? 360 : 395); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(280, 380); ctx.lineTo(210, rightFlip ? 360 : 395); ctx.stroke();
+
+    // Flipper Hit
+    if (by > 370 && by < 400) {
+      if (bx > 80 && bx < 160 && leftFlip) { bvy = -8; score += 20; }
+      if (bx > 200 && bx < 280 && rightFlip) { bvy = -8; score += 20; }
+    }
+
+    // Draw Ball
+    ctx.beginPath(); ctx.arc(bx, by, 9, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffde59'; ctx.fill();
+
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+</script>
+</body>
+</html>`;
+
+    case 'traffic-crossy-road':
+      return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; background: #0f172a; color: #fff; font-family: monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; user-select: none; }
+  h2 { margin: 0 0 5px; color: #38bdf8; font-size: 20px; letter-spacing: 2px; }
+  canvas { border: 2px solid #38bdf8; border-radius: 12px; }
+  .hud { margin-top: 8px; font-size: 13px; color: #38bdf8; display: flex; gap: 20px; font-weight: bold; }
+</style>
+</head>
+<body>
+  <h2>NEON TRAFFIC CROSSING</h2>
+  <canvas id="c" width="400" height="380"></canvas>
+  <div class="hud">
+    <span>SCORE: <b id="sc" style="color:#22c55e">0</b></span>
+    <span>[W/A/S/D or ARROWS] Hop</span>
+  </div>
+<script>
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  let px = 200, py = 340, score = 0, over = false;
+  const lanes = [
+    { y: 80, speed: 3, cars: [50, 220] },
+    { y: 140, speed: -4, cars: [100, 300] },
+    { y: 200, speed: 2.5, cars: [30, 200] },
+    { y: 260, speed: -3.5, cars: [80, 260] }
+  ];
+
+  window.addEventListener('keydown', e => {
+    if (over) return;
+    if (e.key === 'ArrowUp' || e.key === 'w') {
+      py -= 60; score += 10; document.getElementById('sc').innerText = score;
+      if (py < 40) { py = 340; score += 100; }
+    }
+    if (e.key === 'ArrowDown' || e.key === 's') py = Math.min(340, py + 60);
+    if (e.key === 'ArrowLeft' || e.key === 'a') px = Math.max(30, px - 30);
+    if (e.key === 'ArrowRight' || e.key === 'd') px = Math.min(370, px + 30);
+  });
+
+  function loop() {
+    ctx.fillStyle = '#0f172a'; ctx.fillRect(0, 0, 400, 380);
+
+    // Roads
+    lanes.forEach(l => {
+      ctx.fillStyle = '#1e293b'; ctx.fillRect(0, l.y - 20, 400, 50);
+      l.cars.forEach((cx, idx) => {
+        l.cars[idx] += l.speed;
+        if (l.cars[idx] > 450) l.cars[idx] = -60;
+        if (l.cars[idx] < -60) l.cars[idx] = 450;
+        ctx.fillStyle = '#f43f5e';
+        ctx.fillRect(l.cars[idx], l.y - 12, 45, 24);
+
+        if (Math.hypot(px - (l.cars[idx] + 22), py - l.y) < 24) over = true;
+      });
+    });
+
+    // Player
+    ctx.fillStyle = '#eab308';
+    ctx.beginPath(); ctx.arc(px, py, 12, 0, Math.PI * 2); ctx.fill();
+
+    if (over) {
+      ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(0, 0, 400, 380);
+      ctx.fillStyle = '#ef4444'; ctx.font = 'bold 24px monospace';
+      ctx.fillText('SPLAT! RESTARTING...', 70, 190);
+      setTimeout(() => { over = false; px = 200; py = 340; score = 0; }, 1500);
+    }
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+</script>
+</body>
+</html>`;
+
+    case 'cyber-hockey':
+      return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; background: #030712; color: #fff; font-family: monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; user-select: none; }
+  h2 { margin: 0 0 5px; color: #06b6d4; font-size: 20px; letter-spacing: 2px; }
+  canvas { border: 2px solid #06b6d4; border-radius: 12px; box-shadow: 0 0 25px rgba(6,182,212,0.4); }
+  .hud { margin-top: 8px; font-size: 13px; color: #38bdf8; display: flex; gap: 20px; font-weight: bold; }
+</style>
+</head>
+<body>
+  <h2>NEON AIR HOCKEY</h2>
+  <canvas id="c" width="340" height="460"></canvas>
+  <div class="hud">
+    <span>YOU: <b id="pSc" style="color:#22c55e">0</b></span>
+    <span>CPU: <b id="cSc" style="color:#ef4444">0</b></span>
+    <span>[MOUSE] Guide Mallet</span>
+  </div>
+<script>
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  let px = 170, py = 380, cx = 170, cy = 80;
+  let bx = 170, by = 230, bvx = 3, bvy = 4;
+  let pScore = 0, cScore = 0;
+
+  canvas.addEventListener('mousemove', e => {
+    const rect = canvas.getBoundingClientRect();
+    px = e.clientX - rect.left;
+    py = Math.max(260, Math.min(430, e.clientY - rect.top));
+  });
+
+  function loop() {
+    ctx.fillStyle = '#030712'; ctx.fillRect(0, 0, 340, 460);
+
+    // Table lines
+    ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(0, 230); ctx.lineTo(340, 230); ctx.stroke();
+    ctx.beginPath(); ctx.arc(170, 230, 40, 0, Math.PI * 2); ctx.stroke();
+
+    // AI Mallet
+    cx += (bx - cx) * 0.08;
+
+    // Puck Physics
+    bx += bvx; by += bvy;
+    if (bx < 15 || bx > 325) bvx = -bvx;
+
+    // Paddle Hit
+    if (Math.hypot(bx - px, by - py) < 32) { bvy = -Math.abs(bvy) * 1.05; bvx = (bx - px) * 0.3; }
+    if (Math.hypot(bx - cx, by - cy) < 32) { bvy = Math.abs(bvy) * 1.05; bvx = (bx - cx) * 0.3; }
+
+    // Goal Check
+    if (by < 10) { pScore++; document.getElementById('pSc').innerText = pScore; reset(); }
+    if (by > 450) { cScore++; document.getElementById('cSc').innerText = cScore; reset(); }
+
+    function reset() { bx = 170; by = 230; bvx = (Math.random() - 0.5) * 6; bvy = 4; }
+
+    // Render Mallets
+    ctx.beginPath(); ctx.arc(px, py, 20, 0, Math.PI * 2); ctx.fillStyle = '#22c55e'; ctx.fill();
+    ctx.beginPath(); ctx.arc(cx, cy, 20, 0, Math.PI * 2); ctx.fillStyle = '#ef4444'; ctx.fill();
+
+    // Render Puck
+    ctx.beginPath(); ctx.arc(bx, by, 12, 0, Math.PI * 2); ctx.fillStyle = '#38bdf8'; ctx.fill();
+
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
 </script>
 </body>
 </html>`;

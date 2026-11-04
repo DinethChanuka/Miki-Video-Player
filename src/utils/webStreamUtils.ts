@@ -249,9 +249,16 @@ export function isDirectMediaUrl(uri: string): boolean {
     clean.endsWith('.m3u8') ||
     clean.endsWith('.m3u') ||
     clean.endsWith('.mp3') ||
+    clean.includes('-mp3') ||
+    clean.includes('/mp3') ||
     clean.endsWith('.wav') ||
     clean.endsWith('.flac') ||
     clean.endsWith('.aac') ||
-    clean.endsWith('.ogg')
+    clean.includes('/aac') ||
+    clean.endsWith('.ogg') ||
+    clean.includes('somafm.com') ||
+    clean.includes('storage.jamendo.com') ||
+    clean.includes('freesound.org') ||
+    uri.includes('format=mp3')
   );
 }

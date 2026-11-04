@@ -45,7 +45,7 @@ interface WindowWithWebkit extends Window {
  * Resolves web URLs to embed-compatible formats to bypass X-Frame-Options blocking
  */
 export function resolveBrowserFrameUrl(url: string): string {
-  if (!url) return 'https://cinesubz.co';
+  if (!url) return 'https://cinesubz.lk';
   const trimmed = url.trim();
 
   // Convert YouTube links into embed format to prevent X-Frame-Options: SAMEORIGIN rejection
@@ -73,7 +73,7 @@ export function extractHostname(url: string): string {
 
 export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
   isOpen,
-  initialUrl = 'https://cinesubz.co',
+  initialUrl = 'https://cinesubz.lk',
   onClose,
   onPlayInNativePlayer,
   onStartWindowDrag,
@@ -87,6 +87,7 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
   const [isAdShieldActive, setIsAdShieldActive] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [frameBlocked, setFrameBlocked] = useState<boolean>(false);
+  const [iframeError, setIframeError] = useState<boolean>(false);
   const [blockedCount, setBlockedCount] = useState<number>(18);
   const [detectedMediaUrl, setDetectedMediaUrl] = useState<string | null>(null);
   const [detectedMediaTitle, setDetectedMediaTitle] = useState<string | null>(null);
@@ -555,7 +556,7 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
                 }
               }
             }}
-            placeholder="Jump to address (e.g. cinesubz.co) or search..."
+            placeholder="Jump to address (e.g. cinesubz.lk) or search..."
             className="flex-1 bg-transparent border-0 text-xs text-white placeholder-white/40 focus:outline-none"
           />
           <button
@@ -598,17 +599,19 @@ export const WebBrowserModal: React.FC<WebBrowserModalProps> = ({
             onLoad={() => {
               setIsLoading(false);
               setFrameBlocked(false);
+              setIframeError(false);
             }}
             onError={() => {
               setIsLoading(false);
               setFrameBlocked(true);
+              setIframeError(true);
             }}
             className="w-full h-full border-0 bg-slate-950 pointer-events-auto"
           />
         )}
 
         {/* Framing Protection & Black Screen Prevention Card */}
-        {!isNativeBrowserSupported && frameBlocked && (
+        {!isNativeBrowserSupported && (frameBlocked || iframeError) && (
           <div className="absolute inset-0 z-30 flex flex-col items-center justify-center p-6 bg-slate-950/95 text-center pointer-events-auto animate-in fade-in duration-200">
             <div className="w-14 h-14 rounded-2xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-4 shadow-lg shadow-amber-500/10">
               <ShieldAlert className="w-7 h-7" />

@@ -10,7 +10,8 @@ describe('Cinema & Fast Streaming Links Catalog', () => {
   it('contains essential curated streaming portals including CineSubz and movie portals', () => {
     const cinesub = CINEMA_LINKS.find((item) => item.id === 'cinesubz');
     assert.ok(cinesub, 'CineSubz portal must be present');
-    assert.equal(cinesub.url, 'https://cinesubz.co');
+    assert.equal(cinesub.url, 'https://cinesubz.lk');
+    assert.equal(cinesub.canonicalUrl, 'https://cinesubz.lk');
     assert.equal(cinesub.category, 'Subtitles');
     assert.equal(cinesub.isAdShieldRecommended, true);
 

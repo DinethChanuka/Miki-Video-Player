@@ -42,6 +42,8 @@ declare module 'lucide-react' {
   export const Camera: LucideIcon;
   export const Repeat: LucideIcon;
   export const Tv: LucideIcon;
+  export const Tv2: LucideIcon;
+  export const Clapperboard: LucideIcon;
   export const Sun: LucideIcon;
   export const Contrast: LucideIcon;
   export const Ratio: LucideIcon;
@@ -75,6 +77,7 @@ declare module 'lucide-react' {
   export const ChevronDown: LucideIcon;
   export const Share2: LucideIcon;
   export const User: LucideIcon;
+  export const LogIn: LucideIcon;
   export const LogOut: LucideIcon;
   export const Globe: LucideIcon;
   export const Shield: LucideIcon;
@@ -83,6 +86,16 @@ declare module 'lucide-react' {
   export const Lock: LucideIcon;
   export const MousePointer: LucideIcon;
   export const Gamepad2: LucideIcon;
+  export const Music: LucideIcon;
+  export const ListMusic: LucideIcon;
+  export const MessageSquareText: LucideIcon;
+  export const Maximize2: LucideIcon;
+  export const Minimize2: LucideIcon;
+  export const Heart: LucideIcon;
+  export const Download: LucideIcon;
+  export const Bell: LucideIcon;
+  export const ChevronLeft: LucideIcon;
+  export const ChevronRight: LucideIcon;
 
   // Fallback index signature so any other Lucide icon is also typed
   const icons: { [key: string]: LucideIcon };

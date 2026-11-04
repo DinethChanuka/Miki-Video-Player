@@ -277,7 +277,7 @@ jobs:
       - name: Package Android APK
         run: |
           mkdir -p Build/Android
-          ./scripts/package-android.sh || true
+          ./scripts/package-android.sh
           find . -name "*.apk" -not -path "*/node_modules/*" -exec cp {} Build/Android/ \; 2>/dev/null || true
           touch Build/Android/.gitkeep
 
@@ -316,7 +316,7 @@ jobs:
       - name: Package iOS Application
         run: |
           mkdir -p Build/ios
-          ./scripts/package-ios.sh || true
+          ./scripts/package-ios.sh
           find . -name "*.ipa" -not -path "*/node_modules/*" -exec cp {} Build/ios/ \; 2>/dev/null || true
           touch Build/ios/.gitkeep
 
