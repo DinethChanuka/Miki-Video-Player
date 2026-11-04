@@ -6,6 +6,7 @@ import { CINEMA_LINKS, CinemaSiteItem } from '../../utils/cinemaLinks';
 import { INTERNET_MUSIC_STREAMS, InternetMusicStation } from '../../utils/musicStreams';
 import { MOVIE_POSTERS, ALBUM_POSTERS } from '../../utils/mediaPosters';
 import { HERO_ARTWORKS, getHeroArtworkForSection } from '../../utils/heroArtworks';
+import { CINESUBZ_MOVIES, fetchLatestCineSubzMovies, CineSubzMovie } from '../../utils/cinesubzService';
 import {
   Film,
   Play,
@@ -280,6 +281,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
   const [isCoverFlowPlaying, setIsCoverFlowPlaying] = useState<boolean>(false);
   const [partiesToggle, setPartiesToggle] = useState<boolean>(true);
   const [continueToggle, setContinueToggle] = useState<boolean>(true);
+  const [cinesubzList] = useState<CineSubzMovie[]>(CINESUBZ_MOVIES);
 
   const recentMedia = usePlayerStore((s) => s.recentMedia);
   const openMedia = usePlayerStore((s) => s.openMedia);
@@ -346,6 +348,18 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
         c.tags.some((t) => t.includes(q))
     );
   }, [searchQuery]);
+
+  // Filtered CineSubz Sinhala Subtitle Releases
+  const filteredCinesubz = useMemo(() => {
+    if (!searchQuery.trim()) return cinesubzList;
+    const q = searchQuery.toLowerCase();
+    return cinesubzList.filter(
+      (m) =>
+        m.title.toLowerCase().includes(q) ||
+        m.sinhalaTitle.toLowerCase().includes(q) ||
+        m.genres.some((g) => g.toLowerCase().includes(q))
+    );
+  }, [cinesubzList, searchQuery]);
 
   const handlePlayAlbum = (idx: number) => {
     setActiveAlbumIdx(idx);
@@ -1373,6 +1387,65 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                         <div className="flex items-center justify-between text-[10px] text-white/50">
                           <span>{movie.genre}</span>
                           <span className="font-mono">{movie.duration}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              {/* CineSubz Sinhala Subtitle Releases Section */}
+              <section className="flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse" />
+                    <h2 className="text-base font-bold text-white tracking-wide">
+                      CineSubz Sinhala Subtitle Releases (සිංහල උපසිරැසි)
+                    </h2>
+                  </div>
+                  <span className="text-xs text-rose-400 font-mono">Auto-Updating • 1080p & 4K</span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3.5">
+                  {filteredCinesubz.map((movie) => (
+                    <div
+                      key={movie.id}
+                      onClick={() => {
+                        if (onOpenWebBrowser) onOpenWebBrowser(movie.watchUrl);
+                      }}
+                      className="group relative flex flex-col rounded-2xl overflow-hidden bg-white/5 border border-white/10 hover:border-rose-500/50 hover:bg-white/10 transition-all cursor-pointer shadow-lg"
+                    >
+                      <div className="relative aspect-[2/3] w-full overflow-hidden bg-black/60">
+                        <img
+                          src={movie.posterUrl}
+                          alt={movie.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          loading="lazy"
+                        />
+                        <div className="absolute top-2 left-2 flex flex-col gap-1">
+                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-black/80 backdrop-blur-md text-amber-400 font-bold border border-white/10">
+                            {movie.rating}
+                          </span>
+                          <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-rose-600 text-white shadow">
+                            {movie.quality}
+                          </span>
+                        </div>
+
+                        <div className="absolute bottom-2 right-2 w-8 h-8 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center text-white group-hover:bg-rose-600 transition-all shadow-lg">
+                          <Play className="w-3.5 h-3.5 fill-white ml-0.5" />
+                        </div>
+                      </div>
+
+                      <div className="p-2.5 flex flex-col gap-1">
+                        <span className="text-xs font-bold text-white truncate group-hover:text-rose-300">
+                          {movie.title}
+                        </span>
+                        <span className="text-[10px] text-rose-400 font-medium truncate">
+                          {movie.sinhalaTitle}
+                        </span>
+                        <div className="flex items-center justify-between text-[9px] text-white/50">
+                          <span>{movie.year}</span>
+                          <span className="text-emerald-400 font-mono">සිංහල උපසිරැසි</span>
                         </div>
                       </div>
                     </div>
