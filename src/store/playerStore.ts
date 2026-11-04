@@ -60,6 +60,15 @@ export function lookupArtwork(uri: string, title?: string, explicitArtwork?: str
   if (lowerTitle.includes('bin tere') || lowerUri.includes('bin tere')) return ALBUM_POSTERS.binTere;
   if (lowerTitle.includes('darkhaast') || lowerUri.includes('darkhaast')) return ALBUM_POSTERS.darkhaast;
   if (lowerTitle.includes('tujhko') || lowerUri.includes('tujhko')) return ALBUM_POSTERS.tujhkoJoPaaya;
+  if (lowerTitle.includes('blackpink') || lowerTitle.includes('black pink')) {
+    return 'https://upload.wikimedia.org/wikipedia/en/b/be/Blackpink_-_The_Album.png';
+  }
+  if (lowerTitle.includes('bts') || lowerTitle.includes('dynamite') || lowerTitle.includes('butter')) {
+    return 'https://upload.wikimedia.org/wikipedia/en/5/50/BTS_-_Butter.png';
+  }
+  if (lowerTitle.includes('taylor swift') || lowerTitle.includes('cardigan') || lowerTitle.includes('anti-hero') || lowerTitle.includes('lover')) {
+    return 'https://upload.wikimedia.org/wikipedia/en/9/9f/Midnights_-_Taylor_Swift.png';
+  }
 
   // 3. CineSubz movies
   const movie = CINESUBZ_MOVIES.find(
@@ -220,6 +229,12 @@ export interface PlayerStoreState {
 
   // Thumbnail stopped-point persistence
   saveCurrentThumbnail: (dataUrl: string) => void;
+
+  // Navigation & Category History Preservation
+  lastActiveNav: string;
+  setLastActiveNav: (nav: string) => void;
+  lastActiveCategory: string;
+  setLastActiveCategory: (category: string) => void;
 
   // Actions
   bootEngine: (preferred?: EngineType, videoEl?: HTMLVideoElement) => Promise<void>;
@@ -591,6 +606,10 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
   setCurrentArtwork: (url) => set({ currentArtwork: url }),
   isMusicPlayerOpen: false,
   setMusicPlayerOpen: (open) => set({ isMusicPlayerOpen: open }),
+  lastActiveNav: 'browse',
+  setLastActiveNav: (nav) => set({ lastActiveNav: nav }),
+  lastActiveCategory: 'All',
+  setLastActiveCategory: (category) => set({ lastActiveCategory: category }),
 
   playNextMedia: async () => {
     const { recentMedia, currentUri, openMedia } = get();
@@ -1127,16 +1146,33 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     const resolvedArtwork = lookupArtwork(uri, resolvedTitle, artworkUrl);
     const isAudio =
       /\.(?:mp3|ogg|flac|wav|aac|m4a|weba|opus)(?:\?|$)/i.test(uri) ||
-      uri.includes('/mp3/') ||
+      uri.includes('/mp3') ||
+      uri.includes('-mp3') ||
+      uri.includes('format=mp3') ||
+      uri.includes('soundhelix') ||
+      uri.includes('soundcloud') ||
+      uri.includes('jamendo') ||
+      uri.includes('audiomack') ||
+      uri.includes('bandcamp') ||
       uri.includes('mythium') ||
       uri.includes('somafm.com') ||
+      uri.includes('icecast') ||
+      uri.includes('shoutcast') ||
+      get().activePlaybackMode === 'music' ||
+      get().activePlaybackMode === 'radio' ||
+      get().lastActiveCategory === 'Music' ||
+      get().lastActiveCategory === 'Radio' ||
+      get().lastActiveNav === 'music' ||
+      get().lastActiveNav === 'radio' ||
       Boolean(artworkUrl);
-    const playbackMode = isAudio ? 'music' : (get().activePlaybackMode === 'radio' ? 'radio' : 'video');
+    const playbackMode = (get().activePlaybackMode === 'radio' || get().lastActiveCategory === 'Radio' || get().lastActiveNav === 'radio' || uri.includes('somafm'))
+      ? 'radio'
+      : (isAudio ? 'music' : 'video');
 
     // Check if it's an external web stream (YouTube, TikTok, Instagram, Vimeo, Twitch, Dailymotion, Cinema portals or Web stream)
     const webStream = parseWebStream(uri);
     const isHttp = uri.startsWith('http://') || uri.startsWith('https://');
-    const activeWebStream = webStream || (isHttp && !isDirectMediaUrl(uri) ? {
+    const activeWebStream = webStream || (!isAudio && isHttp && !isDirectMediaUrl(uri) ? {
       platform: 'cinema' as const,
       id: `cinema_${Date.now()}`,
       embedUrl: uri,
@@ -1299,7 +1335,7 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
           currentTitle: resolvedTitle,
           currentArtwork: resolvedArtwork || null,
           activePlaybackMode: playbackMode,
-          isMusicPlayerOpen: playbackMode === 'music' ? true : get().isMusicPlayerOpen,
+          isMusicPlayerOpen: get().isMusicPlayerOpen,
           bookmarks: session.bookmarks,
           eqGainsDb: parsedEq,
           nightModeEnabled: session.preferences.nightModeEnabled,
@@ -1332,7 +1368,7 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
       currentTitle: resolvedTitle,
       currentArtwork: resolvedArtwork || null,
       activePlaybackMode: playbackMode,
-      isMusicPlayerOpen: playbackMode === 'music' ? true : get().isMusicPlayerOpen,
+      isMusicPlayerOpen: get().isMusicPlayerOpen,
       retryCount: 0,
       lastError: null,
       resumeBannerPositionMs: null,

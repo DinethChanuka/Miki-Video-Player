@@ -2,6 +2,7 @@ import { invoke, Channel } from '@tauri-apps/api/core';
 import Hls from 'hls.js';
 import { SpatialAudioEngine } from './SpatialAudioEngine';
 import { HlsStreamController } from './HlsStreamController.ts';
+import { ChunkedAudioStreamController } from './ChunkedAudioStreamController.ts';
 
 export type EngineType = 'tauri-mpv' | 'web-media';
 
@@ -273,6 +274,7 @@ export class WebMediaEngine implements IPlayerEngine {
   public readonly engineType: EngineType = 'web-media';
   private videoEl: HTMLVideoElement | null = null;
   private hlsController: HlsStreamController | null = null;
+  private chunkedAudioController: ChunkedAudioStreamController | null = null;
 
   public get hls(): Hls | null {
     return this.hlsController?.getHlsInstance() || null;
@@ -475,9 +477,14 @@ export class WebMediaEngine implements IPlayerEngine {
       this.hlsController.destroy();
       this.hlsController = null;
     }
+    if (this.chunkedAudioController) {
+      this.chunkedAudioController.destroy();
+      this.chunkedAudioController = null;
+    }
 
     const resolvedUri = resolveMediaStreamUrl(uri);
     const isHls = HlsStreamController.isHlsUrl(resolvedUri);
+    const isAudio = ChunkedAudioStreamController.isAudioUrl(resolvedUri);
 
     // Enable crossOrigin = 'anonymous' so WebAudio createMediaElementSource receives authorized audio
     // Adaptive CORS recovery in onerror will automatically remove crossOrigin if the remote server rejects it
@@ -514,18 +521,37 @@ export class WebMediaEngine implements IPlayerEngine {
       });
 
       this.hlsController.load(el, resolvedUri, startPositionMs);
+    } else if (isAudio) {
+      // High-efficiency chunk-by-chunk progressive streaming for instant audio playback (<200ms)
+      el.preload = 'auto';
+      this.chunkedAudioController = new ChunkedAudioStreamController({
+        onInitialChunkReady: () => {
+          if (startPositionMs > 0) {
+            el.currentTime = startPositionMs / 1000;
+          }
+          this.play().catch(() => {});
+        },
+        onError: (err) => {
+          logWarn('Chunked audio notice: ' + err.message);
+        },
+      });
+      await this.chunkedAudioController.load(el, resolvedUri, startPositionMs);
     } else {
+      el.preload = 'auto';
       el.src = resolvedUri;
       el.load();
 
-      const onCanPlay = () => {
+      const onReady = () => {
         if (startPositionMs > 0) {
           el.currentTime = startPositionMs / 1000;
         }
-        el.removeEventListener('canplay', onCanPlay);
+        el.removeEventListener('loadeddata', onReady);
+        el.removeEventListener('canplay', onReady);
         this.play().catch(() => {});
       };
-      el.addEventListener('canplay', onCanPlay);
+      // loadeddata fires as soon as the first media frame is decoded (< 200ms)
+      el.addEventListener('loadeddata', onReady, { once: true });
+      el.addEventListener('canplay', onReady, { once: true });
     }
   }
 
@@ -781,6 +807,8 @@ export class WebMediaEngine implements IPlayerEngine {
   async destroy(): Promise<void> {
     if (this.rafId) cancelAnimationFrame(this.rafId);
     this.hlsController?.destroy();
+    this.chunkedAudioController?.destroy();
+    this.chunkedAudioController = null;
     await this.audioCtx?.close().catch(() => {});
     this.telemetryListeners.clear();
     this.errorListeners.clear();

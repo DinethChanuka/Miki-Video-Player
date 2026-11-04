@@ -20,6 +20,7 @@ import {
   Activity,
   Sliders,
   Sun,
+  EyeOff,
 } from 'lucide-react';
 import { detectOperatingSystem, getOSPresetDirectories } from '../../utils/pathUtils';
 
@@ -469,7 +470,7 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {(Object.keys(PLAYER_THEMES) as PlayerThemeId[]).map((tId) => {
                   const t = PLAYER_THEMES[tId];
                   const isSelected = tId === themeId;
@@ -478,42 +479,52 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
                     <button
                       key={tId}
                       onClick={() => setTheme(tId)}
-                      className={`p-3 rounded-2xl text-left border flex items-center justify-between gap-3 transition-all ${
+                      className={`group relative p-3 rounded-2xl text-left border flex flex-col gap-2.5 transition-all shadow-md cursor-pointer ${
                         isSelected
-                          ? `bg-white/10 ${t.glassBorder} shadow-lg ring-1 ring-white/30 scale-[1.01]`
+                          ? `bg-white/10 ${t.glassBorder} ring-2 ring-white/40 scale-[1.02]`
                           : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
                       }`}
                       style={{
-                        boxShadow: isSelected ? `0 0 20px ${t.haloGlow}` : undefined,
+                        boxShadow: isSelected ? `0 8px 24px ${t.haloGlow}` : undefined,
                       }}
                     >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="relative w-8 h-8 rounded-full overflow-hidden shrink-0 border border-white/20 shadow-inner flex">
-                          <div
-                            className="w-1/2 h-full"
-                            style={{ backgroundColor: t.previewColors[0] }}
-                          />
-                          <div
-                            className="w-1/2 h-full"
-                            style={{ backgroundColor: t.previewColors[1] }}
-                          />
+                      {/* Live Visual Mockup Preview Card */}
+                      <div className={`w-full h-16 rounded-xl ${t.glassBg} border ${t.glassBorder} p-2 flex flex-col justify-between overflow-hidden relative shadow-inner`}>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-2.5 h-2.5 rounded-full shadow-sm" style={{ backgroundColor: t.previewColors[0] }} />
+                            <span className="w-2.5 h-2.5 rounded-full shadow-sm" style={{ backgroundColor: t.previewColors[1] }} />
+                            <span className="text-[10px] font-mono font-bold text-white/90">{t.name}</span>
+                          </div>
+                          <span className={`text-[8px] font-mono px-1.5 py-0.2 rounded-full border ${t.badgeClass}`}>
+                            {t.primaryHex}
+                          </span>
                         </div>
+                        {/* Mini timeline scrubber */}
+                        <div className="w-full flex items-center gap-1.5">
+                          <div className="flex-1 h-1 bg-white/10 rounded-full overflow-hidden">
+                            <div className={`h-full bg-gradient-to-r ${t.timelineTrack}`} style={{ width: '65%' }} />
+                          </div>
+                          <span className="text-[8px] font-mono text-white/50">2:45</span>
+                        </div>
+                      </div>
 
+                      {/* Theme Details Footer */}
+                      <div className="flex items-center justify-between gap-2">
                         <div className="flex flex-col min-w-0">
                           <span className="text-xs font-bold text-white truncate">{t.name}</span>
                           <span className="text-[10px] text-slate-300 truncate">{t.tagline}</span>
                         </div>
+                        {isSelected ? (
+                          <div className="p-1 rounded-full bg-white text-slate-950 font-bold shrink-0 shadow-sm">
+                            <Check className="w-3.5 h-3.5" />
+                          </div>
+                        ) : (
+                          <span className="text-[10px] font-semibold text-white/80 bg-white/10 group-hover:bg-white/20 px-2 py-0.5 rounded-lg shrink-0 transition-colors">
+                            Apply
+                          </span>
+                        )}
                       </div>
-
-                      {isSelected ? (
-                        <div className="p-1 rounded-full bg-white/20 text-white shrink-0">
-                          <Check className="w-3.5 h-3.5" />
-                        </div>
-                      ) : (
-                        <span className="text-[10px] font-semibold text-white/90 bg-white/10 hover:bg-white/20 px-2 py-0.5 rounded-lg shrink-0">
-                          Select
-                        </span>
-                      )}
                     </button>
                   );
                 })}
@@ -528,19 +539,57 @@ export const VideoSettingsModal: React.FC<VideoSettingsModalProps> = ({
                   </span>
                   {customBgImage && (
                     <button
-                      onClick={() => setCustomBgImage(null)}
-                      className="text-[11px] font-semibold text-rose-300 hover:text-rose-200 transition-colors"
+                      onClick={() => {
+                        setCustomBgImage(null);
+                        setCustomBgOpacity(1.0);
+                        setCustomBgBlur(0);
+                        setCustomBgBrightness(1.0);
+                        setCustomBgTint('clear');
+                      }}
+                      className="text-[11px] font-semibold text-rose-300 hover:text-rose-200 transition-colors cursor-pointer"
                     >
-                      Reset
+                      Remove Background
                     </button>
                   )}
                 </div>
                 <p className="text-[10px] text-slate-300">
-                  Custom panoramic wallpaper rendered below the player interface with dynamic blur, opacity, and tint.
+                  Custom panoramic wallpaper or solid dark backdrop rendered below the player interface.
                 </p>
 
-                {/* Curated Aesthetic Wallpaper Cards */}
+                {/* Curated Aesthetic Wallpaper Cards & Explicit Remove Background Option */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  {/* Option 1: Clean Solid Dark Mode / Remove Background */}
+                  <button
+                    onClick={() => {
+                      setCustomBgImage(null);
+                      setCustomBgOpacity(1.0);
+                      setCustomBgBlur(0);
+                      setCustomBgBrightness(1.0);
+                      setCustomBgTint('clear');
+                    }}
+                    className={`group relative h-20 rounded-2xl overflow-hidden border transition-all text-left flex flex-col justify-between p-2.5 shadow-md cursor-pointer ${
+                      customBgImage === null
+                        ? 'border-emerald-400 ring-2 ring-emerald-400/50 bg-black/90 scale-[1.02]'
+                        : 'border-white/15 bg-black/60 hover:border-white/40'
+                    }`}
+                  >
+                    <div className="relative z-10 flex justify-between items-center w-full">
+                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+                        None (Clean Dark)
+                      </span>
+                      {customBgImage === null && (
+                        <div className="p-0.5 rounded-full bg-emerald-500 text-white">
+                          <Check className="w-3 h-3" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="relative z-10 flex items-center gap-1.5">
+                      <EyeOff className="w-3.5 h-3.5 text-emerald-400" />
+                      <span className="text-[11px] font-bold text-white drop-shadow truncate">
+                        Remove Background
+                      </span>
+                    </div>
+                  </button>
                   {WALLPAPERS.map((bg) => {
                     const isSelected = customBgImage === bg.url;
                     return (
