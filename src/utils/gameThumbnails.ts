@@ -3,11 +3,18 @@
  * Provides authentic, crisp, zero-latency vector SVG previews for all 50+ games.
  */
 
+import { getExpandedGameArtSvg } from './expandedGameArt.ts';
+
 function encodeSvg(svg: string): string {
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg.trim())}`;
 }
 
 export function getGamePreviewSvg(gameId: string): string {
+  const expandedArt = getExpandedGameArtSvg(gameId);
+  if (expandedArt) {
+    return expandedArt;
+  }
+
   switch (gameId) {
     case '2048':
       return `
