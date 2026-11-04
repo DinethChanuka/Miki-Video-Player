@@ -5,6 +5,7 @@ import { GAMES_CATALOG, GameItem } from '../../utils/gamesCatalog';
 import { CINEMA_LINKS, CinemaSiteItem } from '../../utils/cinemaLinks';
 import { INTERNET_MUSIC_STREAMS, InternetMusicStation } from '../../utils/musicStreams';
 import { MOVIE_POSTERS, ALBUM_POSTERS } from '../../utils/mediaPosters';
+import { HERO_ARTWORKS, getHeroArtworkForSection } from '../../utils/heroArtworks';
 import {
   Film,
   Play,
@@ -983,6 +984,15 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
             <div className="flex flex-col gap-6">
               {/* Broadcast Hero Banner */}
               <div className="relative w-full rounded-3xl overflow-hidden border border-amber-500/20 bg-gradient-to-r from-amber-950/60 via-slate-900 to-black p-8 sm:p-10 flex flex-col justify-between min-h-[300px] shadow-2xl">
+                {/* Right Side Themed Visual Artwork */}
+                <div className="absolute right-0 top-0 bottom-0 w-1/2 lg:w-3/5 pointer-events-none z-0 overflow-hidden flex items-center justify-end">
+                  <img
+                    src={HERO_ARTWORKS.broadcastCenter}
+                    alt="Broadcast Center Artwork"
+                    className="h-full w-full object-cover object-right opacity-90"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-transparent to-transparent pointer-events-none" />
+                </div>
                 <div className="relative z-10 flex items-center gap-2.5">
                   <span className="flex items-center gap-1.5 text-[10px] font-bold px-3 py-1 rounded-full bg-red-600 text-white shadow-lg shadow-red-600/30">
                     <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
@@ -1080,6 +1090,15 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
             <div className="flex flex-col gap-6">
               {/* Arcade Hero Banner */}
               <div className="relative w-full rounded-3xl overflow-hidden border border-purple-500/20 bg-gradient-to-r from-purple-950/70 via-slate-900 to-black p-8 sm:p-10 flex flex-col justify-between min-h-[300px] shadow-2xl">
+                {/* Right Side Themed Visual Artwork */}
+                <div className="absolute right-0 top-0 bottom-0 w-1/2 lg:w-3/5 pointer-events-none z-0 overflow-hidden flex items-center justify-end">
+                  <img
+                    src={HERO_ARTWORKS.cyberArcade}
+                    alt="Cyber Arcade Artwork"
+                    className="h-full w-full object-cover object-right opacity-90"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-transparent to-transparent pointer-events-none" />
+                </div>
                 <div className="relative z-10 flex items-center gap-2.5">
                   <span className="flex items-center gap-1.5 text-[10px] font-bold px-3 py-1 rounded-full bg-purple-600 text-white shadow-lg shadow-purple-600/30">
                     <Gamepad2 className="w-3.5 h-3.5" />
@@ -1189,6 +1208,15 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
             <div className="flex flex-col gap-8">
               {/* Themed Movie Hero Banner (The SOUL CONDUCTOR - Image 2) */}
               <div className="relative w-full rounded-3xl overflow-hidden border border-rose-500/20 bg-gradient-to-r from-red-950/70 via-slate-900 to-black p-8 sm:p-10 flex flex-col justify-between min-h-[360px] shadow-2xl">
+                {/* Right Side Themed Visual Artwork */}
+                <div className="absolute right-0 top-0 bottom-0 w-1/2 lg:w-3/5 pointer-events-none z-0 overflow-hidden flex items-center justify-end">
+                  <img
+                    src={HERO_ARTWORKS.soulConductor}
+                    alt="The SOUL CONDUCTOR Artwork"
+                    className="h-full w-full object-cover object-right opacity-95"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-transparent to-transparent pointer-events-none" />
+                </div>
                 <div className="relative z-10 flex items-center gap-2.5">
                   <span className="flex items-center gap-1.5 text-[10px] font-bold px-3 py-1 rounded-full bg-rose-600 text-white shadow-lg shadow-rose-600/30">
                     <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
@@ -1396,6 +1424,15 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
             /* ============================================================ */
             <div className="flex flex-col gap-8">
               <div className="relative w-full rounded-3xl overflow-hidden border border-fuchsia-500/20 bg-gradient-to-r from-purple-950/70 via-slate-900 to-black p-8 sm:p-10 flex flex-col justify-between min-h-[300px] shadow-2xl">
+                {/* Right Side Themed Visual Artwork */}
+                <div className="absolute right-0 top-0 bottom-0 w-1/2 lg:w-3/5 pointer-events-none z-0 overflow-hidden flex items-center justify-end">
+                  <img
+                    src={HERO_ARTWORKS.animeCyberpunk}
+                    alt="Anime Cyberpunk Artwork"
+                    className="h-full w-full object-cover object-right opacity-90"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-transparent to-transparent pointer-events-none" />
+                </div>
                 <div className="relative z-10 flex items-center gap-2.5">
                   <span className="text-[10px] font-bold px-3 py-1 rounded-full bg-fuchsia-600 text-white shadow-lg">
                     TV SERIES & ANIME
@@ -1451,6 +1488,15 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
             <>
               {/* 1. HERO SHOWCASE FEATURE BANNER */}
               <div className="relative w-full rounded-3xl overflow-hidden border border-white/10 shadow-2xl bg-[#090d16] p-8 sm:p-10 flex flex-col justify-between min-h-[380px] group">
+                {/* Right Side Themed Visual Artwork */}
+                <div className="absolute right-0 top-0 bottom-0 w-1/2 lg:w-3/5 pointer-events-none z-0 overflow-hidden flex items-center justify-end">
+                  <img
+                    src={HERO_ARTWORKS.spiderMan}
+                    alt="Spider-Man Across the Spider-Verse Artwork"
+                    className="h-full w-full object-cover object-right opacity-95"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-r from-[#090d16] via-transparent to-transparent pointer-events-none" />
+                </div>
                 <div className="relative z-10 flex items-center gap-2.5">
                   <span className="flex items-center gap-1.5 text-[10px] font-bold px-3 py-1 rounded-full bg-rose-600 text-white shadow-lg shadow-rose-600/30">
                     <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
