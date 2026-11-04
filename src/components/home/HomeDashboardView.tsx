@@ -12,6 +12,7 @@ import {
   Tv,
   Gamepad2,
   Music,
+  Clock,
   Search,
   Settings,
   Sliders,
@@ -584,12 +585,27 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
               <Heart className="w-4 h-4 text-rose-400" />
               <span>Watchlist</span>
             </button>
+
+            <button
+              onClick={() => setActiveNav('coming_soon')}
+              className={`relative flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all text-left cursor-pointer ${
+                activeNav === 'coming_soon'
+                  ? 'text-white bg-white/5 font-bold'
+                  : 'text-white/60 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              {activeNav === 'coming_soon' && (
+                <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-full bg-rose-500 shadow-sm shadow-rose-500" />
+              )}
+              <Clock className="w-4 h-4 text-white/50" />
+              <span>Coming Soon</span>
+            </button>
           </div>
 
           {/* Section: Following Users (From Adze Image 2) */}
           <div className="flex flex-col gap-1">
             <span className="px-3 text-[10px] font-bold text-white/40 uppercase tracking-wider mb-1">
-              Active Friends
+              Following &amp; Who's Watching
             </span>
 
             {[
@@ -683,7 +699,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search movies, channels, games, music..."
+                placeholder="Search everything across movies, channels, games, music..."
                 className="w-full pl-9 pr-8 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder-white/40 focus:outline-none focus:border-rose-500/50 transition-all font-medium"
               />
               <button
