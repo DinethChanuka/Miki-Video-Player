@@ -239,7 +239,7 @@ export interface PlayerStoreState {
   // Actions
   bootEngine: (preferred?: EngineType, videoEl?: HTMLVideoElement) => Promise<void>;
   handleStreamError: (error: PlayerErrorEnvelope) => Promise<void>;
-  openMedia: (uri: string, title?: string, autoResume?: boolean, startPositionMs?: number, artworkUrl?: string) => Promise<void>;
+  openMedia: (uri: string, title?: string, autoResume?: boolean, startPositionMs?: number, artworkUrl?: string, mediaType?: 'video' | 'music' | 'radio') => Promise<void>;
   closeMedia: () => Promise<void>;
   togglePlay: () => Promise<void>;
   seek: (timestampMs: number, exact?: boolean) => Promise<void>;
@@ -1132,7 +1132,7 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     }
   },
 
-  openMedia: async (uri, title, autoResume = true, startPositionMs?: number, artworkUrl?: string) => {
+  openMedia: async (uri, title, autoResume = true, startPositionMs?: number, artworkUrl?: string, mediaType?: 'video' | 'music' | 'radio') => {
     // Invalidate prior sessions and cancel any pending retry timeouts
     if (activeRetryTimer) {
       clearTimeout(activeRetryTimer);
@@ -1144,30 +1144,53 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     const resolvedTitle = title ?? extractCleanFileName(uri);
     let startPos = startPositionMs ?? 0;
     const resolvedArtwork = lookupArtwork(uri, resolvedTitle, artworkUrl);
+
+    // Explicit video detection: video files and video web streams MUST NEVER be misclassified as audio
+    const isExplicitVideo =
+      mediaType === 'video' ||
+      /\.(?:mp4|mkv|webm|avi|mov|m4v|flv|ts|wmv|3gp|m3u8)(?:\?|$)/i.test(uri) ||
+      Boolean(parseWebStream(uri));
+
+    // Explicit radio stream detection
+    const isRadio =
+      mediaType === 'radio' ||
+      (!isExplicitVideo && (
+        uri.includes('somafm.com') ||
+        uri.includes('radio.garden') ||
+        uri.includes('/listen/') ||
+        uri.includes('plaza.one') ||
+        uri.includes('streamguys') ||
+        uri.includes('synthwaveradio') ||
+        (get().lastActiveCategory === 'Radio' && !isExplicitVideo) ||
+        (get().lastActiveNav === 'radio' && !isExplicitVideo)
+      ));
+
+    // Audio stream detection
     const isAudio =
-      /\.(?:mp3|ogg|flac|wav|aac|m4a|weba|opus)(?:\?|$)/i.test(uri) ||
-      uri.includes('/mp3') ||
-      uri.includes('-mp3') ||
-      uri.includes('format=mp3') ||
-      uri.includes('soundhelix') ||
-      uri.includes('soundcloud') ||
-      uri.includes('jamendo') ||
-      uri.includes('audiomack') ||
-      uri.includes('bandcamp') ||
-      uri.includes('mythium') ||
-      uri.includes('somafm.com') ||
-      uri.includes('icecast') ||
-      uri.includes('shoutcast') ||
-      get().activePlaybackMode === 'music' ||
-      get().activePlaybackMode === 'radio' ||
-      get().lastActiveCategory === 'Music' ||
-      get().lastActiveCategory === 'Radio' ||
-      get().lastActiveNav === 'music' ||
-      get().lastActiveNav === 'radio' ||
-      Boolean(artworkUrl);
-    const playbackMode = (get().activePlaybackMode === 'radio' || get().lastActiveCategory === 'Radio' || get().lastActiveNav === 'radio' || uri.includes('somafm'))
-      ? 'radio'
-      : (isAudio ? 'music' : 'video');
+      mediaType === 'music' ||
+      isRadio ||
+      (!isExplicitVideo && (
+        /\.(?:mp3|ogg|flac|wav|aac|m4a|weba|opus)(?:\?|$)/i.test(uri) ||
+        uri.includes('/mp3') ||
+        uri.includes('-mp3') ||
+        uri.includes('format=mp3') ||
+        uri.includes('soundcloud') ||
+        uri.includes('jamendo') ||
+        uri.includes('audiomack') ||
+        uri.includes('bandcamp') ||
+        uri.includes('mythium') ||
+        uri.includes('icecast') ||
+        uri.includes('shoutcast') ||
+        Boolean(artworkUrl) ||
+        get().lastActiveCategory === 'Music' ||
+        get().lastActiveNav === 'music'
+      ));
+
+    // Resolved authoritative playback mode: explicit videos are always 'video'
+    const playbackMode: 'video' | 'music' | 'radio' =
+      isExplicitVideo ? 'video' :
+      isRadio ? 'radio' :
+      isAudio ? 'music' : 'video';
 
     // Check if it's an external web stream (YouTube, TikTok, Instagram, Vimeo, Twitch, Dailymotion, Cinema portals or Web stream)
     const webStream = parseWebStream(uri);

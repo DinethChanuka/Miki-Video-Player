@@ -75,6 +75,7 @@ export class ChunkedAudioStreamController {
       clean.endsWith('.weba') ||
       clean.endsWith('.opus') ||
       full.includes('.mp3') ||
+      full.includes('-mp3') ||
       full.includes('.m4a') ||
       full.includes('.aac') ||
       full.includes('jamendo') ||
@@ -84,7 +85,10 @@ export class ChunkedAudioStreamController {
       full.includes('apple') ||
       full.includes('/mp3/') ||
       full.includes('mythium') ||
-      full.includes('somafm.com')
+      full.includes('somafm.com') ||
+      full.includes('radio.garden') ||
+      full.includes('icecast') ||
+      full.includes('shoutcast')
     );
   }
 

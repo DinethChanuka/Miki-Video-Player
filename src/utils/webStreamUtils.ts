@@ -260,7 +260,7 @@ export function isDirectMediaUrl(uri: string): boolean {
     clean.includes('storage.jamendo.com') ||
     clean.includes('freesound.org') ||
     clean.includes('raw.githubusercontent.com') ||
-    clean.includes('soundhelix.com') ||
+    clean.includes('radio.garden') ||
     uri.includes('format=mp3')
   );
 }

@@ -867,14 +867,14 @@ export const App: React.FC = () => {
               id="aether-video-viewport"
               ref={videoRef}
               className={`w-full h-full object-contain z-10 cursor-pointer ${
-                !currentUri ? 'hidden' : activePlaybackMode === 'music' ? 'opacity-0 pointer-events-none absolute w-1 h-1' : ''
+                !currentUri ? 'hidden' : (activePlaybackMode === 'music' || activePlaybackMode === 'radio') ? 'opacity-0 pointer-events-none absolute w-1 h-1' : ''
               }`}
               playsInline
               preload="auto"
               onWaiting={() => usePlayerStore.setState({ isBuffering: true })}
-              onPlaying={() => usePlayerStore.setState({ isBuffering: false })}
+              onPlaying={() => usePlayerStore.setState({ isBuffering: false, lastError: null })}
               onCanPlay={() => usePlayerStore.setState({ isBuffering: false })}
-              onLoadedData={() => usePlayerStore.setState({ isBuffering: false })}
+              onLoadedData={() => usePlayerStore.setState({ isBuffering: false, lastError: null })}
               onLoadStart={() => usePlayerStore.setState({ isBuffering: true })}
               onError={(e) => {
                 // Auto-fallback to resilient WebEmbedPlayer only for web sites, never for direct media/HLS streams
@@ -1066,7 +1066,7 @@ export const App: React.FC = () => {
         )}
 
         {/* Complete Home Streaming Dashboard (Netflix + Adze.DESIGN + Apple Cover Flow 3D) */}
-        {(!currentUri && (activePlaybackMode !== 'video' || !currentUri) || (activePlaybackMode === 'music' && !isMusicPlayerOpen)) && (
+        {(!currentUri && (activePlaybackMode !== 'video' || !currentUri) || ((activePlaybackMode === 'music' || activePlaybackMode === 'radio') && !isMusicPlayerOpen)) && (
           <div className="absolute inset-0 z-30 pointer-events-auto animate-in fade-in duration-300 overflow-hidden">
             <HomeDashboardView
               onOpenGames={(gameId) => {
