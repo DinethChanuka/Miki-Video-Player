@@ -70,7 +70,7 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const mouseTimeoutRef = useRef<any>(null);
 
-  // Monitor loading timeout for external non-srcDoc games
+  // Monitor loading timeout for external non-srcDoc games (Generous 15s timeout for heavy WebGL assets)
   useEffect(() => {
     setIframeError(false);
     if (isPlayingGame && !selectedGame.srcDoc) {
@@ -78,7 +78,7 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
       const timer = setTimeout(() => {
         setIsLoadingIframe(false);
         setIframeError(true);
-      }, 5000);
+      }, 15000);
       return () => clearTimeout(timer);
     } else {
       setIsLoadingIframe(false);
@@ -149,16 +149,23 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
 
       if (trackedKeys.includes(key)) {
         setActiveKeys((prev) => ({ ...prev, [key]: true }));
-        // Forward key event to game iframe
+        // Forward key event to game iframe with safe origin resolution
+        const targetOrigin = selectedGame.srcDoc ? '*' : (() => {
+          try {
+            return new URL(selectedGame.url).origin;
+          } catch {
+            return '*';
+          }
+        })();
         iframeRef.current?.contentWindow?.postMessage(
           { type: 'miki:game-input', action: 'down', key: e.key, code: e.code },
-          '*'
+          targetOrigin
         );
         // Stop propagation so media player doesn't seek or pause
         e.stopPropagation();
       }
     },
-    [isOpen, isPlayingGame, isFullscreen]
+    [isOpen, isPlayingGame, isFullscreen, selectedGame.srcDoc, selectedGame.url]
   );
 
   const handleKeyUp = useCallback(
@@ -166,13 +173,20 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
       if (!isOpen || !isPlayingGame) return;
       const key = e.code;
       setActiveKeys((prev) => ({ ...prev, [key]: false }));
+      const targetOrigin = selectedGame.srcDoc ? '*' : (() => {
+        try {
+          return new URL(selectedGame.url).origin;
+        } catch {
+          return '*';
+        }
+      })();
       iframeRef.current?.contentWindow?.postMessage(
         { type: 'miki:game-input', action: 'up', key: e.key, code: e.code },
-        '*'
+        targetOrigin
       );
       e.stopPropagation();
     },
-    [isOpen, isPlayingGame]
+    [isOpen, isPlayingGame, selectedGame.srcDoc, selectedGame.url]
   );
 
   // Auto-focus game iframe on mount and game switch
@@ -182,11 +196,14 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
     }
   }, [isOpen, isPlayingGame, selectedGame.id, gameKey]);
 
-  // Synchronize bi-directional key activity reported from inside game iframe
+  // Synchronize bi-directional key activity reported from inside game iframe (Origin & sender verified)
   useEffect(() => {
     const handleMessage = (e: MessageEvent) => {
-      if (e.data?.type === 'miki:key-activity') {
-        setActiveKeys((prev) => ({ ...prev, [e.data.code]: Boolean(e.data.isDown) }));
+      if (iframeRef.current && e.source !== iframeRef.current.contentWindow) return;
+      if (e.data && typeof e.data === 'object' && e.data.type === 'miki:key-activity') {
+        if (typeof e.data.code === 'string') {
+          setActiveKeys((prev) => ({ ...prev, [e.data.code]: Boolean(e.data.isDown) }));
+        }
       }
     };
     window.addEventListener('message', handleMessage);
@@ -196,13 +213,20 @@ export const FullWindowGamesModal: React.FC<FullWindowGamesModalProps> = ({
   const syncGameMode = useCallback((mode: 'level' | 'infinity', level: number) => {
     if (iframeRef.current && iframeRef.current.contentWindow) {
       try {
+        const targetOrigin = selectedGame.srcDoc ? '*' : (() => {
+          try {
+            return new URL(selectedGame.url).origin;
+          } catch {
+            return '*';
+          }
+        })();
         iframeRef.current.contentWindow.postMessage(
           { type: 'miki:set-game-mode', mode, level },
-          '*'
+          targetOrigin
         );
       } catch (err) {}
     }
-  }, []);
+  }, [selectedGame.srcDoc, selectedGame.url]);
 
   const handleToggleInfinity = () => {
     const nextMode = gameMode === 'infinity' ? 'level' : 'infinity';

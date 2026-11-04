@@ -18,7 +18,17 @@ interface GamesSectionProps {
   searchTerm?: string;
 }
 
-const CATEGORIES = ['All', 'Arcade', 'Retro', 'Classic', 'Puzzle', 'Action', 'Sports'];
+const CATEGORIES = [
+  'All',
+  'Arcade',
+  'Retro',
+  'Classic',
+  'Puzzle',
+  'Action',
+  'Sports',
+  'Strategy',
+  'Cards',
+];
 
 export const GamesSection: React.FC<GamesSectionProps> = ({ onClose: _onClose, onOpenGames, searchTerm = '' }) => {
   const [selectedGame, setSelectedGame] = useState<GameItem>(GAMES_CATALOG[0]);

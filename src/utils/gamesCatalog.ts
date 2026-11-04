@@ -20,6 +20,18 @@ export type GameCategory =
   | 'Strategy'
   | 'Cards';
 
+export const GAME_CATEGORIES: string[] = [
+  'All',
+  'Arcade',
+  'Retro',
+  'Classic',
+  'Puzzle',
+  'Action',
+  'Sports',
+  'Strategy',
+  'Cards',
+];
+
 export interface GameItem {
   id: string;
   title: string;
