@@ -35,3 +35,4 @@ describe('Remove Adze Design Branding Audit', () => {
     );
   });
 });
+
