@@ -1,11 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { usePlayerStore } from '../../store/playerStore';
 import { CURATED_CHANNELS, LiveChannel } from '../../utils/channelCatalog';
 import { GAMES_CATALOG, GameItem } from '../../utils/gamesCatalog';
 import { CINEMA_LINKS, CinemaSiteItem } from '../../utils/cinemaLinks';
 import { INTERNET_MUSIC_STREAMS, InternetMusicStation } from '../../utils/musicStreams';
 import { MOVIE_POSTERS, ALBUM_POSTERS } from '../../utils/mediaPosters';
-import { HERO_ARTWORKS, getHeroArtworkForSection } from '../../utils/heroArtworks';
+import { HERO_ARTWORKS } from '../../utils/heroArtworks';
 import { CINESUBZ_MOVIES, fetchLatestCineSubzMovies, CineSubzMovie } from '../../utils/cinesubzService';
 import {
   Film,
@@ -281,7 +281,18 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
   const [isCoverFlowPlaying, setIsCoverFlowPlaying] = useState<boolean>(false);
   const [partiesToggle, setPartiesToggle] = useState<boolean>(true);
   const [continueToggle, setContinueToggle] = useState<boolean>(true);
-  const [cinesubzList] = useState<CineSubzMovie[]>(CINESUBZ_MOVIES);
+  const [cinesubzList, setCinesubzList] = useState<CineSubzMovie[]>(CINESUBZ_MOVIES);
+
+  // Background auto-refresh for latest CineSubz releases
+  useEffect(() => {
+    fetchLatestCineSubzMovies()
+      .then((movies) => {
+        if (movies && movies.length > 0) {
+          setCinesubzList(movies);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const recentMedia = usePlayerStore((s) => s.recentMedia);
   const openMedia = usePlayerStore((s) => s.openMedia);
