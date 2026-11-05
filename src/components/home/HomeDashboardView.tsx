@@ -111,8 +111,8 @@ const COVER_FLOW_ALBUMS: CoverFlowTrack[] = [
     artist: 'Vishal-Shekhar, Shafqat Amanat Ali',
     album: 'I Hate Luv Storys',
     albumArt: ALBUM_POSTERS.binTere,
-    url: 'https://raw.githubusercontent.com/rafaelreis-hotmart/Audio-Sample-files/master/sample2.mp3',
-    durationSec: 330,
+    url: 'https://www.youtube.com/watch?v=3bZ41p70uNk',
+    durationSec: 331,
   },
   {
     id: 'track-soniyo',
@@ -120,8 +120,8 @@ const COVER_FLOW_ALBUMS: CoverFlowTrack[] = [
     artist: 'Raju Singh, Sonu Nigam, Shreya Ghoshal',
     album: 'Raaz: The Mystery Continues',
     albumArt: ALBUM_POSTERS.soniyo,
-    url: 'https://ice1.somafm.com/groovesalad-128-mp3',
-    durationSec: 312,
+    url: 'https://www.youtube.com/watch?v=K5N0yW0J_q0',
+    durationSec: 309,
   },
   {
     id: 'track-hindisongs3-soundcloud',
@@ -129,8 +129,8 @@ const COVER_FLOW_ALBUMS: CoverFlowTrack[] = [
     artist: 'Pritam, Mohit Chauhan & Arijit Singh',
     album: 'SoundCloud Discover Hits',
     albumArt: ALBUM_POSTERS.dooriyan,
-    url: 'https://raw.githubusercontent.com/rafaelreis-hotmart/Audio-Sample-files/master/sample.mp3',
-    durationSec: 338,
+    url: 'https://www.youtube.com/watch?v=7z3YeFqd7xQ',
+    durationSec: 334,
     platform: 'soundcloud',
   },
   {
@@ -139,7 +139,7 @@ const COVER_FLOW_ALBUMS: CoverFlowTrack[] = [
     artist: 'Mithoon, Arijit Singh, Sunidhi Chauhan',
     album: 'Shivaay',
     albumArt: ALBUM_POSTERS.darkhaast,
-    url: 'https://ice1.somafm.com/suburbsofgoa-128-mp3',
+    url: 'https://www.youtube.com/watch?v=6p0zY0v4u78',
     durationSec: 374,
   },
   {
@@ -148,8 +148,8 @@ const COVER_FLOW_ALBUMS: CoverFlowTrack[] = [
     artist: 'Pritam, Mohit Chauhan',
     album: 'Crook',
     albumArt: ALBUM_POSTERS.tujhkoJoPaaya,
-    url: 'https://ice1.somafm.com/secretagent-128-mp3',
-    durationSec: 290,
+    url: 'https://www.youtube.com/watch?v=z34x6629k9I',
+    durationSec: 253,
   },
 ];
 
@@ -571,6 +571,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
   const setLastActiveNav = usePlayerStore((s) => s.setLastActiveNav);
   const lastActiveCategory = usePlayerStore((s) => s.lastActiveCategory);
   const setLastActiveCategory = usePlayerStore((s) => s.setLastActiveCategory);
+  const setMusicPlayerOpen = usePlayerStore((s) => s.setMusicPlayerOpen);
 
   const [activeNav, setActiveNavState] = useState<HomeNavTab>(
     ((lastActiveNav as HomeNavTab) || 'browse')
@@ -754,8 +755,9 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
     };
   }, [localMediaList]);
 
-  // Live dynamic online search across iTunes & streaming APIs when user searches
+  // Live dynamic online search across iTunes & streaming APIs when user searches (Race condition resilient)
   useEffect(() => {
+    let isCancelled = false;
     const q = searchQuery.trim();
     if (!q) {
       setLiveSearchedTracks([]);
@@ -764,17 +766,21 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
     const timer = setTimeout(() => {
       fetchOnlineMusicSearch(q, selectedMusicPlatform)
         .then((tracks) => {
-          if (tracks && tracks.length > 0) {
+          if (!isCancelled && tracks && tracks.length > 0) {
             setLiveSearchedTracks(tracks);
           }
         })
         .catch(() => {});
     }, 200);
-    return () => clearTimeout(timer);
+    return () => {
+      isCancelled = true;
+      clearTimeout(timer);
+    };
   }, [searchQuery, selectedMusicPlatform]);
 
-  // Live dynamic online search across CineSubz real movie database
+  // Live dynamic online search across CineSubz real movie database (Race condition resilient)
   useEffect(() => {
+    let isCancelled = false;
     const q = searchQuery.trim();
     if (!q || q.length < 2) {
       setLiveCinesubzMovies([]);
@@ -785,16 +791,21 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
     const timer = setTimeout(() => {
       searchCineSubzLive(q)
         .then((movies) => {
-          if (movies && movies.length > 0) {
+          if (!isCancelled && movies && movies.length > 0) {
             setLiveCinesubzMovies(movies);
           }
         })
         .catch(() => {})
         .finally(() => {
-          setIsSearchingCinesubz(false);
+          if (!isCancelled) {
+            setIsSearchingCinesubz(false);
+          }
         });
     }, 250);
-    return () => clearTimeout(timer);
+    return () => {
+      isCancelled = true;
+      clearTimeout(timer);
+    };
   }, [searchQuery]);
 
   // Determine effective section mode
@@ -1615,7 +1626,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                   {liveSearchTracks.length > 0 && (
                     <div className="flex flex-col gap-2 pt-1">
                       <div className="flex items-center justify-between px-1 pb-1 border-b border-white/10 text-[10px] font-bold text-emerald-400 tracking-wider">
-                        <span>ONLINE MUSIC DISCOVERY ({liveSearchTracks.length})</span>
+                        <span>ONLINE & YOUTUBE MUSIC DISCOVERY ({liveSearchTracks.length})</span>
                         <button
                           onClick={() => {
                             setActiveNav('music');
@@ -1634,7 +1645,8 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                             onClick={() => {
                               if (track.streamUrl) {
                                 openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl, 'music');
-                                usePlayerStore.setState({ isMusicPlayerOpen: true });
+                                setMusicPlayerOpen(true);
+                                if (onOpenMusic) onOpenMusic();
                                 setIsSearchFocused(false);
                               }
                             }}
@@ -1653,9 +1665,16 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                                 />
                               </div>
                               <div className="min-w-0 flex flex-col">
-                                <span className="text-xs font-bold text-white truncate group-hover:text-emerald-300 transition-colors">
-                                  {track.title}
-                                </span>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-xs font-bold text-white truncate group-hover:text-emerald-300 transition-colors">
+                                    {track.title}
+                                  </span>
+                                  {track.platform === 'youtube' && (
+                                    <span className="text-[8px] font-bold px-1.5 py-0.2 rounded bg-red-600/30 text-rose-300 border border-red-500/30 shrink-0">
+                                      YouTube Music
+                                    </span>
+                                  )}
+                                </div>
                                 <span className="text-[10px] text-white/60 truncate">
                                   {track.artist}
                                 </span>
@@ -1664,19 +1683,20 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
 
                             <div className="flex items-center gap-2 shrink-0">
                               <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/10 text-white/70">
-                                {track.genre.split('/')[0].trim()}
+                                {track.duration || track.genre.split('/')[0].trim()}
                               </span>
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   if (track.streamUrl) {
                                     openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl, 'music');
-                                    usePlayerStore.setState({ isMusicPlayerOpen: true });
+                                    setMusicPlayerOpen(true);
+                                    if (onOpenMusic) onOpenMusic();
                                     setIsSearchFocused(false);
                                   }
                                 }}
                                 className="w-7 h-7 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 flex items-center justify-center font-bold shadow-md transition-transform hover:scale-110 active:scale-95 cursor-pointer"
-                                title="Play Track"
+                                title="Play Track in Hi-Fi Music Studio"
                               >
                                 <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
                               </button>
@@ -2082,7 +2102,21 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                   return (
                     <div
                       key={album.id}
-                      onClick={() => handlePlayAlbum(idx)}
+                      onClick={() => {
+                        if (isCenter && previouslyPlayed) {
+                          openMedia(
+                            previouslyPlayed.uri,
+                            previouslyPlayed.title,
+                            true,
+                            previouslyPlayed.lastPositionMs,
+                            previouslyPlayed.thumbnailUri,
+                            'music'
+                          );
+                          setIsCoverFlowPlaying(true);
+                        } else {
+                          handlePlayAlbum(idx);
+                        }
+                      }}
                       className="absolute w-52 h-52 rounded-2xl overflow-hidden cursor-pointer transition-all duration-500 ease-out shadow-2xl border border-white/20 select-none group"
                       style={{
                         transform,
@@ -2275,6 +2309,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                   <div className="flex items-center gap-1.5 flex-wrap">
                     {[
                       { id: 'all', label: 'All Platforms', color: 'bg-white/40' },
+                      { id: 'youtube', label: 'YouTube Music', color: 'bg-[#FF0000]' },
                       { id: 'jamendo', label: 'Jamendo', color: 'bg-[#E11456]' },
                       { id: 'soundcloud', label: 'SoundCloud', color: 'bg-[#FF5500]' },
                       { id: 'bandcamp', label: 'Bandcamp', color: 'bg-[#1DA0C3]' },
@@ -2342,7 +2377,8 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                             onClick={() => {
                               if (track.streamUrl) {
                                 openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl, 'music');
-                                usePlayerStore.setState({ isMusicPlayerOpen: true });
+                                setMusicPlayerOpen(true);
+                                if (onOpenMusic) onOpenMusic();
                               }
                             }}
                             className="group relative flex flex-col rounded-2xl bg-white/5 border border-white/10 overflow-hidden hover:border-emerald-500/50 hover:bg-white/10 transition-all shadow-xl hover:shadow-2xl cursor-pointer"
@@ -2383,7 +2419,8 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                                     e.stopPropagation();
                                     if (track.streamUrl) {
                                       openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl, 'music');
-                                      usePlayerStore.setState({ isMusicPlayerOpen: true });
+                                      setMusicPlayerOpen(true);
+                                      if (onOpenMusic) onOpenMusic();
                                     }
                                   }}
                                   className="w-11 h-11 rounded-full bg-white text-black hover:scale-110 flex items-center justify-center shadow-xl transition-all cursor-pointer"
@@ -2420,7 +2457,8 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                                     e.stopPropagation();
                                     if (track.streamUrl) {
                                       openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl, 'music');
-                                      usePlayerStore.setState({ isMusicPlayerOpen: true });
+                                      setMusicPlayerOpen(true);
+                                      if (onOpenMusic) onOpenMusic();
                                     }
                                   }}
                                   className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-emerald-600/80 hover:bg-emerald-500 hover:scale-[1.02] text-white text-[10px] font-bold shadow-md transition-all cursor-pointer"
@@ -3622,7 +3660,25 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                     recentMedia.slice(0, 6).map((item) => (
                       <div
                         key={item.uri}
-                        onClick={() => openMedia(item.uri, item.title, true, item.lastPositionMs)}
+                        onClick={() => {
+                          const isItemAudio =
+                            (item.uri && /\.(mp3|wav|flac|aac|m4a|ogg|opus)/i.test(item.uri)) ||
+                            item.uri.includes('/mp3') ||
+                            item.uri.includes('somafm') ||
+                            item.uri.includes('soundcloud') ||
+                            item.uri.includes('jamendo') ||
+                            item.uri.includes('audiomack') ||
+                            item.uri.includes('bandcamp') ||
+                            item.uri.includes('apple.com') ||
+                            item.uri.includes('itunes') ||
+                            item.title.toLowerCase().includes('song') ||
+                            item.title.toLowerCase().includes('track') ||
+                            item.title.toLowerCase().includes('hindi') ||
+                            item.title.toLowerCase().includes('dooriyan') ||
+                            item.title.toLowerCase().includes('saiyaara');
+                          openMedia(item.uri, item.title, true, item.lastPositionMs, item.thumbnailUri, isItemAudio ? 'music' : 'video');
+                          if (isItemAudio) setMusicPlayerOpen(true);
+                        }}
                         className="group relative flex flex-col rounded-2xl overflow-hidden bg-white/5 border border-white/10 hover:border-rose-400/50 hover:bg-white/10 transition-all cursor-pointer shadow-lg"
                       >
                         <div className="relative aspect-video w-full overflow-hidden bg-black/60">

@@ -1104,7 +1104,7 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     if (error.recovery === 'fallback_to_web_engine' && get().activeEngineType !== 'web-media') {
       await get().bootEngine('web-media');
       const uri = get().currentUri;
-      if (uri) await get().openMedia(uri, get().currentTitle);
+      if (uri) await get().openMedia(uri, get().currentTitle, true, get().positionMs, get().currentArtwork || undefined, get().activePlaybackMode);
     } else if (error.recovery === 'retry_with_backoff' && get().retryCount < 3) {
       const nextRetry = get().retryCount + 1;
       set({ retryCount: nextRetry });
@@ -1146,9 +1146,12 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     const resolvedArtwork = lookupArtwork(uri, resolvedTitle, artworkUrl);
 
     // Explicit video detection: video files and video web streams MUST NEVER be misclassified as audio
+    // Piped/googlevideo audio streams have mime=audio in URL — never classify those as video
+    const isPipedAudioStream = uri.includes('googlevideo.com') && (uri.includes('mime=audio') || uri.includes('itag='));
     const isExplicitVideo =
       mediaType === 'video' ||
-      (mediaType !== 'music' &&
+      (!isPipedAudioStream &&
+        mediaType !== 'music' &&
         mediaType !== 'radio' &&
         (/\.(?:mp4|mkv|webm|avi|mov|m4v|flv|ts|wmv|3gp|m3u8)(?:\?|$)/i.test(uri) ||
           Boolean(parseWebStream(uri))));
@@ -1172,7 +1175,7 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
       mediaType === 'music' ||
       isRadio ||
       (!isExplicitVideo && (
-        /\.(?:mp3|ogg|flac|wav|aac|m4a|weba|opus)(?:\?|$)/i.test(uri) ||
+        /\.(?:mp3|ogg|flac|wav|aac|m4a|weba|opus|webm)(?:\?|$)/i.test(uri) ||
         uri.includes('/mp3') ||
         uri.includes('-mp3') ||
         uri.includes('format=mp3') ||
@@ -1183,6 +1186,14 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
         uri.includes('mythium') ||
         uri.includes('icecast') ||
         uri.includes('shoutcast') ||
+        uri.includes('apple.com') ||
+        uri.includes('itunes') ||
+        uri.includes('audio-ssl') ||
+        // Piped API direct audio stream URLs (googlevideo CDN)
+        uri.includes('googlevideo.com') ||
+        uri.includes('mime=audio') ||
+        uri.includes('itag=') ||
+        (resolvedTitle && /(?:song|track|feat\.|audio|remix|acoustic|original mix|lo-fi|session|saiyaara|dooriyan|hindi)/i.test(resolvedTitle)) ||
         Boolean(artworkUrl) ||
         get().lastActiveCategory === 'Music' ||
         get().lastActiveNav === 'music'
@@ -1356,7 +1367,7 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
         const savedPos = session.history?.lastPositionMs ?? 0;
         startPos = autoResume ? savedPos : 0;
 
-        const autoOpenStudio = playbackMode === 'music';
+        const autoOpenStudio = playbackMode === 'music' || (get().isMusicPlayerOpen && playbackMode !== 'video');
         set({
           currentMediaId: session.mediaId,
           currentUri: uri,
@@ -1370,6 +1381,7 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
           playbackRate: session.preferences.playbackRate,
           resumeBannerPositionMs: !autoResume && savedPos > 0 ? savedPos : null,
           retryCount: 0,
+          isPaused: false,
         });
 
         await get().engine?.load(uri, startPos);
@@ -1391,7 +1403,7 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     }
 
     // Web / Standalone mode
-    const autoOpenStudio = playbackMode === 'music';
+    const autoOpenStudio = playbackMode === 'music' || (get().isMusicPlayerOpen && playbackMode !== 'video');
     set({
       currentUri: uri,
       currentTitle: resolvedTitle,
@@ -1400,6 +1412,7 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
       isMusicPlayerOpen: autoOpenStudio ? true : false,
       retryCount: 0,
       lastError: null,
+      isPaused: false,
       resumeBannerPositionMs: null,
       isBuffering: true,
     });

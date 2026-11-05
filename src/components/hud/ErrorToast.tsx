@@ -6,6 +6,7 @@ export const ErrorToast: React.FC = () => {
   const lastError = usePlayerStore((s) => s.lastError);
   const dismissError = usePlayerStore((s) => s.dismissError);
   const currentUri = usePlayerStore((s) => s.currentUri);
+  const activePlaybackMode = usePlayerStore((s) => s.activePlaybackMode);
   const removeRecentMedia = usePlayerStore((s) => s.removeRecentMedia);
 
   if (!lastError) return null;
@@ -18,6 +19,8 @@ export const ErrorToast: React.FC = () => {
   );
   const isMissingOrMoved =
     isLocalFile &&
+    activePlaybackMode !== 'music' &&
+    activePlaybackMode !== 'radio' &&
     (lastError.code === 'MEDIA_NOT_FOUND' ||
       (lastError.message && lastError.message.toLowerCase().includes('not found')) ||
       (lastError.details && lastError.details.toLowerCase().includes('404')) ||

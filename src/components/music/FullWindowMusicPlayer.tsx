@@ -51,32 +51,50 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
   const [isLyricsOpen, setIsLyricsOpen] = useState(false);
   const [isQueueOpen, setIsQueueOpen] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const createdBlobUrlsRef = useRef<string[]>([]);
+
+  const activeTrack = tracks[activeIndex] || tracks[0];
+  const isYouTubeTrack = Boolean(currentUri?.match(/(?:youtube\.com|youtu\.be)/i));
+
+  // Revoke created blob URLs on unmount to eliminate memory leaks
+  useEffect(() => {
+    return () => {
+      createdBlobUrlsRef.current.forEach((url) => {
+        try {
+          URL.revokeObjectURL(url);
+        } catch {}
+      });
+      createdBlobUrlsRef.current = [];
+    };
+  }, []);
 
   // Sync activeIndex with currentUri if playing a track from list or dynamic stream
   useEffect(() => {
     if (currentUri) {
-      const idx = tracks.findIndex((t) => t.url === currentUri);
-      if (idx !== -1) {
-        setActiveIndex(idx);
-      } else if (currentTitle) {
-        const parts = currentTitle.split(' - ');
-        const title = parts[0]?.trim() || currentTitle;
-        const artist = parts[1]?.trim() || 'Featured Artist';
-        const newTrack = {
-          id: `current-${Date.now()}`,
-          title,
-          artist,
-          url: currentUri,
-          durationSec: durationMs ? Math.floor(durationMs / 1000) : 210,
-          albumArt: currentArtwork || 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=500&auto=format&fit=crop&q=80',
-        };
-        setTracks((prev) => [newTrack, ...prev.filter((t) => t.url !== currentUri)]);
-        setActiveIndex(0);
-      }
+      setTracks((prev) => {
+        const idx = prev.findIndex((t) => t.url === currentUri);
+        if (idx !== -1) {
+          setActiveIndex(idx);
+          return prev;
+        } else if (currentTitle) {
+          const parts = currentTitle.split(' - ');
+          const title = parts[0]?.trim() || currentTitle;
+          const artist = parts[1]?.trim() || 'Featured Artist';
+          const newTrack = {
+            id: `current-${Date.now()}`,
+            title,
+            artist,
+            url: currentUri,
+            durationSec: durationMs ? Math.floor(durationMs / 1000) : 210,
+            albumArt: currentArtwork || 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=500&auto=format&fit=crop&q=80',
+          };
+          setActiveIndex(0);
+          return [newTrack, ...prev.filter((t) => t.url !== currentUri)];
+        }
+        return prev;
+      });
     }
-  }, [currentUri, currentTitle, currentArtwork, durationMs, tracks]);
-
-  const activeTrack = tracks[activeIndex] || tracks[0];
+  }, [currentUri, currentTitle, currentArtwork, durationMs]);
 
   const handleSelectTrack = (idx: number) => {
     setActiveIndex(idx);
@@ -100,6 +118,7 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
     const file = e.target.files?.[0];
     if (file) {
       const uri = URL.createObjectURL(file);
+      createdBlobUrlsRef.current.push(uri);
       const newTrack = {
         id: `local-${Date.now()}`,
         title: file.name.replace(/\.[^/.]+$/, ''),
@@ -160,24 +179,35 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
       ctx.fillStyle = bgGrad;
       ctx.fillRect(0, 0, w, h);
 
-      // Floating sine wave spectrum bars
-      const barCount = 48;
+      // Atmospheric sound stage visualizer behind Cover Flow
+      const barCount = 64;
       const barWidth = w / barCount;
       const isAudible = !isPaused;
+      const floorY = h * 0.72; // Anchored to studio floor horizon
 
       for (let i = 0; i < barCount; i++) {
-        const factor = Math.sin(phase + i * 0.25) * 0.5 + 0.5;
-        const amp = isAudible ? factor * (h * 0.18) + 10 : 6;
-        const x = i * barWidth;
-        const y = h / 2;
+        const centerDist = Math.abs(i - barCount / 2) / (barCount / 2);
+        const archFactor = Math.cos(centerDist * Math.PI * 0.45);
+        const wave = Math.sin(phase + i * 0.22) * 0.5 + Math.cos(phase * 0.7 + i * 0.15) * 0.5;
+        const normalizedAmp = (wave * 0.5 + 0.5) * archFactor;
 
-        const grad = ctx.createLinearGradient(x, y - amp, x, y + amp);
-        grad.addColorStop(0, '#38bdf8');
-        grad.addColorStop(0.5, '#a855f7');
-        grad.addColorStop(1, '#ec4899');
+        const amp = isAudible ? normalizedAmp * (h * 0.28) + 12 : Math.sin(phase * 0.5 + i * 0.2) * 4 + 6;
+        const x = i * barWidth;
+        const barH = amp * 1.6;
+
+        const grad = ctx.createLinearGradient(x, floorY - barH, x, floorY);
+        grad.addColorStop(0, 'rgba(56, 189, 248, 0.85)'); // Cyan top
+        grad.addColorStop(0.5, 'rgba(168, 85, 247, 0.65)'); // Purple mid tone
+        grad.addColorStop(1, 'rgba(236, 72, 153, 0.15)'); // Soft base
 
         ctx.fillStyle = grad;
-        ctx.fillRect(x + barWidth * 0.2, y - amp, barWidth * 0.6, amp * 2);
+        ctx.beginPath();
+        if (ctx.roundRect) {
+          ctx.roundRect(x + barWidth * 0.15, floorY - barH, barWidth * 0.7, barH, [4, 4, 0, 0]);
+          ctx.fill();
+        } else {
+          ctx.fillRect(x + barWidth * 0.15, floorY - barH, barWidth * 0.7, barH);
+        }
       }
 
       animId = requestAnimationFrame(render);
@@ -244,7 +274,9 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
                 Cover Flow 3D
               </span>
             </h1>
-            <p className="text-[11px] text-white/50">Studio Master 24-Bit / 192kHz Audio</p>
+            <p className="text-[11px] text-white/50">
+              {isYouTubeTrack ? 'YouTube Music Hi-Fi Audio (Full Track)' : 'Studio Master 24-Bit / 192kHz Audio'}
+            </p>
           </div>
         </div>
 
@@ -345,7 +377,7 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
               <div
                 key={track.id}
                 onClick={() => handleSelectTrack(idx)}
-                className="absolute w-64 h-64 cursor-pointer transition-all duration-500 ease-out flex flex-col items-center group"
+                className="absolute w-64 h-64 cursor-pointer transition-all duration-500 ease-out flex flex-col items-center group select-none"
                 style={{
                   transform,
                   zIndex,
@@ -353,12 +385,12 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
                   transformStyle: 'preserve-3d',
                 }}
               >
-                {/* Vinyl / Cover Card */}
-                <div className="relative w-full h-full rounded-2xl overflow-hidden border-2 border-white/20 shadow-2xl bg-slate-900 group-hover:border-cyan-400/60 transition-colors">
+                {/* 3D Vinyl / Cover Art Card */}
+                <div className="relative w-full h-full rounded-2xl overflow-hidden border-2 border-white/20 shadow-2xl bg-slate-900 group-hover:border-cyan-400/60 transition-all duration-300">
                   <img
                     src={track.albumArt}
                     alt={track.title}
-                    className="w-full h-full object-cover select-none"
+                    className="w-full h-full object-cover select-none pointer-events-none"
                     onError={(e) => {
                       (e.target as HTMLElement).style.display = 'none';
                     }}
@@ -370,16 +402,36 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
                   )}
                 </div>
 
-                {/* Mirror Reflection Effect */}
+                {/* Floor Contact Shadow / Ambient Occlusion */}
                 <div
-                  className="w-full h-20 mt-1 rounded-b-2xl overflow-hidden opacity-30 pointer-events-none"
+                  className="contact-shadow absolute -bottom-3 left-1/2 -translate-x-1/2 w-56 h-5 rounded-full pointer-events-none blur-sm"
+                  style={{
+                    background: 'radial-gradient(ellipse at center, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 45%, transparent 75%)',
+                    transform: 'rotateX(80deg)',
+                  }}
+                />
+
+                {/* Realistic 3D Floor Reflection */}
+                <div
+                  className="floor-reflection absolute top-[258px] left-0 right-0 h-32 overflow-hidden pointer-events-none select-none"
                   style={{
                     transform: 'scaleY(-1)',
-                    WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.8), transparent)',
-                    maskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.8), transparent)',
+                    transformOrigin: 'top',
+                    opacity: isCenter ? 0.45 : 0.25,
+                    WebkitMaskImage: 'linear-gradient(to top, transparent 0%, rgba(0,0,0,0.15) 35%, rgba(0,0,0,0.75) 100%)',
+                    maskImage: 'linear-gradient(to top, transparent 0%, rgba(0,0,0,0.15) 35%, rgba(0,0,0,0.75) 100%)',
+                    filter: 'blur(0.6px)',
                   }}
                 >
-                  <img src={track.albumArt} alt="" className="w-full h-full object-cover" />
+                  <div className="w-64 h-64 rounded-2xl overflow-hidden bg-slate-900 border border-white/10">
+                    <img
+                      src={track.albumArt}
+                      alt=""
+                      className="w-full h-full object-cover select-none pointer-events-none"
+                    />
+                  </div>
+                  {/* Dark Glass Floor Tint Overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#05060a]/30 to-[#05060a]/80" />
                 </div>
               </div>
             );

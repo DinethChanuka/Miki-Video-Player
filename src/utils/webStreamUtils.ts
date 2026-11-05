@@ -256,11 +256,17 @@ export function isDirectMediaUrl(uri: string): boolean {
     clean.endsWith('.aac') ||
     clean.includes('/aac') ||
     clean.endsWith('.ogg') ||
+    clean.endsWith('.m4a') ||
+    clean.endsWith('.weba') ||
+    clean.endsWith('.opus') ||
     clean.includes('somafm.com') ||
     clean.includes('storage.jamendo.com') ||
     clean.includes('freesound.org') ||
     clean.includes('raw.githubusercontent.com') ||
     clean.includes('radio.garden') ||
+    clean.includes('apple.com') ||
+    clean.includes('itunes') ||
+    clean.includes('archive.org') ||
     uri.includes('format=mp3')
   );
 }

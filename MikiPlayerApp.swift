@@ -350,6 +350,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
         contentController.add(self, name: "requestSystemAccess")
         contentController.add(self, name: "browserViewAction")
         contentController.add(self, name: "browserMediaDetected")
+        contentController.add(self, name: "searchYouTubeMusic")
         config.userContentController = contentController
 
         webView = WKWebView(frame: window.contentView!.bounds, configuration: config)
@@ -976,6 +977,80 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKScriptMe
                     let js = "window.dispatchEvent(new CustomEvent('miki:browser-media-detected', { detail: { url: '\(cleanUrl)', title: '\(cleanTitle)' } }));"
                     self.webView.evaluateJavaScript(js, completionHandler: nil)
                 }
+            } else if message.name == "searchYouTubeMusic", let dict = message.body as? [String: Any] {
+                let query = dict["query"] as? String ?? ""
+                let requestId = dict["requestId"] as? String ?? "yt-def"
+                let cleanQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !cleanQuery.isEmpty else { return }
+
+                let searchUrl = URL(string: "https://www.youtube.com/youtubei/v1/search")!
+                var req = URLRequest(url: searchUrl)
+                req.httpMethod = "POST"
+                req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                let payload: [String: Any] = [
+                    "context": [
+                        "client": [
+                            "clientName": "WEB",
+                            "clientVersion": "2.20240101.01.00",
+                            "hl": "en"
+                        ]
+                    ],
+                    "query": "\(cleanQuery) audio"
+                ]
+                req.httpBody = try? JSONSerialization.data(withJSONObject: payload)
+
+                URLSession.shared.dataTask(with: req) { [weak self] data, _, _ in
+                    guard let self = self,
+                          let data = data,
+                          let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                          let contents = root["contents"] as? [String: Any],
+                          let twoCol = contents["twoColumnSearchResultsRenderer"] as? [String: Any],
+                          let primary = twoCol["primaryContents"] as? [String: Any],
+                          let secList = primary["sectionListRenderer"] as? [String: Any],
+                          let secContents = secList["contents"] as? [[String: Any]],
+                          let itemSec = secContents.first?["itemSectionRenderer"] as? [String: Any],
+                          let itemContents = itemSec["contents"] as? [[String: Any]] else {
+                        return
+                    }
+
+                    var tracks: [[String: Any]] = []
+                    for item in itemContents {
+                        guard let v = item["videoRenderer"] as? [String: Any],
+                              let videoId = v["videoId"] as? String else { continue }
+
+                        let titleRuns = (v["title"] as? [String: Any])?["runs"] as? [[String: Any]]
+                        let rawTitle = titleRuns?.first?["text"] as? String ?? cleanQuery
+
+                        let ownerRuns = ((v["ownerText"] as? [String: Any])?["runs"] as? [[String: Any]])
+                        let artist = ownerRuns?.first?["text"] as? String ?? "Official Artist"
+
+                        let durationText = (v["lengthText"] as? [String: Any])?["simpleText"] as? String ?? "3:45"
+
+                        tracks.append([
+                            "id": "yt-\(videoId)",
+                            "youtubeId": videoId,
+                            "title": rawTitle,
+                            "artist": artist,
+                            "duration": durationText,
+                            "durationSec": 210,
+                            "coverUrl": "https://img.youtube.com/vi/\(videoId)/hqdefault.jpg",
+                            "streamUrl": "https://www.youtube.com/watch?v=\(videoId)",
+                            "platform": "youtube",
+                            "genre": "YouTube Music",
+                            "badge": "YouTube Music Full Track"
+                        ])
+                        if tracks.count >= 10 { break }
+                    }
+
+                    if let jsonData = try? JSONSerialization.data(withJSONObject: tracks),
+                       let jsonString = String(data: jsonData, encoding: .utf8) {
+                        DispatchQueue.main.async {
+                            let escapedReq = requestId.replacingOccurrences(of: "'", with: "\\'")
+                            let js = "window.dispatchEvent(new CustomEvent('miki:youtubeMusicResults', { detail: { requestId: '\(escapedReq)', results: \(jsonString) } }));"
+                            self.webView.evaluateJavaScript(js, completionHandler: nil)
+                        }
+                    }
+                }.resume()
             }
         }
     }

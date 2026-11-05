@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { usePlayerStore } from '../../store/playerStore';
 import {
-  MusicAudioEngine,
-  MusicTrack,
-  MusicEqualizerPreset,
   MUSIC_PRESETS,
+  MusicEqualizerPreset,
+  MusicTrack,
 } from '../../core/MusicAudioEngine';
 import {
   Play,
@@ -19,88 +19,111 @@ export const FEATURED_MUSIC_TRACKS: MusicTrack[] = [
   {
     id: 'music-synth-odyssey',
     title: 'Ambient Cyberpunk Synth Odyssey',
-    artist: 'Miki Hi-Fi Studio',
-    url: 'https://raw.githubusercontent.com/rafaelreis-hotmart/Audio-Sample-files/master/sample.mp3',
+    artist: 'Mythium Audio Project',
+    url: 'https://archive.org/download/mythium/PNY04-05_M.mp3',
     durationSec: 142,
     albumArt: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=400&q=80',
   },
   {
     id: 'music-analog-chillwave',
     title: 'Deep Analog Chillwave Groove',
-    artist: 'Antigravity Resonance',
-    url: 'https://raw.githubusercontent.com/rafaelreis-hotmart/Audio-Sample-files/master/sample2.mp3',
-    durationSec: 96,
+    artist: 'Mythium Sessions',
+    url: 'https://archive.org/download/mythium/PNY04-05_OTW.mp3',
+    durationSec: 186,
     albumArt: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=400&q=80',
   },
   {
     id: 'music-neon-retrowave',
     title: 'Neon Horizon Retrowave Drive',
-    artist: 'Aether Audio Lab',
-    url: 'https://ice1.somafm.com/groovesalad-128-mp3',
-    durationSec: 120,
+    artist: 'Mythium Lab',
+    url: 'https://archive.org/download/mythium/BSFM_ATKM.mp3',
+    durationSec: 210,
     albumArt: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=400&q=80',
   },
 ];
 
 export const MusicPlayerView: React.FC = () => {
-  const engineRef = useRef<MusicAudioEngine | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const animFrameRef = useRef<number | null>(null);
+  const previousBlobUrlRef = useRef<string | null>(null);
+
+  // Authoritative Player Store Integration
+  const currentUri = usePlayerStore((s) => s.currentUri);
+  const isPaused = usePlayerStore((s) => s.isPaused);
+  const positionMs = usePlayerStore((s) => s.positionMs);
+  const durationMs = usePlayerStore((s) => s.durationMs);
+  const storeVolume = usePlayerStore((s) => s.volume);
+  const openMedia = usePlayerStore((s) => s.openMedia);
+  const togglePlay = usePlayerStore((s) => s.togglePlay);
+  const seek = usePlayerStore((s) => s.seek);
+  const setStoreVolume = usePlayerStore((s) => s.setVolume);
+  const setEqualizer = usePlayerStore((s) => s.setEqualizer);
 
   const [tracks, setTracks] = useState<MusicTrack[]>(FEATURED_MUSIC_TRACKS);
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(1.0);
   const [bassBoost, setBassBoost] = useState(true);
   const [activePreset, setActivePreset] = useState<MusicEqualizerPreset>('Bass Boost');
 
-  const currentTrack = tracks[currentTrackIndex];
+  const isPlaying = !isPaused && Boolean(currentUri);
+  const currentTime = positionMs / 1000;
+  const duration = durationMs > 0 ? durationMs / 1000 : (tracks[currentTrackIndex]?.durationSec || 180);
+  const currentTrack = tracks[currentTrackIndex] || FEATURED_MUSIC_TRACKS[0];
 
+  // Match currentUri to tracks array if already active
   useEffect(() => {
-    const engine = new MusicAudioEngine();
-    engineRef.current = engine;
+    if (currentUri) {
+      const idx = tracks.findIndex((t) => t.url === currentUri);
+      if (idx !== -1) {
+        setCurrentTrackIndex(idx);
+      }
+    }
+  }, [currentUri, tracks]);
 
+  // Cleanup object URLs on unmount
+  useEffect(() => {
     return () => {
-      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+      if (previousBlobUrlRef.current) {
+        URL.revokeObjectURL(previousBlobUrlRef.current);
+      }
     };
   }, []);
 
-  // Visualizer Animation Loop
+  // Visualizer Animation Loop (Driven by authoritative playback state)
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    let phase = 0;
     const render = () => {
-      const engine = engineRef.current;
-      if (engine && isPlaying) {
-        const freqData = engine.getByteFrequencyData();
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const barCount = 36;
+      const barWidth = canvas.width / barCount;
 
-        const barWidth = (canvas.width / freqData.length) * 2.2;
-        let x = 0;
+      if (isPlaying) {
+        phase += 0.08;
+      }
 
-        for (let i = 0; i < freqData.length / 2; i++) {
-          const val = freqData[i] || 0;
-          const barHeight = (val / 255) * canvas.height;
-
-          // Gradient bar
-          const grad = ctx.createLinearGradient(0, canvas.height - barHeight, 0, canvas.height);
-          grad.addColorStop(0, '#f43f5e'); // Rose
-          grad.addColorStop(0.5, '#a855f7'); // Purple
-          grad.addColorStop(1, '#06b6d4'); // Cyan
-
-          ctx.fillStyle = grad;
-          ctx.fillRect(x, canvas.height - barHeight, barWidth - 1.5, barHeight);
-          x += barWidth;
+      for (let i = 0; i < barCount; i++) {
+        let barHeight = 4;
+        if (isPlaying) {
+          const wave = Math.sin(phase + i * 0.35) * 0.5 + 0.5;
+          const harmonic = Math.cos(phase * 1.5 + i * 0.2) * 0.3 + 0.3;
+          const heightFactor = (wave + harmonic) * 0.85;
+          barHeight = Math.max(6, heightFactor * canvas.height * 0.9);
         }
 
-        setCurrentTime(engine.getCurrentTime());
-        setDuration(engine.getDuration());
+        const x = i * barWidth;
+        const grad = ctx.createLinearGradient(0, canvas.height - barHeight, 0, canvas.height);
+        grad.addColorStop(0, '#f43f5e'); // Rose
+        grad.addColorStop(0.5, '#a855f7'); // Purple
+        grad.addColorStop(1, '#06b6d4'); // Cyan
+
+        ctx.fillStyle = grad;
+        ctx.fillRect(x, canvas.height - barHeight, barWidth - 2, barHeight);
       }
+
       animFrameRef.current = requestAnimationFrame(render);
     };
 
@@ -113,19 +136,16 @@ export const MusicPlayerView: React.FC = () => {
   const handlePlayTrack = async (index: number) => {
     setCurrentTrackIndex(index);
     const track = tracks[index];
-    if (engineRef.current && track) {
-      await engineRef.current.loadTrack(track);
-      setIsPlaying(true);
+    if (track) {
+      await openMedia(track.url, `${track.title} - ${track.artist}`, true, 0, track.albumArt, 'music');
     }
   };
 
   const handleTogglePlay = async () => {
-    if (!engineRef.current) return;
-    if (!isPlaying && !engineRef.current.currentTrack) {
+    if (!currentUri) {
       await handlePlayTrack(currentTrackIndex);
     } else {
-      await engineRef.current.togglePlay();
-      setIsPlaying(engineRef.current.isPlaying);
+      await togglePlay();
     }
   };
 
@@ -140,32 +160,44 @@ export const MusicPlayerView: React.FC = () => {
   };
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const pos = parseFloat(e.target.value);
-    setCurrentTime(pos);
-    engineRef.current?.seek(pos);
+    const posSec = parseFloat(e.target.value);
+    seek(posSec * 1000);
   };
 
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const vol = parseFloat(e.target.value);
-    setVolume(vol);
-    engineRef.current?.setVolume(vol);
+    setStoreVolume(vol);
   };
 
   const handleToggleBassBoost = () => {
     const next = !bassBoost;
     setBassBoost(next);
-    engineRef.current?.setBassBoost(next);
+    const currentGains = [...MUSIC_PRESETS[activePreset]];
+    if (next) {
+      currentGains[0] += 4;
+      currentGains[1] += 3;
+    }
+    setEqualizer(currentGains, false);
   };
 
   const handlePresetSelect = (preset: MusicEqualizerPreset) => {
     setActivePreset(preset);
-    engineRef.current?.applyPreset(preset);
+    const gains = [...MUSIC_PRESETS[preset]];
+    if (bassBoost) {
+      gains[0] += 4;
+      gains[1] += 3;
+    }
+    setEqualizer(gains, false);
   };
 
   const handleLoadLocalAudio = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (previousBlobUrlRef.current) {
+        URL.revokeObjectURL(previousBlobUrlRef.current);
+      }
       const localUrl = URL.createObjectURL(file);
+      previousBlobUrlRef.current = localUrl;
       const newTrack: MusicTrack = {
         id: `local-${Date.now()}`,
         title: file.name.replace(/\.[^/.]+$/, ''),
@@ -174,7 +206,8 @@ export const MusicPlayerView: React.FC = () => {
         durationSec: 180,
       };
       setTracks((prev) => [newTrack, ...prev]);
-      handlePlayTrack(0);
+      setCurrentTrackIndex(0);
+      openMedia(localUrl, newTrack.title, true, 0, undefined, 'music');
     }
   };
 
@@ -316,11 +349,11 @@ export const MusicPlayerView: React.FC = () => {
             min={0}
             max={2.0}
             step={0.05}
-            value={volume}
+            value={storeVolume}
             onChange={handleVolumeChange}
             className="w-20 h-1.5 bg-white/10 rounded-full appearance-none accent-purple-500 cursor-pointer"
           />
-          <span className="text-[10px] font-mono text-white/60">{(volume * 100).toFixed(0)}%</span>
+          <span className="text-[10px] font-mono text-white/60">{(storeVolume * 100).toFixed(0)}%</span>
         </div>
       </div>
 

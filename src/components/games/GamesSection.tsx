@@ -10,6 +10,8 @@ import {
   Search,
   Filter,
   Gamepad2,
+  AlertCircle,
+  ExternalLink,
 } from 'lucide-react';
 
 interface GamesSectionProps {
@@ -18,7 +20,17 @@ interface GamesSectionProps {
   searchTerm?: string;
 }
 
-const CATEGORIES = ['All', 'Arcade', 'Retro', 'Classic', 'Puzzle', 'Action', 'Sports'];
+const CATEGORIES = [
+  'All',
+  'Arcade',
+  'Retro',
+  'Classic',
+  'Puzzle',
+  'Action',
+  'Sports',
+  'Strategy',
+  'Cards',
+];
 
 export const GamesSection: React.FC<GamesSectionProps> = ({ onClose: _onClose, onOpenGames, searchTerm = '' }) => {
   const [selectedGame, setSelectedGame] = useState<GameItem>(GAMES_CATALOG[0]);
@@ -28,9 +40,55 @@ export const GamesSection: React.FC<GamesSectionProps> = ({ onClose: _onClose, o
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [activeKeys, setActiveKeys] = useState<{ [key: string]: boolean }>({});
   const [mouseActivity, setMouseActivity] = useState<boolean>(false);
+  const [iframeError, setIframeError] = useState<boolean>(false);
+  const [isLoadingIframe, setIsLoadingIframe] = useState<boolean>(false);
+  const [gameKey, setGameKey] = useState<number>(0);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const mouseTimeoutRef = useRef<any>(null);
+
+  // Monitor loading timeout for external non-srcDoc games (Generous 15s timeout for heavy WebGL assets)
+  useEffect(() => {
+    setIframeError(false);
+    if (isPlaying && !selectedGame.srcDoc) {
+      setIsLoadingIframe(true);
+      const timer = setTimeout(() => {
+        setIsLoadingIframe(false);
+        setIframeError(true);
+      }, 15000);
+      return () => clearTimeout(timer);
+    } else {
+      setIsLoadingIframe(false);
+    }
+  }, [isPlaying, selectedGame.id, gameKey, selectedGame.srcDoc]);
+
+  const handleOpenInBrowser = useCallback(
+    (game: GameItem) => {
+      let targetUrl = game.url;
+      if (game.srcDoc) {
+        try {
+          const blob = new Blob([game.srcDoc], { type: 'text/html;charset=utf-8' });
+          targetUrl = URL.createObjectURL(blob);
+        } catch {
+          targetUrl = `data:text/html;charset=utf-8,${encodeURIComponent(game.srcDoc)}`;
+        }
+      }
+      try {
+        if (typeof window !== 'undefined' && (window as any).webkit?.messageHandlers?.browserViewAction) {
+          (window as any).webkit.messageHandlers.browserViewAction.postMessage({
+            action: 'open',
+            url: targetUrl,
+          });
+          if (_onClose) _onClose();
+        } else if (typeof window !== 'undefined') {
+          window.open(targetUrl, '_blank', 'noopener,noreferrer');
+        }
+      } catch (err) {
+        console.warn('Failed to launch external browser for game:', err);
+      }
+    },
+    [_onClose]
+  );
 
   const filteredGames = useMemo(() => {
     const effectiveQuery = (searchTerm || searchQuery).trim().toLowerCase();
@@ -98,6 +156,8 @@ export const GamesSection: React.FC<GamesSectionProps> = ({ onClose: _onClose, o
   }, [isPlaying, handleKeyDown, handleKeyUp, handleMouseMove]);
 
   const handleReloadGame = () => {
+    setIframeError(false);
+    setGameKey((k) => k + 1);
     if (iframeRef.current) {
       iframeRef.current.src = selectedGame.url;
     }
@@ -224,6 +284,7 @@ export const GamesSection: React.FC<GamesSectionProps> = ({ onClose: _onClose, o
       {isPlaying ? (
         <div className="relative flex-1 w-full min-h-[460px] rounded-2xl overflow-hidden border border-white/10 bg-black shadow-2xl">
           <iframe
+            key={gameKey}
             ref={iframeRef}
             srcDoc={selectedGame.srcDoc}
             src={!selectedGame.srcDoc ? selectedGame.url : undefined}
@@ -232,10 +293,80 @@ export const GamesSection: React.FC<GamesSectionProps> = ({ onClose: _onClose, o
             allow="autoplay; fullscreen; gamepad; focus-without-user-activation *"
             sandbox="allow-scripts allow-same-origin allow-forms allow-pointer-lock allow-popups"
             tabIndex={0}
+            onLoad={() => {
+              setIsLoadingIframe(false);
+              setIframeError(false);
+            }}
+            onError={() => {
+              setIsLoadingIframe(false);
+              setIframeError(true);
+            }}
           />
+
+          {/* Loading Indicator HUD */}
+          {isLoadingIframe && !selectedGame.srcDoc && (
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm gap-3 pointer-events-none">
+              <div className="w-10 h-10 border-4 border-purple-500/20 border-t-purple-500 rounded-full animate-spin" />
+              <span className="text-xs text-white/70 font-mono">
+                Loading {selectedGame.title}...
+              </span>
+            </div>
+          )}
+
+          {/* Graceful Fallback Card when embedding is restricted or fails */}
+          {iframeError && !selectedGame.srcDoc && (
+            <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/90 backdrop-blur-md p-6">
+              <div className="max-w-md w-full p-6 rounded-3xl bg-slate-900 border border-purple-500/30 flex flex-col items-center text-center gap-4 shadow-2xl">
+                <div className="p-3 rounded-2xl bg-purple-500/20 text-purple-400">
+                  <AlertCircle className="w-8 h-8" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">
+                    {selectedGame.title} Embedding Restricted
+                  </h3>
+                  <p className="text-xs text-white/60 mt-1.5 leading-relaxed">
+                    This game server restricts third-party iframe embedding or is temporarily unreachable. You can launch it directly in the web browser or enjoy an instant offline inbuilt title.
+                  </p>
+                </div>
+                <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full mt-2">
+                  <button
+                    onClick={() => {
+                      const fallback =
+                        GAMES_CATALOG.find((g) => g.isInbuilt && g.id === 'pacman') ||
+                        GAMES_CATALOG[0];
+                      setSelectedGame(fallback);
+                      setIframeError(false);
+                      setGameKey((k) => k + 1);
+                    }}
+                    className="flex-1 w-full py-2.5 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs transition-all shadow-lg shadow-purple-600/30 flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <Gamepad2 className="w-4 h-4" />
+                    <span>Play Inbuilt Alternative</span>
+                  </button>
+                  <button
+                    onClick={() => handleOpenInBrowser(selectedGame)}
+                    className="flex-1 w-full py-2.5 px-4 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs border border-white/10 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <ExternalLink className="w-4 h-4 text-cyan-400" />
+                    <span>Launch in Web Browser</span>
+                  </button>
+                </div>
+                <button
+                  onClick={() => {
+                    setIframeError(false);
+                    setGameKey((k) => k + 1);
+                  }}
+                  className="text-[11px] text-white/40 hover:text-white transition-colors cursor-pointer mt-1"
+                >
+                  Retry Loading
+                </button>
+              </div>
+            </div>
+          )}
+
           <button
             onClick={() => setIsPlaying(false)}
-            className="absolute top-3 right-3 px-3 py-1.5 rounded-xl bg-black/80 hover:bg-black text-white text-xs font-semibold border border-white/20 backdrop-blur-md transition-all shadow-lg"
+            className="absolute top-3 right-3 px-3 py-1.5 rounded-xl bg-black/80 hover:bg-black text-white text-xs font-semibold border border-white/20 backdrop-blur-md transition-all shadow-lg cursor-pointer"
           >
             Switch Game
           </button>
