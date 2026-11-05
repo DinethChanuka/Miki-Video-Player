@@ -116,9 +116,16 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
     }
 
     const handleWindowMessage = (event: MessageEvent) => {
-      if (typeof event.data !== 'string') return;
+      let payload = event.data;
+      if (typeof payload === 'string') {
+        try {
+          payload = JSON.parse(payload);
+        } catch {
+          return;
+        }
+      }
+      if (!payload || typeof payload !== 'object') return;
       try {
-        const payload = JSON.parse(event.data);
         if (payload.event === 'infoDelivery' && payload.info) {
           const info = payload.info;
 

@@ -17,7 +17,6 @@ import {
   FolderOpen,
 } from 'lucide-react';
 import { FEATURED_MUSIC_TRACKS } from './MusicPlayerView';
-import { YouTubePlayer } from '../player/YouTubePlayer';
 
 export interface FullWindowMusicPlayerProps {
   isOpen: boolean;
@@ -55,11 +54,7 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
   const createdBlobUrlsRef = useRef<string[]>([]);
 
   const activeTrack = tracks[activeIndex] || tracks[0];
-  const activeYouTubeId = React.useMemo(() => {
-    const raw = currentUri || activeTrack?.url || '';
-    const match = raw.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i);
-    return match ? match[1] : null;
-  }, [currentUri, activeTrack?.url]);
+  const isYouTubeTrack = Boolean(currentUri?.match(/(?:youtube\.com|youtu\.be)/i));
 
   // Revoke created blob URLs on unmount to eliminate memory leaks
   useEffect(() => {
@@ -279,7 +274,9 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
                 Cover Flow 3D
               </span>
             </h1>
-            <p className="text-[11px] text-white/50">Studio Master 24-Bit / 192kHz Audio</p>
+            <p className="text-[11px] text-white/50">
+              {isYouTubeTrack ? 'YouTube Music Hi-Fi Audio (Full Track)' : 'Studio Master 24-Bit / 192kHz Audio'}
+            </p>
           </div>
         </div>
 
@@ -416,22 +413,25 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
 
                 {/* Realistic 3D Floor Reflection */}
                 <div
-                  className="floor-reflection absolute -bottom-[102px] left-0 right-0 h-[100px] overflow-hidden pointer-events-none select-none rounded-b-2xl"
+                  className="floor-reflection absolute top-[258px] left-0 right-0 h-32 overflow-hidden pointer-events-none select-none"
                   style={{
                     transform: 'scaleY(-1)',
-                    opacity: isCenter ? 0.45 : 0.3,
-                    WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.25) 35%, rgba(0,0,0,0.05) 65%, transparent 85%)',
-                    maskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.25) 35%, rgba(0,0,0,0.05) 65%, transparent 85%)',
-                    filter: 'blur(0.5px)',
+                    transformOrigin: 'top',
+                    opacity: isCenter ? 0.45 : 0.25,
+                    WebkitMaskImage: 'linear-gradient(to top, transparent 0%, rgba(0,0,0,0.15) 35%, rgba(0,0,0,0.75) 100%)',
+                    maskImage: 'linear-gradient(to top, transparent 0%, rgba(0,0,0,0.15) 35%, rgba(0,0,0,0.75) 100%)',
+                    filter: 'blur(0.6px)',
                   }}
                 >
-                  <img
-                    src={track.albumArt}
-                    alt=""
-                    className="w-full h-64 object-cover object-bottom"
-                  />
+                  <div className="w-64 h-64 rounded-2xl overflow-hidden bg-slate-900 border border-white/10">
+                    <img
+                      src={track.albumArt}
+                      alt=""
+                      className="w-full h-full object-cover select-none pointer-events-none"
+                    />
+                  </div>
                   {/* Dark Glass Floor Tint Overlay */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-transparent via-[#05060a]/30 to-[#05060a]/50" />
+                  <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#05060a]/30 to-[#05060a]/80" />
                 </div>
               </div>
             );
@@ -590,20 +590,6 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
               );
             })}
           </div>
-        </div>
-      )}
-
-      {/* Authoritative High-Fidelity YouTube Audio Bridge */}
-      {activeYouTubeId && (
-        <div
-          className="fixed -left-[4000px] -top-[4000px] w-[320px] h-[240px] opacity-[0.02] pointer-events-none z-0"
-          aria-hidden="true"
-        >
-          <YouTubePlayer
-            youtubeId={activeYouTubeId}
-            initialPositionMs={positionMs}
-            onEnded={handleNext}
-          />
         </div>
       )}
     </div>
