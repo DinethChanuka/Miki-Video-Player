@@ -19,30 +19,37 @@ describe('Multi-Platform Music Discovery Service Audit', async () => {
     assert.match(serviceCode, /export\s+async\s+function\s+fetchLiveMusicDiscovery/, 'Must export fetchLiveMusicDiscovery');
   });
 
-  it('verifies expanded catalog contains at least 36-40 songs across all 4 platforms', async () => {
+  it('verifies expanded catalog contains exclusively YouTube Music full-length tracks', async () => {
     const { MUSIC_DISCOVERY_CATALOG } = await import(`file://${servicePath}`);
     assert.ok(Array.isArray(MUSIC_DISCOVERY_CATALOG), 'Catalog must be an array');
-    assert.ok(MUSIC_DISCOVERY_CATALOG.length >= 36, `Catalog has ${MUSIC_DISCOVERY_CATALOG.length}, expected >= 36`);
+    assert.ok(MUSIC_DISCOVERY_CATALOG.length >= 20, `Catalog has ${MUSIC_DISCOVERY_CATALOG.length}, expected >= 20`);
 
-    const jamendo = MUSIC_DISCOVERY_CATALOG.filter((t) => t.platform === 'jamendo');
-    const soundcloud = MUSIC_DISCOVERY_CATALOG.filter((t) => t.platform === 'soundcloud');
-    const bandcamp = MUSIC_DISCOVERY_CATALOG.filter((t) => t.platform === 'bandcamp');
-    const audiomack = MUSIC_DISCOVERY_CATALOG.filter((t) => t.platform === 'audiomack');
+    const nonYouTube = MUSIC_DISCOVERY_CATALOG.filter((t) => t.platform !== 'youtube');
+    assert.equal(nonYouTube.length, 0, 'Catalog must not contain any third-party platforms (Jamendo, SoundCloud, Bandcamp, Audiomack)');
 
-    assert.ok(jamendo.length >= 9, 'Must contain at least 9 Jamendo songs');
-    assert.ok(soundcloud.length >= 9, 'Must contain at least 9 SoundCloud songs');
-    assert.ok(bandcamp.length >= 9, 'Must contain at least 9 Bandcamp songs');
-    assert.ok(audiomack.length >= 9, 'Must contain at least 9 Audiomack songs');
+    const youtubeTracks = MUSIC_DISCOVERY_CATALOG.filter((t) => t.platform === 'youtube');
+    assert.ok(youtubeTracks.length >= 20, 'Must contain at least 20 verified YouTube Music songs');
+
+    for (const track of youtubeTracks) {
+      assert.ok(
+        track.streamUrl && track.streamUrl.includes('youtube.com/watch?v='),
+        `YouTube track ${track.title} must have direct youtube.com/watch URL`
+      );
+      assert.ok(
+        track.coverUrl && (track.coverUrl.includes('youtube.com') || track.coverUrl.includes('unsplash.com')),
+        `YouTube track ${track.title} must have valid cover artwork`
+      );
+    }
   });
 
   it('verifies getPlatformSearchUrl and searchMusicOnline generate live query links', async () => {
     const { getPlatformSearchUrl, searchMusicOnline } = await import(`file://${servicePath}`);
 
-    const scUrl = getPlatformSearchUrl('soundcloud', 'chillhop beats');
-    assert.match(scUrl, /soundcloud\.com\/search\/sounds\?q=chillhop%20beats/);
+    const ytUrl = getPlatformSearchUrl('youtube', 'saiyaara');
+    assert.match(ytUrl, /music\.youtube\.com\/search\?q=saiyaara/);
 
-    const jmUrl = getPlatformSearchUrl('jamendo', 'ambient');
-    assert.match(jmUrl, /jamendo\.com\/en\/catalog\?query=ambient/);
+    const fallbackUrl = getPlatformSearchUrl('soundcloud', 'chillhop beats');
+    assert.match(fallbackUrl, /music\.youtube\.com\/search\?q=chillhop%20beats/);
 
     const onlineResults = searchMusicOnline('cyberpunk', 'all');
     assert.ok(onlineResults.length > 0);
@@ -50,13 +57,12 @@ describe('Multi-Platform Music Discovery Service Audit', async () => {
     assert.ok(onlineResults.some((t) => t.isLiveUpdate === true));
   });
 
-  it('verifies Jamendo tracks provide direct playable audio stream URLs', async () => {
+  it('verifies all catalog tracks provide direct playable YouTube stream URLs', async () => {
     const { MUSIC_DISCOVERY_CATALOG } = await import(`file://${servicePath}`);
-    const jamendoTracks = MUSIC_DISCOVERY_CATALOG.filter((t) => t.platform === 'jamendo');
-    for (const track of jamendoTracks) {
+    for (const track of MUSIC_DISCOVERY_CATALOG) {
       assert.ok(
         track.streamUrl && track.streamUrl.startsWith('http'),
-        `Jamendo track ${track.title} must have direct stream URL`
+        `Track ${track.title} must have direct stream URL`
       );
     }
   });
@@ -65,6 +71,7 @@ describe('Multi-Platform Music Discovery Service Audit', async () => {
     const { fetchLiveMusicDiscovery } = await import(`file://${servicePath}`);
     const liveTracks = await fetchLiveMusicDiscovery();
     assert.ok(Array.isArray(liveTracks));
-    assert.ok(liveTracks.length >= 36);
+    assert.ok(liveTracks.length >= 20);
+    assert.ok(liveTracks.every((t) => t.platform === 'youtube'));
   });
 });

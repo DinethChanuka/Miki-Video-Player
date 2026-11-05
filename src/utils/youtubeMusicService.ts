@@ -215,7 +215,7 @@ function searchViaNativeBridge(cleanQuery: string): Promise<YouTubeMusicTrack[] 
     const timer = setTimeout(() => {
       window.removeEventListener('miki:youtubeMusicResults', handler as EventListener);
       resolve(null);
-    }, 2800);
+    }, 8000);
 
     const handler = (e: CustomEvent<{ requestId: string; results: YouTubeMusicTrack[] }>) => {
       if (e.detail?.requestId === requestId) {
@@ -261,7 +261,23 @@ export async function searchYouTubeMusicLive(query: string): Promise<YouTubeMusi
     }
   }
 
-  // 2. Try native macOS desktop URLSession IPC (zero CORS restrictions)
+  // 2. Query native desktop LocalAppServer endpoint (zero CORS restrictions, ultra fast)
+  try {
+    const localRes = await fetch(`http://127.0.0.1:39281/api/search-youtube?q=${encodeURIComponent(clean)}`, {
+      signal: AbortSignal.timeout(6000),
+    });
+    if (localRes.ok) {
+      const localData = await localRes.json();
+      if (Array.isArray(localData) && localData.length > 0) {
+        YT_SEARCH_CACHE.set(cacheKey, localData);
+        return localData;
+      }
+    }
+  } catch {
+    // Fall back to native bridge IPC
+  }
+
+  // 3. Try native macOS desktop URLSession IPC (zero CORS restrictions)
   const nativeResults = await searchViaNativeBridge(clean);
   if (nativeResults && nativeResults.length > 0) {
     YT_SEARCH_CACHE.set(cacheKey, nativeResults);

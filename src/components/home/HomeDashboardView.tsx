@@ -124,14 +124,14 @@ const COVER_FLOW_ALBUMS: CoverFlowTrack[] = [
     durationSec: 309,
   },
   {
-    id: 'track-hindisongs3-soundcloud',
+    id: 'track-hindisongs3-yt',
     title: 'Hindi Songs 3',
     artist: 'Pritam, Mohit Chauhan & Arijit Singh',
-    album: 'SoundCloud Discover Hits',
+    album: 'YouTube Music Hits',
     albumArt: ALBUM_POSTERS.dooriyan,
     url: 'https://www.youtube.com/watch?v=7z3YeFqd7xQ',
     durationSec: 334,
-    platform: 'soundcloud',
+    platform: 'youtube',
   },
   {
     id: 'track-darkhaast',
@@ -595,13 +595,14 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
   const [channelFilterCategory, setChannelFilterCategory] = useState<string>('All');
   const [gameFilterCategory, setGameFilterCategory] = useState<string>('All');
   const [isUserLoggedIn, setIsUserLoggedIn] = useState<boolean>(true);
-  const [activeAlbumIdx, setActiveAlbumIdx] = useState<number>(2); // Default to Hindi Songs 3 (SoundCloud)
+  const [activeAlbumIdx, setActiveAlbumIdx] = useState<number>(2); // Default to Hindi Songs 3 (YouTube Music)
   const [isCoverFlowPlaying, setIsCoverFlowPlaying] = useState<boolean>(false);
   const [partiesToggle, setPartiesToggle] = useState<boolean>(true);
   const [continueToggle, setContinueToggle] = useState<boolean>(true);
   const [cinesubzList, setCinesubzList] = useState<CineSubzMovie[]>(CINESUBZ_MOVIES);
   const [cinesubzTvList, setCinesubzTvList] = useState<CineSubzTvShow[]>(CINESUBZ_TV_SHOWS);
-  const [selectedMusicPlatform, setSelectedMusicPlatform] = useState<MusicPlatform | 'all'>('all');
+  const [selectedMusicCategory, setSelectedMusicCategory] = useState<string>('all');
+  const [selectedMusicPlatform, setSelectedMusicPlatform] = useState<MusicPlatform | 'all'>('youtube');
   const [musicDiscoveryList, setMusicDiscoveryList] = useState<MusicTrack[]>(MUSIC_DISCOVERY_CATALOG);
   const [liveSearchedTracks, setLiveSearchedTracks] = useState<MusicTrack[]>([]);
   const [liveCinesubzMovies, setLiveCinesubzMovies] = useState<CineSubzMovie[]>([]);
@@ -912,25 +913,31 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
     );
   }, [cinesubzTvList, searchQuery]);
 
-  // Filtered Online Music Discovery (Jamendo, SoundCloud, Bandcamp, Audiomack) with Live Online Search
+  // Filtered YouTube Music Catalog with Live YouTube Music Search & Categories
   const filteredMusicTracks = useMemo(() => {
     if (searchQuery.trim()) {
       if (liveSearchedTracks.length > 0) {
         return liveSearchedTracks;
       }
-      return searchMusicOnline(searchQuery, selectedMusicPlatform);
+      return searchMusicOnline(searchQuery, 'youtube');
     }
     let list = musicDiscoveryList;
-    if (selectedMusicPlatform !== 'all') {
-      list = list.filter((t) => t.platform === selectedMusicPlatform);
+    if (selectedMusicCategory !== 'all') {
+      const cat = selectedMusicCategory.toLowerCase();
+      list = list.filter(
+        (t) =>
+          t.genre.toLowerCase().includes(cat) ||
+          t.title.toLowerCase().includes(cat) ||
+          t.artist.toLowerCase().includes(cat)
+      );
     }
     return list;
-  }, [musicDiscoveryList, selectedMusicPlatform, searchQuery, liveSearchedTracks]);
+  }, [musicDiscoveryList, selectedMusicCategory, searchQuery, liveSearchedTracks]);
 
-  // Reset pagination to page 1 whenever search query or platform changes
+  // Reset pagination to page 1 whenever search query or category changes
   useEffect(() => {
     setMusicCurrentPage(1);
-  }, [searchQuery, selectedMusicPlatform]);
+  }, [searchQuery, selectedMusicCategory]);
 
   const musicTotalPages = useMemo(() => {
     return Math.max(1, Math.ceil(filteredMusicTracks.length / MUSIC_PAGE_SIZE));
@@ -2150,9 +2157,9 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                     <span>PREVIOUSLY PLAYED TRACK</span>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-500/20 border border-orange-500/30 text-[10px] font-bold text-orange-300 mb-1">
-                    <span className="w-2 h-2 rounded-full bg-orange-400 animate-pulse" />
-                    <span>DEFAULT SOUNDCLOUD TRACK</span>
+                  <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-500/20 border border-red-500/30 text-[10px] font-bold text-red-300 mb-1">
+                    <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
+                    <span>YOUTUBE MUSIC EXCLUSIVE</span>
                   </div>
                 )}
                 <h2 className="text-xl font-bold text-white tracking-wide">
@@ -2265,7 +2272,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                 </div>
               </div>
 
-              {/* Online Music Discovery & Search (Jamendo, SoundCloud, Bandcamp, Audiomack) */}
+              {/* YouTube Music Discovery & Live Search */}
               <div className="w-full max-w-5xl flex flex-col gap-5 mt-6">
                 {/* In-Section Live Music Search Bar */}
                 <div className="relative w-full">
@@ -2274,8 +2281,8 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Live search songs, artists & genres across Jamendo, SoundCloud, Bandcamp, Audiomack..."
-                    className="w-full pl-11 pr-24 py-3 rounded-2xl bg-white/5 border border-white/10 text-xs text-white placeholder-white/40 focus:outline-none focus:border-rose-500/60 focus:bg-white/10 transition-all font-medium"
+                    placeholder="Live search songs, artists & genres on YouTube Music..."
+                    className="w-full pl-11 pr-24 py-3 rounded-2xl bg-white/5 border border-white/10 text-xs text-white placeholder-white/40 focus:outline-none focus:border-red-500/60 focus:bg-white/10 transition-all font-medium"
                   />
                   {searchQuery && (
                     <button
@@ -2294,35 +2301,36 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                     </div>
                     <div>
                       <h3 className="text-sm font-bold text-white tracking-wide uppercase flex items-center gap-2">
-                        Online Music Discovery &amp; Search
-                        <span className="text-[10px] font-normal normal-case px-2 py-0.5 rounded-full bg-white/10 text-white/80">
+                        Online Music Discovery & Search — YouTube Music
+                        <span className="text-[10px] font-normal normal-case px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/30">
                           {filteredMusicTracks.length} Songs
                         </span>
                       </h3>
                       <p className="text-[11px] text-white/50">
-                        Search and stream tracks from Jamendo, SoundCloud, Bandcamp, and Audiomack
+                        Stream authentic full-length songs powered exclusively by YouTube Music
                       </p>
                     </div>
                   </div>
 
-                  {/* Platform Filter Buttons */}
+                  {/* YouTube Music Category Filter Buttons */}
                   <div className="flex items-center gap-1.5 flex-wrap">
                     {[
-                      { id: 'all', label: 'All Platforms', color: 'bg-white/40' },
-                      { id: 'youtube', label: 'YouTube Music', color: 'bg-[#FF0000]' },
-                      { id: 'jamendo', label: 'Jamendo', color: 'bg-[#E11456]' },
-                      { id: 'soundcloud', label: 'SoundCloud', color: 'bg-[#FF5500]' },
-                      { id: 'bandcamp', label: 'Bandcamp', color: 'bg-[#1DA0C3]' },
-                      { id: 'audiomack', label: 'Audiomack', color: 'bg-[#FFA200]' },
+                      { id: 'all', label: 'All YouTube Songs', color: 'bg-red-500' },
+                      { id: 'romantic', label: 'Romantic', color: 'bg-pink-400' },
+                      { id: 'hindi', label: 'Hindi', color: 'bg-amber-400' },
+                      { id: 'english', label: 'English', color: 'bg-cyan-400' },
+                      { id: 'sinhala', label: 'Sinhala', color: 'bg-emerald-400' },
+                      { id: 'phonk', label: 'Phonk', color: 'bg-purple-500' },
+                      { id: 'lo-fi', label: 'Lo-Fi', color: 'bg-indigo-400' },
                     ].map((p) => {
-                      const isActive = selectedMusicPlatform === p.id;
+                      const isActive = selectedMusicCategory === p.id;
                       return (
                         <button
                           key={p.id}
-                          onClick={() => setSelectedMusicPlatform(p.id as MusicPlatform | 'all')}
+                          onClick={() => setSelectedMusicCategory(p.id)}
                           className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
                             isActive
-                              ? 'bg-white text-black font-bold shadow-md shadow-white/10'
+                              ? 'bg-red-600 text-white font-bold shadow-md shadow-red-500/20'
                               : 'bg-white/5 text-white/70 hover:bg-white/10 hover:text-white border border-white/10'
                           }`}
                         >

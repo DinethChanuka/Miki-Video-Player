@@ -3,30 +3,30 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 
-describe('Default SoundCloud Music, Previously Played Display & Live Preview Search Audit', () => {
+describe('Exclusive YouTube Music, Previously Played Display & Live Preview Search Audit', () => {
   const rootDir = process.cwd();
   const homeDashboardPath = path.join(rootDir, 'src/components/home/HomeDashboardView.tsx');
   const musicDiscoveryPath = path.join(rootDir, 'src/utils/musicDiscoveryService.ts');
 
-  it('verifies default music is configured to hindisongs3 from soundcloud', () => {
+  it('verifies default music is configured to YouTube Music', () => {
     assert.ok(fs.existsSync(homeDashboardPath), 'HomeDashboardView.tsx must exist');
     const homeCode = fs.readFileSync(homeDashboardPath, 'utf-8');
     assert.match(
       homeCode,
       /hindisongs3|Hindi Songs 3/i,
-      'HomeDashboardView must define hindisongs3 as default music'
+      'HomeDashboardView must define default music track'
     );
     assert.match(
       homeCode,
-      /soundcloud/i,
-      'HomeDashboardView must associate hindisongs3 with SoundCloud'
+      /youtube/i,
+      'HomeDashboardView must associate music with YouTube Music'
     );
 
     const discCode = fs.readFileSync(musicDiscoveryPath, 'utf-8');
     assert.match(
       discCode,
-      /hindisongs3|Hindi Songs 3/i,
-      'musicDiscoveryService must catalog hindisongs3 from SoundCloud'
+      /youtube/i,
+      'musicDiscoveryService must catalog YouTube Music tracks'
     );
   });
 

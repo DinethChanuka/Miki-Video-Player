@@ -5,7 +5,7 @@ echo "[Miki Player] Building web assets..."
 npm run build
 
 echo "[Miki Player] Compiling native Swift Cocoa borderless binary..."
-swiftc -O -o MikiPlayer MikiPlayerApp.swift -framework Cocoa -framework WebKit
+swiftc -O -o MikiPlayer MikiPlayerApp.swift -framework Cocoa -framework WebKit -framework Network
 
 echo "[Miki Player] Generating macOS Application bundle structure..."
 mkdir -p "Miki Player.app/Contents/MacOS" "Miki Player.app/Contents/Resources" AppIcon.iconset
