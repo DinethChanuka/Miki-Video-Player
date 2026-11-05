@@ -486,6 +486,19 @@ export class WebMediaEngine implements IPlayerEngine {
     const isHls = HlsStreamController.isHlsUrl(resolvedUri);
     const isAudio = ChunkedAudioStreamController.isAudioUrl(resolvedUri);
 
+    // YouTube URLs are played via the YouTube Audio Bridge iframe in FullWindowMusicPlayer,
+    // NOT through the native HTML5 audio element. Skip engine load entirely.
+    const isYouTubeUrl = /(?:youtube\.com\/(?:watch\?|embed\/|shorts\/)|youtu\.be\/)/i.test(resolvedUri);
+    if (isYouTubeUrl) {
+      // Clear buffering state — the YouTube iframe bridge handles playback independently
+      if (typeof window !== 'undefined') {
+        import('../store/playerStore')
+          .then(({ usePlayerStore }) => usePlayerStore.setState({ isBuffering: false, isPaused: false }))
+          .catch(() => {});
+      }
+      return;
+    }
+
     // Enable crossOrigin = 'anonymous' so WebAudio createMediaElementSource receives authorized audio
     // Adaptive CORS recovery in onerror will automatically remove crossOrigin if the remote server rejects it
     try {

@@ -246,3 +246,4 @@ export async function searchYouTubeMusicLive(query: string): Promise<YouTubeMusi
   YT_SEARCH_CACHE.set(cacheKey, fallbackMatch);
   return fallbackMatch;
 }
+

@@ -657,6 +657,8 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
                 JSON.stringify({ event: 'command', func: 'setVolume', args: [isMuted ? 0 : volume] }),
                 '*'
               );
+              // Clear buffering state now that YouTube bridge is ready
+              usePlayerStore.setState({ isBuffering: false, isPaused: false });
             }
           }}
         />
