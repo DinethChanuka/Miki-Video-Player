@@ -59,7 +59,8 @@ export class ChunkedAudioStreamController {
   }
 
   /**
-   * Identifies whether a given URL is a direct audio stream or file
+   * Identifies whether a given URL is a direct audio stream or file.
+   * Handles standard audio files, streaming CDNs, and Piped/YouTube direct audio streams.
    */
   public static isAudioUrl(url: string): boolean {
     if (!url || typeof url !== 'string') return false;
@@ -78,6 +79,8 @@ export class ChunkedAudioStreamController {
       full.includes('-mp3') ||
       full.includes('.m4a') ||
       full.includes('.aac') ||
+      full.includes('.webm') ||
+      full.includes('.opus') ||
       full.includes('jamendo') ||
       full.includes('soundcloud') ||
       full.includes('audiomack') ||
@@ -88,7 +91,14 @@ export class ChunkedAudioStreamController {
       full.includes('somafm.com') ||
       full.includes('radio.garden') ||
       full.includes('icecast') ||
-      full.includes('shoutcast')
+      full.includes('shoutcast') ||
+      // Piped API direct audio stream URLs (googlevideo CDN)
+      full.includes('googlevideo.com') ||
+      full.includes('piped') ||
+      // YouTube direct audio CDN patterns from Piped resolution
+      full.includes('mime=audio') ||
+      full.includes('itag=') ||
+      (full.includes('youtube.com') && full.includes('mime='))
     );
   }
 

@@ -1146,9 +1146,12 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     const resolvedArtwork = lookupArtwork(uri, resolvedTitle, artworkUrl);
 
     // Explicit video detection: video files and video web streams MUST NEVER be misclassified as audio
+    // Piped/googlevideo audio streams have mime=audio in URL — never classify those as video
+    const isPipedAudioStream = uri.includes('googlevideo.com') && (uri.includes('mime=audio') || uri.includes('itag='));
     const isExplicitVideo =
       mediaType === 'video' ||
-      (mediaType !== 'music' &&
+      (!isPipedAudioStream &&
+        mediaType !== 'music' &&
         mediaType !== 'radio' &&
         (/\.(?:mp4|mkv|webm|avi|mov|m4v|flv|ts|wmv|3gp|m3u8)(?:\?|$)/i.test(uri) ||
           Boolean(parseWebStream(uri))));
@@ -1172,7 +1175,7 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
       mediaType === 'music' ||
       isRadio ||
       (!isExplicitVideo && (
-        /\.(?:mp3|ogg|flac|wav|aac|m4a|weba|opus)(?:\?|$)/i.test(uri) ||
+        /\.(?:mp3|ogg|flac|wav|aac|m4a|weba|opus|webm)(?:\?|$)/i.test(uri) ||
         uri.includes('/mp3') ||
         uri.includes('-mp3') ||
         uri.includes('format=mp3') ||
@@ -1186,6 +1189,10 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
         uri.includes('apple.com') ||
         uri.includes('itunes') ||
         uri.includes('audio-ssl') ||
+        // Piped API direct audio stream URLs (googlevideo CDN)
+        uri.includes('googlevideo.com') ||
+        uri.includes('mime=audio') ||
+        uri.includes('itag=') ||
         (resolvedTitle && /(?:song|track|feat\.|audio|remix|acoustic|original mix|lo-fi|session|saiyaara|dooriyan|hindi)/i.test(resolvedTitle)) ||
         Boolean(artworkUrl) ||
         get().lastActiveCategory === 'Music' ||
