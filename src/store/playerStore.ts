@@ -1381,6 +1381,7 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
           playbackRate: session.preferences.playbackRate,
           resumeBannerPositionMs: !autoResume && savedPos > 0 ? savedPos : null,
           retryCount: 0,
+          isPaused: false,
         });
 
         await get().engine?.load(uri, startPos);
@@ -1411,6 +1412,7 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
       isMusicPlayerOpen: autoOpenStudio ? true : false,
       retryCount: 0,
       lastError: null,
+      isPaused: false,
       resumeBannerPositionMs: null,
       isBuffering: true,
     });

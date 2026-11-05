@@ -57,6 +57,13 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
           '*'
         );
       }
+      // Proactively trigger playVideo if unpaused so autoplay engages reliably across webview boundaries
+      if (!usePlayerStore.getState().isPaused) {
+        iframeRef.current.contentWindow.postMessage(
+          JSON.stringify({ event: 'command', func: 'playVideo', args: [] }),
+          '*'
+        );
+      }
     }
   }, []);
 
@@ -242,9 +249,12 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
   }, [volume, isMuted]);
 
   // STABLE MEMOIZED EMBED URL: NEVER changes while watching the same video
+  // Note: Only pass origin if it starts with http/https. Custom app:// schemes in WKWebView/Electron are rejected by YouTube's embed origin checks.
   const embedSrc = useMemo(() => {
     const originParam =
-      typeof window !== 'undefined' && window.location.origin
+      typeof window !== 'undefined' &&
+      window.location.origin &&
+      window.location.origin.startsWith('http')
         ? `&origin=${encodeURIComponent(window.location.origin)}`
         : '';
     const initialStart = startSecRef.current;

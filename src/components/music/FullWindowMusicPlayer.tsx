@@ -17,6 +17,7 @@ import {
   FolderOpen,
 } from 'lucide-react';
 import { FEATURED_MUSIC_TRACKS } from './MusicPlayerView';
+import { YouTubePlayer } from '../player/YouTubePlayer';
 
 export interface FullWindowMusicPlayerProps {
   isOpen: boolean;
@@ -51,7 +52,6 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
   const [isLyricsOpen, setIsLyricsOpen] = useState(false);
   const [isQueueOpen, setIsQueueOpen] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const ytIframeRef = useRef<HTMLIFrameElement | null>(null);
   const createdBlobUrlsRef = useRef<string[]>([]);
 
   const activeTrack = tracks[activeIndex] || tracks[0];
@@ -60,54 +60,6 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
     const match = raw.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i);
     return match ? match[1] : null;
   }, [currentUri, activeTrack?.url]);
-
-  // Synchronize play/pause with YouTube Audio Bridge
-  useEffect(() => {
-    if (activeYouTubeId && ytIframeRef.current?.contentWindow) {
-      const cmd = isPaused ? 'pauseVideo' : 'playVideo';
-      ytIframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: cmd, args: [] }), '*');
-    }
-  }, [isPaused, activeYouTubeId]);
-
-  // Synchronize sound volume with YouTube Audio Bridge
-  useEffect(() => {
-    if (activeYouTubeId && ytIframeRef.current?.contentWindow) {
-      if (isMuted) {
-        ytIframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'mute', args: [] }), '*');
-      } else {
-        ytIframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'unMute', args: [] }), '*');
-        ytIframeRef.current.contentWindow.postMessage(
-          JSON.stringify({ event: 'command', func: 'setVolume', args: [volume] }),
-          '*'
-        );
-      }
-    }
-  }, [volume, isMuted, activeYouTubeId]);
-
-  // Listen for time updates and metadata from YouTube Audio Bridge
-  useEffect(() => {
-    if (!activeYouTubeId) return;
-    const handleMessage = (e: MessageEvent) => {
-      try {
-        const data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
-        if (data?.event === 'infoDelivery' && data?.info) {
-          const info = data.info;
-          if (typeof info.currentTime === 'number') {
-            usePlayerStore.setState({
-              positionMs: Math.round(info.currentTime * 1000),
-            });
-          }
-          if (typeof info.duration === 'number' && info.duration > 0) {
-            usePlayerStore.setState({
-              durationMs: Math.round(info.duration * 1000),
-            });
-          }
-        }
-      } catch {}
-    };
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, [activeYouTubeId]);
 
   // Revoke created blob URLs on unmount to eliminate memory leaks
   useEffect(() => {
@@ -641,27 +593,18 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
         </div>
       )}
 
-      {/* Hidden YouTube Music Audio Bridge for Full-Track Playback */}
+      {/* Authoritative High-Fidelity YouTube Audio Bridge */}
       {activeYouTubeId && (
-        <iframe
-          ref={ytIframeRef}
-          key={`yt-audio-bridge-${activeYouTubeId}`}
-          src={`https://www.youtube-nocookie.com/embed/${activeYouTubeId}?autoplay=1&enablejsapi=1&playsinline=1&rel=0`}
-          title="YouTube Music Audio Bridge"
-          className="w-0 h-0 opacity-0 pointer-events-none absolute -bottom-10"
-          allow="autoplay; encrypted-media"
-          onLoad={() => {
-            if (ytIframeRef.current?.contentWindow) {
-              ytIframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'listening' }), '*');
-              ytIframeRef.current.contentWindow.postMessage(
-                JSON.stringify({ event: 'command', func: 'setVolume', args: [isMuted ? 0 : volume] }),
-                '*'
-              );
-              // Clear buffering state now that YouTube bridge is ready
-              usePlayerStore.setState({ isBuffering: false, isPaused: false });
-            }
-          }}
-        />
+        <div
+          className="fixed -left-[4000px] -top-[4000px] w-[320px] h-[240px] opacity-[0.02] pointer-events-none z-0"
+          aria-hidden="true"
+        >
+          <YouTubePlayer
+            youtubeId={activeYouTubeId}
+            initialPositionMs={positionMs}
+            onEnded={handleNext}
+          />
+        </div>
       )}
     </div>
   );

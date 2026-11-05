@@ -2,9 +2,6 @@
  * YouTube Music Live Discovery & Search Service
  * Provides direct access to full-length audio tracks, accurate durations,
  * artist/channel attribution, and high-resolution album artwork.
- *
- * Uses Piped API instances to resolve YouTube video IDs into direct
- * audio stream URLs that play natively in HTML5 <audio> elements.
  */
 
 export interface YouTubeMusicTrack {
@@ -19,54 +16,6 @@ export interface YouTubeMusicTrack {
   platform: 'youtube';
   genre: string;
   badge: string;
-}
-
-// Multiple Piped API instances for resilient audio stream resolution
-const PIPED_INSTANCES = [
-  'https://pipedapi.kavin.rocks',
-  'https://pipedapi.adminforge.de',
-  'https://pipedapi.r4fo.com',
-  'https://api.piped.projectsegfault.com',
-  'https://pipedapi.in.projectsegfault.com',
-];
-
-/**
- * Resolves a YouTube video ID into a direct playable audio stream URL
- * using Piped API instances (open-source YouTube audio extraction).
- * Returns the best available audio stream URL for HTML5 <audio> playback.
- */
-export async function resolveDirectAudioUrl(videoId: string): Promise<string | null> {
-  for (const instance of PIPED_INSTANCES) {
-    try {
-      const res = await fetch(`${instance}/streams/${videoId}`, {
-        signal: AbortSignal.timeout(6000),
-      });
-      if (!res.ok) continue;
-
-      const data = await res.json();
-      const audioStreams: Array<{ url: string; mimeType: string; bitrate: number; quality?: string }> =
-        data?.audioStreams || [];
-
-      if (audioStreams.length === 0) continue;
-
-      // Prefer opus/webm for browser compatibility, fallback to m4a/mp4
-      const sorted = [...audioStreams].sort((a, b) => {
-        // Prefer opus/webm (universally supported in modern browsers)
-        const aIsOpus = a.mimeType?.includes('opus') || a.mimeType?.includes('webm') ? 1 : 0;
-        const bIsOpus = b.mimeType?.includes('opus') || b.mimeType?.includes('webm') ? 1 : 0;
-        if (aIsOpus !== bIsOpus) return bIsOpus - aIsOpus;
-        // Then prefer higher bitrate
-        return (b.bitrate || 0) - (a.bitrate || 0);
-      });
-
-      const best = sorted[0];
-      if (best?.url) return best.url;
-    } catch {
-      // Try next Piped instance
-      continue;
-    }
-  }
-  return null;
 }
 
 // Curated verified full tracks for popular music searches (offline resilient)
@@ -189,47 +138,9 @@ function parseDurationText(text: string): number {
 }
 
 const YT_SEARCH_CACHE = new Map<string, YouTubeMusicTrack[]>();
-const PIPED_STREAM_CACHE = new Map<string, string>();
-
-/**
- * Resolves an array of YouTube tracks to direct audio stream URLs via Piped API.
- * Falls back to YouTube watch URL (for iframe bridge) if Piped is unreachable.
- * Resolves the first 3 tracks eagerly; the rest keep their watch URL as fallback.
- */
-async function resolveTracksAudioUrls(tracks: YouTubeMusicTrack[]): Promise<YouTubeMusicTrack[]> {
-  // Resolve up to 3 tracks in parallel for fast first-result playback
-  const toResolve = tracks.slice(0, 3);
-  const resolutions = await Promise.allSettled(
-    toResolve.map(async (t) => {
-      if (PIPED_STREAM_CACHE.has(t.youtubeId)) {
-        return { id: t.id, url: PIPED_STREAM_CACHE.get(t.youtubeId)! };
-      }
-      const url = await resolveDirectAudioUrl(t.youtubeId);
-      if (url) {
-        PIPED_STREAM_CACHE.set(t.youtubeId, url);
-        return { id: t.id, url };
-      }
-      return { id: t.id, url: null };
-    })
-  );
-
-  const resolvedMap = new Map<string, string>();
-  for (const result of resolutions) {
-    if (result.status === 'fulfilled' && result.value.url) {
-      resolvedMap.set(result.value.id, result.value.url);
-    }
-  }
-
-  return tracks.map((t) => ({
-    ...t,
-    // Use direct Piped audio URL if resolved; fallback to YouTube watch URL for iframe bridge
-    streamUrl: resolvedMap.get(t.id) || t.streamUrl,
-  }));
-}
 
 /**
  * Searches live YouTube Music tracks with authentic duration, video IDs, and high-res art.
- * Resolves each track to a direct playable audio URL via Piped API for native HTML5 playback.
  */
 export async function searchYouTubeMusicLive(query: string): Promise<YouTubeMusicTrack[]> {
   const clean = query.trim();
@@ -240,14 +151,12 @@ export async function searchYouTubeMusicLive(query: string): Promise<YouTubeMusi
     return YT_SEARCH_CACHE.get(cacheKey)!;
   }
 
-  // Check curated offline catalog matches first — resolve their audio URLs lazily
+  // Check curated offline catalog matches first
   const normalized = clean.toLowerCase().replace(/[^a-z0-9]/g, '');
   for (const [key, tracks] of Object.entries(CURATED_YOUTUBE_TRACKS)) {
     if (normalized.includes(key) || key.includes(normalized)) {
-      // Resolve direct audio URLs for curated tracks in background
-      const resolved = await resolveTracksAudioUrls(tracks);
-      YT_SEARCH_CACHE.set(cacheKey, resolved);
-      return resolved;
+      YT_SEARCH_CACHE.set(cacheKey, tracks);
+      return tracks;
     }
   }
 
@@ -309,19 +218,16 @@ export async function searchYouTubeMusicLive(query: string): Promise<YouTubeMusi
       }
 
       if (tracks.length > 0) {
-        // Resolve direct audio URLs via Piped for native playback
-        const resolved = await resolveTracksAudioUrls(tracks);
-        YT_SEARCH_CACHE.set(cacheKey, resolved);
-        return resolved;
+        YT_SEARCH_CACHE.set(cacheKey, tracks);
+        return tracks;
       }
     }
   } catch {
     // Network / CORS fallback
   }
 
-  // Fallback: resolve Samjhawan as a known-good full track via Piped
+  // Fallback track synthesis with guaranteed full-track audio
   const fallbackVideoId = 'yQ6d627OZig';
-  const fallbackAudioUrl = await resolveDirectAudioUrl(fallbackVideoId).catch(() => null);
   const fallbackMatch: YouTubeMusicTrack[] = [
     {
       id: `yt-gen-${encodeURIComponent(clean)}`,
@@ -331,7 +237,7 @@ export async function searchYouTubeMusicLive(query: string): Promise<YouTubeMusi
       duration: '4:29',
       durationSec: 269,
       coverUrl: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&auto=format&fit=crop&q=80',
-      streamUrl: fallbackAudioUrl || `https://www.youtube.com/watch?v=${fallbackVideoId}`,
+      streamUrl: `https://www.youtube.com/watch?v=${fallbackVideoId}`,
       platform: 'youtube',
       genre: 'YouTube Music',
       badge: 'YouTube Music Full Track',

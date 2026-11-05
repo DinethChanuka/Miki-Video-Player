@@ -70,12 +70,14 @@ describe('Full-Track Playback Audit — No 30-second iTunes preview clips', () =
       fullPlayerContent.includes('activeYouTubeId'),
       'Must detect YouTube video ID from currentUri'
     );
+    const ytPlayerPath = path.resolve('src/components/player/YouTubePlayer.tsx');
+    const ytPlayerContent = fs.readFileSync(ytPlayerPath, 'utf8');
     assert.ok(
-      fullPlayerContent.includes('postMessage'),
+      fullPlayerContent.includes('YouTubePlayer') && ytPlayerContent.includes('postMessage'),
       'Must synchronize playback via postMessage to YouTube iframe'
     );
     assert.ok(
-      fullPlayerContent.includes('youtube-nocookie.com/embed'),
+      fullPlayerContent.includes('YouTubePlayer') && ytPlayerContent.includes('youtube-nocookie.com/embed'),
       'Must use privacy-enhanced YouTube embed URL'
     );
   });

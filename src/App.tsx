@@ -800,7 +800,7 @@ export const App: React.FC = () => {
         {!youtubeId && !activeWebStream && <AmbientCanvas videoRef={videoRef} />}
 
         {/* Web Stream (YouTube, TikTok, Instagram, Cinema, Vimeo, Twitch) or Standard Video */}
-        {youtubeId ? (
+        {youtubeId && activePlaybackMode !== 'music' ? (
           <YouTubePlayer
             youtubeId={youtubeId}
             initialPositionMs={usePlayerStore.getState().positionMs}
