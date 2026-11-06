@@ -57,3 +57,31 @@ body,
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.4);
 }
+
+/* Hi-Fi Music Studio Timeline Indeterminate Buffering Beam */
+@keyframes miki-timeline-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.miki-timeline-buffering-beam {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(34, 211, 238, 0.3) 25%,
+    rgba(168, 85, 247, 0.9) 50%,
+    rgba(244, 63, 94, 0.8) 75%,
+    transparent 100%
+  );
+  animation: miki-timeline-shimmer 1.4s infinite cubic-bezier(0.4, 0, 0.2, 1);
+}
+

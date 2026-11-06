@@ -143,6 +143,9 @@ function localMediaStreamerPlugin() {
           execFile(
             ytDlpPath,
             [
+              '--force-ipv4',
+              '--no-check-certificates',
+              '--geo-bypass',
               '--extractor-args', 'youtube:skip=hls,dash,translated_subs',
               '-f', 'bestaudio[ext=m4a]/bestaudio[ext=mp4]/bestaudio',
               '--no-warnings',

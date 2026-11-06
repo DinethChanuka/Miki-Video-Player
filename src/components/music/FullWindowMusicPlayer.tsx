@@ -6,6 +6,7 @@ import {
   SkipBack,
   SkipForward,
   Volume2,
+  Volume1,
   VolumeX,
   Sliders,
   X,
@@ -15,6 +16,7 @@ import {
   Sparkles,
   Music,
   FolderOpen,
+  RefreshCw,
 } from 'lucide-react';
 import { FEATURED_MUSIC_TRACKS } from './MusicPlayerView';
 
@@ -35,6 +37,7 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
   const currentTitle = usePlayerStore((s) => s.currentTitle);
   const currentArtwork = usePlayerStore((s) => s.currentArtwork);
   const isPaused = usePlayerStore((s) => s.isPaused);
+  const isBuffering = usePlayerStore((s) => s.isBuffering);
   const positionMs = usePlayerStore((s) => s.positionMs);
   const durationMs = usePlayerStore((s) => s.durationMs);
   const volume = usePlayerStore((s) => s.volume);
@@ -133,6 +136,20 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
   const handleNext = () => {
     const nextIdx = (activeIndex + 1) % tracks.length;
     handleSelectTrack(nextIdx);
+  };
+
+  const handleVolumeChange = (newVal: number) => {
+    // 1. Instantaneous direct hardware volume update with smooth perceptual logarithmic curve:
+    const video = (document.getElementById('aether-video-viewport') as HTMLVideoElement) || null;
+    if (video) {
+      const isMutedNow = newVal === 0;
+      video.muted = isMutedNow;
+      const normalizedPercent = Math.min(100, newVal) / 100;
+      const smoothGain = Math.pow(normalizedPercent, 1.4);
+      video.volume = Math.max(0, Math.min(1.0, smoothGain));
+    }
+    // 2. Synchronous player store dispatch
+    setVolume(newVal);
   };
 
   const handleOpenLocalAudio = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -417,9 +434,27 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
                       (e.target as HTMLElement).style.display = 'none';
                     }}
                   />
-                  {isCenter && !isPaused && (
-                    <div className="absolute top-3 right-3 px-2 py-1 rounded-full bg-cyan-500/80 backdrop-blur-md text-[10px] font-mono text-black font-bold flex items-center gap-1 shadow-lg">
-                      <Sparkles className="w-3 h-3 animate-spin" /> PLAYING
+                  {isCenter && (
+                    isBuffering ? (
+                      <div className="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-amber-500/90 backdrop-blur-md text-[10px] font-mono text-slate-950 font-bold flex items-center gap-1.5 shadow-lg animate-pulse z-30">
+                        <RefreshCw className="w-3 h-3 animate-spin" /> LOADING STREAM...
+                      </div>
+                    ) : !isPaused ? (
+                      <div className="absolute top-3 right-3 px-2 py-1 rounded-full bg-cyan-500/80 backdrop-blur-md text-[10px] font-mono text-black font-bold flex items-center gap-1 shadow-lg z-30">
+                        <Sparkles className="w-3 h-3 animate-spin" /> PLAYING
+                      </div>
+                    ) : null
+                  )}
+
+                  {/* Frosted Loading Indicator Overlay when Stream is Buffering */}
+                  {isCenter && isBuffering && (
+                    <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm flex flex-col items-center justify-center gap-2 rounded-2xl z-20 pointer-events-none animate-in fade-in duration-200">
+                      <div className="p-3 rounded-full bg-cyan-500/20 border border-cyan-400/40 text-cyan-300 shadow-xl">
+                        <RefreshCw className="w-7 h-7 animate-spin" />
+                      </div>
+                      <span className="text-[11px] font-mono font-bold tracking-wider text-white uppercase drop-shadow">
+                        Buffering Audio Stream...
+                      </span>
                     </div>
                   )}
                 </div>
@@ -486,9 +521,15 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
             <button
               onClick={handlePlayToggle}
               className="w-12 h-12 rounded-2xl bg-gradient-to-r from-cyan-400 to-blue-500 hover:brightness-110 text-slate-950 flex items-center justify-center transition-all shadow-lg shadow-cyan-500/30 active:scale-95"
-              title="Play / Pause (Space)"
+              title={isBuffering ? "Loading Audio Stream..." : isPaused ? "Play (Space)" : "Pause (Space)"}
             >
-              {isPaused ? <Play className="w-5 h-5 fill-current ml-0.5" /> : <Pause className="w-5 h-5 fill-current" />}
+              {isBuffering ? (
+                <RefreshCw className="w-5 h-5 animate-spin text-slate-950" />
+              ) : isPaused ? (
+                <Play className="w-5 h-5 fill-current ml-0.5" />
+              ) : (
+                <Pause className="w-5 h-5 fill-current" />
+              )}
             </button>
             <button
               onClick={handleNext}
@@ -499,14 +540,17 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
             </button>
           </div>
 
-          {/* Center: Mini Track Badge & Interactive Scrubber Bar */}
+          {/* Center: Mini Track Badge & Interactive Scrubber Bar with Indeterminate Buffering Animation */}
           <div className="flex-1 flex flex-col gap-1.5 min-w-0 px-2">
             <div className="flex items-center justify-between text-[11px] font-mono text-white/50">
-              <span className="truncate max-w-[200px] font-semibold text-white/90">
+              <span className="truncate max-w-[200px] font-semibold text-white/90 flex items-center gap-1.5">
+                {isBuffering && <RefreshCw className="w-3 h-3 animate-spin text-cyan-400 shrink-0" />}
                 {activeTrack?.title}
               </span>
-              <span>
-                {formatTime(positionMs)} / {formatTime(effectiveDuration)}
+              <span className={isBuffering && positionMs === 0 ? "text-cyan-400 font-semibold animate-pulse" : ""}>
+                {isBuffering && positionMs === 0
+                  ? 'Buffering Audio...'
+                  : `${formatTime(positionMs)} / ${formatTime(effectiveDuration)}`}
               </span>
             </div>
             {/* Scrubber */}
@@ -520,6 +564,8 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
               }}
               className="relative w-full h-2 rounded-full bg-white/10 cursor-pointer overflow-hidden group"
             >
+              {/* Indeterminate Shimmer Beam when Buffering */}
+              {isBuffering && <div className="miki-timeline-buffering-beam z-10" />}
               <div
                 className="h-full bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-500 transition-all rounded-full group-hover:brightness-125"
                 style={{ width: `${progressPercent}%` }}
@@ -529,22 +575,38 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
 
           {/* Right: Sound Controls & Drawers */}
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-white/5 border border-white/10 hover:border-white/20 transition-all">
               <button
                 onClick={() => setMuted(!isMuted)}
-                className="p-2 rounded-xl hover:bg-white/10 text-white/70 hover:text-white"
+                className="p-1 rounded-lg hover:bg-white/10 text-white/70 hover:text-white transition-colors cursor-pointer"
                 title={isMuted ? 'Unmute' : 'Mute'}
               >
-                {isMuted || volume === 0 ? <VolumeX className="w-4 h-4 text-rose-400" /> : <Volume2 className="w-4 h-4" />}
+                {isMuted || volume === 0 ? (
+                  <VolumeX className="w-4 h-4 text-rose-400" />
+                ) : volume < 50 ? (
+                  <Volume1 className="w-4 h-4 text-white/80" />
+                ) : (
+                  <Volume2 className="w-4 h-4 text-cyan-400" />
+                )}
               </button>
-              <input
-                type="range"
-                min="0"
-                max="200"
-                value={isMuted ? 0 : volume}
-                onChange={(e) => setVolume(Number(e.target.value))}
-                className="w-20 accent-cyan-400 h-1 bg-white/20 rounded-lg cursor-pointer"
-              />
+
+              <div className="relative flex items-center group/vol">
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value={isMuted ? 0 : volume}
+                  onInput={(e) => handleVolumeChange(Number((e.target as HTMLInputElement).value))}
+                  onChange={(e) => handleVolumeChange(Number(e.target.value))}
+                  className="w-24 h-1.5 bg-white/20 rounded-full appearance-none cursor-pointer accent-cyan-400 hover:accent-cyan-300 transition-all"
+                  title={`Volume: ${Math.round(isMuted ? 0 : volume)}%`}
+                />
+              </div>
+
+              <span className="text-[10px] font-mono text-white/60 min-w-[28px] text-right font-medium">
+                {isMuted ? '0%' : `${Math.round(volume)}%`}
+              </span>
             </div>
 
             <button

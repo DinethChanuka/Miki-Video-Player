@@ -267,6 +267,7 @@ class StreamProxySession: NSObject, URLSessionDataDelegate {
     let id = UUID()
     let connection: NWConnection
     var onFinish: (() -> Void)?
+    var session: URLSession?
 
     init(connection: NWConnection) {
         self.connection = connection
@@ -355,6 +356,9 @@ class LocalAppServer {
             let proc = Process()
             proc.executableURL = URL(fileURLWithPath: ytDlpPath)
             proc.arguments = [
+                "--force-ipv4",
+                "--no-check-certificates",
+                "--geo-bypass",
                 "--extractor-args", "youtube:skip=hls,dash,translated_subs",
                 "-f", "bestaudio[ext=m4a]/bestaudio[ext=mp4]/bestaudio",
                 "--no-warnings",
@@ -539,6 +543,8 @@ class LocalAppServer {
                                 upstreamReq.setValue("bytes=0-", forHTTPHeaderField: "Range")
                             }
                             let proxyDelegate = StreamProxySession(connection: connection)
+                            let session = URLSession(configuration: .default, delegate: proxyDelegate, delegateQueue: nil)
+                            proxyDelegate.session = session
                             self.proxySessionsLock.lock()
                             self.activeProxySessions.insert(proxyDelegate)
                             self.proxySessionsLock.unlock()
@@ -548,9 +554,10 @@ class LocalAppServer {
                                 self.proxySessionsLock.lock()
                                 self.activeProxySessions.remove(proxyDelegate)
                                 self.proxySessionsLock.unlock()
+                                proxyDelegate.session?.finishTasksAndInvalidate()
+                                proxyDelegate.session = nil
                             }
 
-                            let session = URLSession(configuration: .default, delegate: proxyDelegate, delegateQueue: nil)
                             let dataTask = session.dataTask(with: upstreamReq)
                             dataTask.resume()
                         } else {

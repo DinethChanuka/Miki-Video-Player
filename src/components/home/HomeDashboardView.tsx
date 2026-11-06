@@ -596,7 +596,6 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
   const [gameFilterCategory, setGameFilterCategory] = useState<string>('All');
   const [isUserLoggedIn, setIsUserLoggedIn] = useState<boolean>(true);
   const [activeAlbumIdx, setActiveAlbumIdx] = useState<number>(2); // Default to Hindi Songs 3 (YouTube Music)
-  const [isCoverFlowPlaying, setIsCoverFlowPlaying] = useState<boolean>(false);
   const [partiesToggle, setPartiesToggle] = useState<boolean>(true);
   const [continueToggle, setContinueToggle] = useState<boolean>(true);
   const [cinesubzList, setCinesubzList] = useState<CineSubzMovie[]>(CINESUBZ_MOVIES);
@@ -653,6 +652,11 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
   const volume = usePlayerStore((s) => s.volume);
   const isMuted = usePlayerStore((s) => s.isMuted);
   const toggleMute = usePlayerStore((s) => s.toggleMute);
+  const isBuffering = usePlayerStore((s) => s.isBuffering);
+  const isPaused = usePlayerStore((s) => s.isPaused);
+  const togglePlay = usePlayerStore((s) => s.togglePlay);
+  const activePlaybackMode = usePlayerStore((s) => s.activePlaybackMode);
+  const currentUri = usePlayerStore((s) => s.currentUri);
 
   const activeAlbum = COVER_FLOW_ALBUMS[activeAlbumIdx] || COVER_FLOW_ALBUMS[0];
 
@@ -991,7 +995,6 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
     const track = COVER_FLOW_ALBUMS[idx];
     if (track) {
       openMedia(track.url, `${track.title} - ${track.artist}`, true, 0, track.albumArt, 'music');
-      setIsCoverFlowPlaying(true);
     }
   };
 
@@ -2119,7 +2122,6 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                             previouslyPlayed.thumbnailUri,
                             'music'
                           );
-                          setIsCoverFlowPlaying(true);
                         } else {
                           handlePlayAlbum(idx);
                         }
@@ -2186,7 +2188,9 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
 
                   <button
                     onClick={() => {
-                      if (previouslyPlayed) {
+                      if (currentUri && activePlaybackMode === 'music') {
+                        togglePlay();
+                      } else if (previouslyPlayed) {
                         openMedia(
                           previouslyPlayed.uri,
                           previouslyPlayed.title,
@@ -2195,14 +2199,16 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                           previouslyPlayed.thumbnailUri,
                           'music'
                         );
-                        setIsCoverFlowPlaying(true);
                       } else {
                         handlePlayAlbum(activeAlbumIdx);
                       }
                     }}
                     className="p-2.5 rounded-full bg-white text-slate-950 hover:scale-105 transition-all cursor-pointer shadow-lg"
+                    title={isBuffering ? "Loading Audio Stream..." : !isPaused && activePlaybackMode === 'music' ? "Pause (Space)" : "Play (Space)"}
                   >
-                    {isCoverFlowPlaying ? (
+                    {isBuffering ? (
+                      <RefreshCw className="w-4 h-4 animate-spin text-slate-950" />
+                    ) : !isPaused && activePlaybackMode === 'music' ? (
                       <Pause className="w-4 h-4 fill-current" />
                     ) : (
                       <Play className="w-4 h-4 fill-current ml-0.5" />

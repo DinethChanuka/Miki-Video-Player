@@ -13,6 +13,7 @@ import {
   X,
   Music,
   Radio,
+  RefreshCw,
 } from 'lucide-react';
 
 export interface PersistentMusicControlHubProps {
@@ -26,6 +27,7 @@ export const PersistentMusicControlHub: React.FC<PersistentMusicControlHubProps>
   const currentTitle = usePlayerStore((s) => s.currentTitle);
   const currentArtwork = usePlayerStore((s) => s.currentArtwork);
   const isPaused = usePlayerStore((s) => s.isPaused);
+  const isBuffering = usePlayerStore((s) => s.isBuffering);
   const positionMs = usePlayerStore((s) => s.positionMs);
   const durationMs = usePlayerStore((s) => s.durationMs);
   const volume = usePlayerStore((s) => s.volume);
@@ -179,9 +181,11 @@ export const PersistentMusicControlHub: React.FC<PersistentMusicControlHubProps>
             <button
               onClick={togglePlay}
               className="p-2 rounded-full bg-white text-slate-950 hover:bg-cyan-200 transition-all cursor-pointer shadow-lg hover:scale-105 active:scale-95"
-              title={isPaused ? 'Play (Space)' : 'Pause (Space)'}
+              title={isBuffering ? "Loading Audio Stream..." : isPaused ? 'Play (Space)' : 'Pause (Space)'}
             >
-              {isPaused ? (
+              {isBuffering ? (
+                <RefreshCw className="w-4 h-4 animate-spin text-slate-950" />
+              ) : isPaused ? (
                 <Play className="w-4 h-4 fill-current ml-0.5" />
               ) : (
                 <Pause className="w-4 h-4 fill-current" />
@@ -197,9 +201,11 @@ export const PersistentMusicControlHub: React.FC<PersistentMusicControlHubProps>
             </button>
           </div>
 
-          {/* Timeline Scrubber */}
+          {/* Timeline Scrubber with Indeterminate Buffering Beam */}
           <div className="w-full flex items-center gap-2 text-[10px] font-mono text-white/50">
-            <span className="w-8 text-right text-white/70">{formatTime(positionMs)}</span>
+            <span className="w-8 text-right text-white/70">
+              {isBuffering && positionMs === 0 ? '...' : formatTime(positionMs)}
+            </span>
             <div
               onClick={(e) => {
                 if (durationMs <= 0) return;
@@ -210,13 +216,14 @@ export const PersistentMusicControlHub: React.FC<PersistentMusicControlHubProps>
               }}
               className="flex-1 h-1.5 bg-white/15 rounded-full overflow-hidden relative cursor-pointer group"
             >
+              {isBuffering && <div className="miki-timeline-buffering-beam z-10" />}
               <div
                 className="h-full bg-gradient-to-r from-cyan-400 via-purple-400 to-rose-400 rounded-full transition-all duration-100"
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
             <span className="w-8 text-left text-white/70">
-              {durationMs > 0 ? formatTime(durationMs) : 'Live'}
+              {isBuffering && positionMs === 0 ? 'Load' : durationMs > 0 ? formatTime(durationMs) : 'Live'}
             </span>
           </div>
         </div>
@@ -231,7 +238,7 @@ export const PersistentMusicControlHub: React.FC<PersistentMusicControlHubProps>
             >
               {isMuted || volume === 0 ? (
                 <VolumeX className="w-3.5 h-3.5 text-rose-400" />
-              ) : volume < 0.5 ? (
+              ) : volume < 50 ? (
                 <Volume1 className="w-3.5 h-3.5" />
               ) : (
                 <Volume2 className="w-3.5 h-3.5 text-cyan-400" />
@@ -240,12 +247,22 @@ export const PersistentMusicControlHub: React.FC<PersistentMusicControlHubProps>
             <input
               type="range"
               min={0}
-              max={1}
-              step={0.05}
+              max={100}
+              step={1}
               value={isMuted ? 0 : volume}
-              onChange={(e) => setVolume(parseFloat(e.target.value))}
+              onInput={(e) => {
+                const val = parseInt((e.target as HTMLInputElement).value, 10);
+                const video = (document.getElementById('aether-video-viewport') as HTMLVideoElement) || null;
+                if (video) {
+                  video.muted = val === 0;
+                  const normalized = Math.min(100, val) / 100;
+                  video.volume = Math.max(0, Math.min(1.0, Math.pow(normalized, 1.4)));
+                }
+                setVolume(val);
+              }}
+              onChange={(e) => setVolume(parseInt(e.target.value, 10))}
               className="w-14 sm:w-16 h-1 accent-cyan-400 bg-white/20 rounded-full cursor-pointer"
-              title={`Volume: ${Math.round(volume * 100)}%`}
+              title={`Volume: ${Math.round(volume)}%`}
             />
           </div>
 

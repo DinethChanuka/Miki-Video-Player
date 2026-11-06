@@ -977,8 +977,6 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
         isPaused: telemetry.isPaused,
         isBuffering: telemetry.isBuffering,
         playbackRate: telemetry.playbackRate,
-        volume: telemetry.volume,
-        isMuted: telemetry.isMuted,
         audioTracks: telemetry.audioTracks,
         subtitleTracks: telemetry.subtitleTracks,
         chapters: telemetry.chapters,
@@ -1359,6 +1357,8 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     set({ recentMedia: updatedRecent });
     saveStoredRecentMedia(updatedRecent);
 
+    console.log(`%c[Miki Music Request] openMedia: ${resolvedTitle} | mode=${playbackMode} | URI: ${uri}`, 'color: #06b6d4; font-weight: bold;');
+
     if (isTauriRuntime()) {
       try {
         const session = await invoke<MediaSessionBundle>('db_load_or_init_session', {
@@ -1385,6 +1385,8 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
           resumeBannerPositionMs: !autoResume && savedPos > 0 ? savedPos : null,
           retryCount: 0,
           isPaused: false,
+          isBuffering: true,
+          positionMs: startPos,
         });
 
         await get().engine?.load(uri, startPos);
@@ -1482,22 +1484,33 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
   },
 
   togglePlay: async () => {
-    const { engine, isPaused, currentMediaId, currentUri, positionMs, durationMs } = get();
+    const { engine, isPaused, currentMediaId, currentUri, positionMs, durationMs, activePlaybackMode } = get();
 
-    // Check if currently playing YouTube
-    const isYouTube = /(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/.test(currentUri || '');
-    if (isYouTube) {
+    console.log(
+      `%c[Miki Music Action] togglePlay called | isPaused=${isPaused} -> ${!isPaused} | mode=${activePlaybackMode} | URI: ${currentUri}`,
+      'color: #06b6d4; font-weight: bold;'
+    );
+
+    // Check if currently playing YouTube video embed (iframe)
+    const isMusicOrRadio = activePlaybackMode === 'music' || activePlaybackMode === 'radio';
+    const isYouTubeVideo =
+      !isMusicOrRadio &&
+      /(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/.test(currentUri || '');
+
+    if (isYouTubeVideo) {
       set({ isPaused: !isPaused });
       return;
     }
 
-    // Direct DOM element control for 100% reliable local video playback
+    // Direct DOM element control for 100% reliable local video and music playback
     const video = (document.getElementById('aether-video-viewport') as HTMLVideoElement) || null;
     if (video) {
       if (video.paused) {
         try {
+          video.muted = false;
           await video.play();
           set({ isPaused: false });
+          console.log('%c[Miki Music Status] Resumed HTML5 video playback', 'color: #10b981;');
         } catch {
           video.muted = false;
           await video.play().catch(() => {});
@@ -1509,6 +1522,7 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
       } else {
         video.pause();
         set({ isPaused: true });
+        console.log('%c[Miki Music Status] Paused HTML5 video playback', 'color: #8b5cf6;');
         if (engine && 'pause' in engine) {
           await engine.pause().catch(() => {});
         }
@@ -1536,6 +1550,7 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
 
   seek: async (timestampMs, exact = false) => {
     set({ positionMs: timestampMs });
+    console.log(`%c[Miki Music Action] seek to ${(timestampMs / 1000).toFixed(2)}s`, 'color: #06b6d4;');
     const { currentUri, engine, activePlaybackMode } = get();
     const isYouTube = /(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/.test(currentUri || '');
     if (isYouTube && activePlaybackMode === 'video') {
@@ -1544,14 +1559,32 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
       }
       return;
     }
+    const video = (document.getElementById('aether-video-viewport') as HTMLVideoElement) || null;
+    if (video) {
+      video.currentTime = Math.max(0, timestampMs / 1000);
+    }
     await engine?.seek(timestampMs, exact);
   },
 
   setVolume: async (volume) => {
+    // Defense normalization: if non-zero volume is passed as 0..1 (float fraction), convert to 0..100
+    const normalized = volume > 0 && volume <= 1.0 ? Math.round(volume * 100) : volume;
     // Allows 0% to 200% VLC overdrive
-    const clamped = Math.max(0, Math.min(200, volume));
+    const clamped = Math.max(0, Math.min(200, normalized));
     const isMuted = clamped === 0;
     set({ volume: clamped, isMuted });
+
+    console.log(`%c[Miki Music Action] setVolume: ${clamped}%, isMuted: ${isMuted}`, 'color: #06b6d4;');
+
+    // Direct hardware volume control on DOM video element with smooth perceptual exponential curve
+    const video = (document.getElementById('aether-video-viewport') as HTMLVideoElement) || null;
+    if (video) {
+      video.muted = isMuted;
+      const normalizedPercent = Math.min(100, clamped) / 100;
+      const smoothGain = Math.pow(normalizedPercent, 1.4);
+      video.volume = Math.max(0, Math.min(1.0, smoothGain));
+    }
+
     await get().engine?.setVolume(clamped);
 
     // Broadcast sound change across web streams, YouTube & native WKWebView
@@ -1576,6 +1609,19 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     set({ isMuted: muted });
     const currentVol = get().volume;
     const effectiveVol = muted ? 0 : currentVol;
+    console.log(`%c[Miki Music Action] setMuted: ${muted}, effectiveVolume: ${effectiveVol}%`, 'color: #06b6d4;');
+
+    // Direct hardware mute control on DOM video element with smooth perceptual exponential curve
+    const video = (document.getElementById('aether-video-viewport') as HTMLVideoElement) || null;
+    if (video) {
+      video.muted = muted;
+      if (!muted) {
+        const normalizedPercent = Math.min(100, currentVol) / 100;
+        const smoothGain = Math.pow(normalizedPercent, 1.4);
+        video.volume = Math.max(0, Math.min(1.0, smoothGain));
+      }
+    }
+
     await get().engine?.setVolume(effectiveVol);
 
     if (typeof window !== 'undefined') {
