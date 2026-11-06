@@ -263,13 +263,127 @@ class AppAssetSchemeHandler: NSObject, WKURLSchemeHandler {
     func webView(_ webView: WKWebView, stop urlSchemeTask: WKURLSchemeTask) {}
 }
 
+class StreamProxySession: NSObject, URLSessionDataDelegate {
+    let id = UUID()
+    let connection: NWConnection
+    var onFinish: (() -> Void)?
+
+    init(connection: NWConnection) {
+        self.connection = connection
+    }
+
+    static func == (lhs: StreamProxySession, rhs: StreamProxySession) -> Bool {
+        lhs.id == rhs.id
+    }
+
+    override var hash: Int {
+        id.hashValue
+    }
+
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse, completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
+        guard let httpResp = response as? HTTPURLResponse else {
+            completionHandler(.cancel)
+            return
+        }
+        var header = "HTTP/1.1 \(httpResp.statusCode) \(httpResp.statusCode == 206 ? "Partial Content" : "OK")\r\n"
+        header += "Content-Type: \(httpResp.value(forHTTPHeaderField: "Content-Type") ?? "audio/mp4")\r\n"
+        if let cl = httpResp.value(forHTTPHeaderField: "Content-Length") {
+            header += "Content-Length: \(cl)\r\n"
+        }
+        if let cr = httpResp.value(forHTTPHeaderField: "Content-Range") {
+            header += "Content-Range: \(cr)\r\n"
+        }
+        header += "Accept-Ranges: bytes\r\n"
+        header += "Access-Control-Allow-Origin: *\r\n"
+        header += "Access-Control-Expose-Headers: Content-Length, Content-Range, Accept-Ranges\r\n"
+        header += "Cache-Control: no-store\r\n"
+        header += "Connection: close\r\n\r\n"
+        
+        if let headerData = header.data(using: .utf8) {
+            connection.send(content: headerData, completion: .contentProcessed({ _ in }))
+        }
+        completionHandler(.allow)
+    }
+
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+        connection.send(content: data, completion: .contentProcessed({ _ in }))
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        connection.send(content: nil, contentContext: .finalMessage, isComplete: true, completion: .contentProcessed({ [weak self] _ in
+            self?.connection.cancel()
+            self?.onFinish?()
+        }))
+    }
+}
+
 class LocalAppServer {
     private var listener: NWListener?
     let baseDir: URL
     let port: UInt16 = 39281
+    private var streamCache: [String: (url: String, expires: Date)] = [:]
+    private let cacheLock = NSLock()
+    private var activeProxySessions = Set<StreamProxySession>()
+    private let proxySessionsLock = NSLock()
 
     init(baseDir: URL) {
         self.baseDir = baseDir
+    }
+
+    private func resolveAudioStream(videoId: String, completion: @escaping (String?) -> Void) {
+        cacheLock.lock()
+        if let cached = streamCache[videoId], cached.expires > Date() {
+            let url = cached.url
+            cacheLock.unlock()
+            completion(url)
+            return
+        }
+        cacheLock.unlock()
+
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self = self else { completion(nil); return }
+            
+            var ytDlpPath = "./bin/yt-dlp"
+            if let resBin = Bundle.main.resourcePath.map({ "\($0)/bin/yt-dlp" }), FileManager.default.fileExists(atPath: resBin) {
+                ytDlpPath = resBin
+            } else if FileManager.default.fileExists(atPath: "./bin/yt-dlp") {
+                ytDlpPath = "./bin/yt-dlp"
+            } else if FileManager.default.fileExists(atPath: "/usr/local/bin/yt-dlp") {
+                ytDlpPath = "/usr/local/bin/yt-dlp"
+            }
+            
+            let proc = Process()
+            proc.executableURL = URL(fileURLWithPath: ytDlpPath)
+            proc.arguments = [
+                "--extractor-args", "youtube:skip=hls,dash,translated_subs",
+                "-f", "bestaudio[ext=m4a]/bestaudio[ext=mp4]/bestaudio",
+                "--no-warnings",
+                "--no-playlist",
+                "-g",
+                "https://www.youtube.com/watch?v=\(videoId)"
+            ]
+            let pipe = Pipe()
+            proc.standardOutput = pipe
+            proc.standardError = Pipe()
+            
+            do {
+                try proc.run()
+                proc.waitUntilExit()
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                if let outStr = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                   !outStr.isEmpty && outStr.hasPrefix("http") {
+                    let firstUrl = outStr.components(separatedBy: "\n").first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? outStr
+                    self.cacheLock.lock()
+                    self.streamCache[videoId] = (url: firstUrl, expires: Date().addingTimeInterval(14400))
+                    self.cacheLock.unlock()
+                    completion(firstUrl)
+                    return
+                }
+            } catch {
+                NSLog("[Miki Server] yt-dlp execution error: %@", error.localizedDescription)
+            }
+            completion(nil)
+        }
     }
 
     func start() {
@@ -375,6 +489,106 @@ class LocalAppServer {
                     resp.append(jsonRespData)
                     connection.send(content: resp, completion: .contentProcessed({ _ in connection.cancel() }))
                 }.resume()
+                return
+            }
+
+            // Direct native YouTube audio stream resolution & streaming endpoint (Hidara pattern)
+            if cleanPath == "/api/stream-audio" || cleanPath.hasPrefix("/api/stream-audio") {
+                let queryItems = URLComponents(string: rawPath)?.queryItems
+                let rawId = queryItems?.first(where: { $0.name == "id" })?.value ?? ""
+                let rawUrl = queryItems?.first(where: { $0.name == "url" })?.value ?? ""
+                let redirect = queryItems?.first(where: { $0.name == "redirect" })?.value == "true"
+                let isStream = queryItems?.first(where: { $0.name == "stream" })?.value == "true" ||
+                               reqStr.lowercased().contains("range:") ||
+                               reqStr.lowercased().contains("accept: audio")
+                
+                var videoId = rawId.trimmingCharacters(in: .whitespacesAndNewlines)
+                if videoId.isEmpty && !rawUrl.isEmpty {
+                    if let match = rawUrl.range(of: "([a-zA-Z0-9_-]{11})", options: .regularExpression) {
+                        videoId = String(rawUrl[match])
+                    }
+                }
+                
+                guard !videoId.isEmpty else {
+                    let errResp = "HTTP/1.1 400 Bad Request\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n{\"error\":\"missing_id\"}"
+                    connection.send(content: errResp.data(using: .utf8)!, completion: .contentProcessed({ _ in connection.cancel() }))
+                    return
+                }
+
+                self.resolveAudioStream(videoId: videoId) { resolvedUrl in
+                    if let directUrl = resolvedUrl {
+                        if redirect {
+                            var redirectResp = "HTTP/1.1 302 Found\r\n"
+                            redirectResp += "Location: \(directUrl)\r\n"
+                            redirectResp += "Access-Control-Allow-Origin: *\r\n"
+                            redirectResp += "Connection: close\r\n\r\n"
+                            connection.send(content: redirectResp.data(using: .utf8)!, completion: .contentProcessed({ _ in connection.cancel() }))
+                        } else if isStream {
+                            // Hidara audio proxy: forward range requests with valid yt-dlp User-Agent & CORS headers
+                            guard let targetUrl = URL(string: directUrl) else {
+                                let errResp = "HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\n\r\n"
+                                connection.send(content: errResp.data(using: .utf8)!, completion: .contentProcessed({ _ in connection.cancel() }))
+                                return
+                            }
+                            var upstreamReq = URLRequest(url: targetUrl)
+                            upstreamReq.setValue("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36", forHTTPHeaderField: "User-Agent")
+                            if let clientRange = reqStr.components(separatedBy: "\r\n").first(where: { $0.lowercased().hasPrefix("range:") }) {
+                                let rangeVal = clientRange.components(separatedBy: ":").dropFirst().joined(separator: ":").trimmingCharacters(in: .whitespaces)
+                                upstreamReq.setValue(rangeVal, forHTTPHeaderField: "Range")
+                            } else {
+                                upstreamReq.setValue("bytes=0-", forHTTPHeaderField: "Range")
+                            }
+                            let proxyDelegate = StreamProxySession(connection: connection)
+                            self.proxySessionsLock.lock()
+                            self.activeProxySessions.insert(proxyDelegate)
+                            self.proxySessionsLock.unlock()
+
+                            proxyDelegate.onFinish = { [weak self, weak proxyDelegate] in
+                                guard let self = self, let proxyDelegate = proxyDelegate else { return }
+                                self.proxySessionsLock.lock()
+                                self.activeProxySessions.remove(proxyDelegate)
+                                self.proxySessionsLock.unlock()
+                            }
+
+                            let session = URLSession(configuration: .default, delegate: proxyDelegate, delegateQueue: nil)
+                            let dataTask = session.dataTask(with: upstreamReq)
+                            dataTask.resume()
+                        } else {
+                            let jsonPayload: [String: Any] = [
+                                "url": directUrl,
+                                "id": videoId,
+                                "source": "youtube",
+                                "kind": "direct_stream"
+                            ]
+                            let jsonData = (try? JSONSerialization.data(withJSONObject: jsonPayload)) ?? Data("{}".utf8)
+                            var header = "HTTP/1.1 200 OK\r\n"
+                            header += "Content-Type: application/json; charset=utf-8\r\n"
+                            header += "Content-Length: \(jsonData.count)\r\n"
+                            header += "Access-Control-Allow-Origin: *\r\n"
+                            header += "Cache-Control: no-cache\r\n"
+                            header += "Connection: close\r\n\r\n"
+                            var resp = header.data(using: .utf8)!
+                            resp.append(jsonData)
+                            connection.send(content: resp, completion: .contentProcessed({ _ in connection.cancel() }))
+                        }
+                    } else {
+                        let jsonPayload: [String: Any] = [
+                            "url": "https://www.youtube.com/watch?v=\(videoId)",
+                            "id": videoId,
+                            "source": "youtube",
+                            "fallback": true
+                        ]
+                        let jsonData = (try? JSONSerialization.data(withJSONObject: jsonPayload)) ?? Data("{}".utf8)
+                        var header = "HTTP/1.1 200 OK\r\n"
+                        header += "Content-Type: application/json; charset=utf-8\r\n"
+                        header += "Content-Length: \(jsonData.count)\r\n"
+                        header += "Access-Control-Allow-Origin: *\r\n"
+                        header += "Connection: close\r\n\r\n"
+                        var resp = header.data(using: .utf8)!
+                        resp.append(jsonData)
+                        connection.send(content: resp, completion: .contentProcessed({ _ in connection.cancel() }))
+                    }
+                }
                 return
             }
 

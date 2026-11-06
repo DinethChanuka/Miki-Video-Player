@@ -956,11 +956,14 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     }
 
     engine.onTelemetry((telemetry: PlaybackTelemetry) => {
-      // If an external web stream (YouTube, TikTok, Instagram) is actively playing,
+      // If an external web stream (YouTube, TikTok, Instagram) is actively playing in video mode,
       // completely IGNORE telemetry from the background idle/paused HTML5 <video> element!
       const activeUri = get().currentUri;
+      const isMusicOrRadio = get().activePlaybackMode === 'music' || get().activePlaybackMode === 'radio';
       const isExternalStream =
-        activeUri && /(?:youtube\.com|youtu\.be|tiktok\.com|instagram\.com)/i.test(activeUri);
+        !isMusicOrRadio &&
+        activeUri &&
+        /(?:youtube\.com|youtu\.be|tiktok\.com|instagram\.com)/i.test(activeUri);
 
       if (isExternalStream) {
         // Do not let background paused video element overwrite external player state!
@@ -1533,9 +1536,9 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
 
   seek: async (timestampMs, exact = false) => {
     set({ positionMs: timestampMs });
-    const { currentUri, engine } = get();
+    const { currentUri, engine, activePlaybackMode } = get();
     const isYouTube = /(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/.test(currentUri || '');
-    if (isYouTube) {
+    if (isYouTube && activePlaybackMode === 'video') {
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('miki:youtube-seek', { detail: { positionSec: timestampMs / 1000 } }));
       }

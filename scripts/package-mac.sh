@@ -81,6 +81,11 @@ echo "[Miki Player] Copying embedded dist web assets..."
 rm -rf "Miki Player.app/Contents/Resources/dist"
 cp -r dist "Miki Player.app/Contents/Resources/dist"
 
+echo "[Miki Player] Bundling yt-dlp native audio engine..."
+mkdir -p "Miki Player.app/Contents/Resources/bin"
+cp bin/yt-dlp "Miki Player.app/Contents/Resources/bin/yt-dlp"
+chmod +x "Miki Player.app/Contents/Resources/bin/yt-dlp"
+
 echo "[Miki Player] Installing native executable binary..."
 cp MikiPlayer "Miki Player.app/Contents/MacOS/Miki Player"
 chmod +x "Miki Player.app/Contents/MacOS/Miki Player"

@@ -3,6 +3,7 @@ import Hls from 'hls.js';
 import { SpatialAudioEngine } from './SpatialAudioEngine';
 import { HlsStreamController } from './HlsStreamController.ts';
 import { ChunkedAudioStreamController } from './ChunkedAudioStreamController.ts';
+import { parseYouTubeId } from '../utils/webStreamUtils.ts';
 
 export type EngineType = 'tauri-mpv' | 'web-media';
 
@@ -225,6 +226,21 @@ export class TauriMpvEngine implements IPlayerEngine {
     this.errorListeners.clear();
     await invoke('destroy_native_player').catch(() => {});
   }
+}
+
+/**
+ * Resolves a direct audio stream URL for a YouTube track via the local stream-audio backend.
+ * Adopts the Hidara architecture pattern using yt-dlp direct Opus/WebM extraction.
+ */
+export async function resolveYouTubeAudioStream(youtubeId: string): Promise<string> {
+  const origin =
+    typeof window !== 'undefined' && window.location?.origin?.startsWith('http')
+      ? window.location.origin
+      : 'http://127.0.0.1:39281';
+
+  // Hidara pattern: Return direct local audio streaming proxy endpoint
+  // Ensures same-origin, Range byte-seeking, and CORS headers for WebAudio DSP
+  return `${origin}/api/stream-audio?id=${encodeURIComponent(youtubeId)}&stream=true`;
 }
 
 export function resolveMediaStreamUrl(uri: string): string {
@@ -459,17 +475,6 @@ export class WebMediaEngine implements IPlayerEngine {
   async load(uri: string, startPositionMs = 0): Promise<void> {
     this.setupWebAudioGraph();
 
-    // If YouTube URL, never pass to <video> src
-    if (/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)/.test(uri)) {
-      const el = this.getVideoEl();
-      if (el) {
-        el.pause();
-        el.removeAttribute('src');
-        el.load();
-      }
-      return;
-    }
-
     const el = this.getVideoEl();
     if (!el) return;
 
@@ -482,22 +487,37 @@ export class WebMediaEngine implements IPlayerEngine {
       this.chunkedAudioController = null;
     }
 
+    // Direct YouTube Music Audio Stream Resolution (Hidara Architecture)
+    const youtubeId = parseYouTubeId(uri);
+    if (youtubeId) {
+      try {
+        el.crossOrigin = 'anonymous';
+      } catch {
+        el.removeAttribute('crossOrigin');
+      }
+
+      try {
+        const directAudioUrl = await resolveYouTubeAudioStream(youtubeId);
+        el.src = directAudioUrl;
+        if (startPositionMs > 0) {
+          el.currentTime = startPositionMs / 1000;
+        }
+        this.setupWebAudioGraph();
+        await this.play().catch(() => {});
+        if (typeof window !== 'undefined') {
+          import('../store/playerStore')
+            .then(({ usePlayerStore }) => usePlayerStore.setState({ isBuffering: false, isPaused: false }))
+            .catch(() => {});
+        }
+        return;
+      } catch (err) {
+        logWarn('YouTube direct audio stream loading fallback: ' + String(err));
+      }
+    }
+
     const resolvedUri = resolveMediaStreamUrl(uri);
     const isHls = HlsStreamController.isHlsUrl(resolvedUri);
     const isAudio = ChunkedAudioStreamController.isAudioUrl(resolvedUri);
-
-    // YouTube URLs are played via the YouTube Audio Bridge iframe in FullWindowMusicPlayer,
-    // NOT through the native HTML5 audio element. Skip engine load entirely.
-    const isYouTubeUrl = /(?:youtube\.com\/(?:watch\?|embed\/|shorts\/)|youtu\.be\/)/i.test(resolvedUri);
-    if (isYouTubeUrl) {
-      // Clear buffering state — the YouTube iframe bridge handles playback independently
-      if (typeof window !== 'undefined') {
-        import('../store/playerStore')
-          .then(({ usePlayerStore }) => usePlayerStore.setState({ isBuffering: false, isPaused: false }))
-          .catch(() => {});
-      }
-      return;
-    }
 
     // Enable crossOrigin = 'anonymous' so WebAudio createMediaElementSource receives authorized audio
     // Adaptive CORS recovery in onerror will automatically remove crossOrigin if the remote server rejects it

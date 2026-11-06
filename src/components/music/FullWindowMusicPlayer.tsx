@@ -75,15 +75,28 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
         const idx = prev.findIndex((t) => t.url === currentUri);
         if (idx !== -1) {
           setActiveIndex(idx);
+          if (durationMs > 0 && prev[idx].durationSec !== Math.floor(durationMs / 1000)) {
+            const updated = [...prev];
+            updated[idx] = { ...updated[idx], durationSec: Math.floor(durationMs / 1000) };
+            return updated;
+          }
           return prev;
         } else if (currentTitle) {
-          const parts = currentTitle.split(' - ');
-          const title = parts[0]?.trim() || currentTitle;
-          const artist = parts[1]?.trim() || 'Featured Artist';
+          let songTitle = currentTitle;
+          let songArtist = 'YouTube Music';
+          if (currentTitle.includes(' - ')) {
+            const parts = currentTitle.split(' - ');
+            songTitle = parts[1]?.trim() || parts[0]?.trim() || currentTitle;
+            songArtist = parts[0]?.trim() || 'Official Artist';
+          } else if (currentTitle.includes(' | ')) {
+            const parts = currentTitle.split(' | ');
+            songTitle = parts[0]?.trim() || currentTitle;
+            songArtist = parts[1]?.trim() || 'Official Artist';
+          }
           const newTrack = {
             id: `current-${Date.now()}`,
-            title,
-            artist,
+            title: songTitle,
+            artist: songArtist,
             url: currentUri,
             durationSec: durationMs ? Math.floor(durationMs / 1000) : 210,
             albumArt: currentArtwork || 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=500&auto=format&fit=crop&q=80',
@@ -94,13 +107,21 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
         return prev;
       });
     }
-  }, [currentUri, currentTitle, currentArtwork, durationMs]);
+  }, [currentUri, currentTitle, currentArtwork]);
 
   const handleSelectTrack = (idx: number) => {
     setActiveIndex(idx);
     const tr = tracks[idx];
     if (tr) {
       openMedia(tr.url, tr.title, true, 0, tr.albumArt, 'music');
+    }
+  };
+
+  const handlePlayToggle = () => {
+    if (!currentUri && activeTrack) {
+      openMedia(activeTrack.url, activeTrack.title, true, 0, activeTrack.albumArt, 'music');
+    } else {
+      togglePlay();
     }
   };
 
@@ -139,7 +160,7 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
     const handleKey = (e: KeyboardEvent) => {
       if (e.code === 'Space') {
         e.preventDefault();
-        togglePlay();
+        handlePlayToggle();
       } else if (e.code === 'ArrowLeft') {
         e.preventDefault();
         handlePrev();
@@ -217,7 +238,8 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
     return () => cancelAnimationFrame(animId);
   }, [isOpen, isPaused]);
 
-  const progressPercent = durationMs > 0 ? (positionMs / durationMs) * 100 : 0;
+  const effectiveDuration = durationMs > 0 ? durationMs : (activeTrack?.durationSec ? activeTrack.durationSec * 1000 : 0);
+  const progressPercent = effectiveDuration > 0 ? Math.min(100, (positionMs / effectiveDuration) * 100) : 0;
 
   const formatTime = (ms: number) => {
     const s = Math.floor(ms / 1000);
@@ -376,7 +398,7 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
             return (
               <div
                 key={track.id}
-                onClick={() => handleSelectTrack(idx)}
+                onClick={() => (isCenter ? handlePlayToggle() : handleSelectTrack(idx))}
                 className="absolute w-64 h-64 cursor-pointer transition-all duration-500 ease-out flex flex-col items-center group select-none"
                 style={{
                   transform,
@@ -462,7 +484,7 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
               <SkipBack className="w-5 h-5 fill-white/80" />
             </button>
             <button
-              onClick={togglePlay}
+              onClick={handlePlayToggle}
               className="w-12 h-12 rounded-2xl bg-gradient-to-r from-cyan-400 to-blue-500 hover:brightness-110 text-slate-950 flex items-center justify-center transition-all shadow-lg shadow-cyan-500/30 active:scale-95"
               title="Play / Pause (Space)"
             >
@@ -484,7 +506,7 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
                 {activeTrack?.title}
               </span>
               <span>
-                {formatTime(positionMs)} / {formatTime(durationMs)}
+                {formatTime(positionMs)} / {formatTime(effectiveDuration)}
               </span>
             </div>
             {/* Scrubber */}
@@ -492,8 +514,8 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
               onClick={(e) => {
                 const rect = e.currentTarget.getBoundingClientRect();
                 const pos = (e.clientX - rect.left) / rect.width;
-                if (durationMs > 0) {
-                  seek(pos * durationMs, true);
+                if (effectiveDuration > 0) {
+                  seek(pos * effectiveDuration, true);
                 }
               }}
               className="relative w-full h-2 rounded-full bg-white/10 cursor-pointer overflow-hidden group"
