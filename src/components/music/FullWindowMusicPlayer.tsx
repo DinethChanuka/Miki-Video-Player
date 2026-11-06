@@ -577,7 +577,17 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-white/5 border border-white/10 hover:border-white/20 transition-all">
               <button
-                onClick={() => setMuted(!isMuted)}
+                onClick={() => {
+                  if (isMuted) {
+                    if (volume === 0) {
+                      handleVolumeChange(80);
+                    } else {
+                      setMuted(false);
+                    }
+                  } else {
+                    setMuted(true);
+                  }
+                }}
                 className="p-1 rounded-lg hover:bg-white/10 text-white/70 hover:text-white transition-colors cursor-pointer"
                 title={isMuted ? 'Unmute' : 'Mute'}
               >

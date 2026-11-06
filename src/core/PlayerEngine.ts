@@ -311,12 +311,14 @@ export class WebMediaEngine implements IPlayerEngine {
   private static readonly EQ_FREQUENCIES = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
 
   private dspBypass: boolean = true;
+  private isDirectAudioStream: boolean = false;
 
   public setDspBypass(bypass: boolean): void {
     this.dspBypass = bypass;
     if (bypass) {
       if (this.videoEl) {
-        this.videoEl.volume = Math.min(1, this.currentVolumePercent / 100);
+        const normalizedPercent = Math.min(100, this.currentVolumePercent) / 100;
+        this.videoEl.volume = Math.max(0, Math.min(1.0, Math.pow(normalizedPercent, 1.4)));
       }
     } else {
       this.setupWebAudioGraph();
@@ -521,6 +523,7 @@ export class WebMediaEngine implements IPlayerEngine {
     // Direct YouTube Music Audio Stream Resolution (Hidara Architecture)
     const youtubeId = parseYouTubeId(uri);
     if (youtubeId) {
+      this.isDirectAudioStream = true;
       // Direct audio bypass: never enforce crossOrigin on YouTube audio streams to prevent CORS block
       el.removeAttribute('crossOrigin');
 
@@ -549,7 +552,8 @@ export class WebMediaEngine implements IPlayerEngine {
 
         el.src = directAudioUrl;
         el.muted = false;
-        el.volume = Math.min(1.0, this.currentVolumePercent / 100);
+        const normalizedPercent = Math.min(100, this.currentVolumePercent) / 100;
+        el.volume = Math.max(0, Math.min(1.0, Math.pow(normalizedPercent, 1.4)));
         if (startPositionMs > 0) {
           el.currentTime = startPositionMs / 1000;
         }
@@ -571,6 +575,7 @@ export class WebMediaEngine implements IPlayerEngine {
     const resolvedUri = resolveMediaStreamUrl(uri);
     const isHls = HlsStreamController.isHlsUrl(resolvedUri);
     const isAudio = ChunkedAudioStreamController.isAudioUrl(resolvedUri);
+    this.isDirectAudioStream = isAudio;
 
     // Enable crossOrigin = 'anonymous' so WebAudio createMediaElementSource receives authorized audio
     // Adaptive CORS recovery in onerror will automatically remove crossOrigin if the remote server rejects it
@@ -685,70 +690,81 @@ export class WebMediaEngine implements IPlayerEngine {
     this.currentVolumePercent = clamped;
 
     const el = this.getVideoEl();
-    if (el && clamped > 0 && el.muted) {
-      el.muted = false;
+    const isMuted = clamped === 0;
+
+    // Perceptually smooth logarithmic audio curve (gamma 1.4):
+    // ensures human ear perceives smooth, linear loudness transition across the entire slider range
+    const normalizedPercent = Math.min(100, clamped) / 100;
+    const smoothGain = Math.pow(normalizedPercent, 1.4);
+
+    if (this.isDirectAudioStream || this.dspBypass) {
+      if (el) {
+        el.muted = isMuted;
+        el.volume = Math.max(0, Math.min(1.0, smoothGain));
+      }
+    } else {
+      if (this.videoEl) {
+        this.videoEl.muted = isMuted;
+        this.videoEl.volume = 1.0;
+      }
     }
 
     console.log(`%c[Miki Music Action] PlayerEngine.setVolume: ${clamped}% (hardware volume: ${(Math.min(1, clamped / 100) * 100).toFixed(0)}%)`, 'color: #06b6d4;');
 
     if (this.dspBypass) {
-      if (el) {
-        el.muted = clamped === 0;
-        const normalizedPercent = Math.min(100, clamped) / 100;
-        const smoothGain = Math.pow(normalizedPercent, 1.4);
-        el.volume = Math.max(0, Math.min(1.0, smoothGain));
-      }
       this.notifyTelemetry();
       return;
     }
 
     this.setupWebAudioGraph();
 
-    const hasWebAudio = Boolean(this.gainNode || this.spatialAudio || this.mediaSourceNode);
-
-    if (el) {
-      if (hasWebAudio) {
-        el.volume = 1.0;
-      } else {
-        const normalizedPercent = Math.min(100, clamped) / 100;
-        const smoothGain = Math.pow(normalizedPercent, 1.4);
-        el.volume = Math.max(0, Math.min(1.0, smoothGain));
-      }
-    }
+    const webAudioGain = isMuted ? 0 : smoothGain * (clamped > 100 ? clamped / 100 : 1.0);
 
     if (this.gainNode && this.audioCtx) {
-      this.gainNode.gain.setValueAtTime(clamped / 100, this.audioCtx.currentTime);
+      this.gainNode.gain.setValueAtTime(webAudioGain, this.audioCtx.currentTime);
     }
 
     if (this.spatialAudio) {
-      this.spatialAudio.setMasterVolume(clamped / 100);
+      this.spatialAudio.setMasterVolume(webAudioGain);
     }
+
+    this.notifyTelemetry();
   }
 
   async setMuted(muted: boolean): Promise<void> {
-    if (this.dspBypass) {
+    const el = this.getVideoEl();
+    const normalizedPercent = Math.min(100, this.currentVolumePercent) / 100;
+    const smoothGain = Math.pow(normalizedPercent, 1.4);
+
+    if (this.isDirectAudioStream || this.dspBypass) {
+      if (el) {
+        el.muted = muted;
+        if (!muted) {
+          el.volume = Math.max(0, Math.min(1.0, smoothGain));
+        }
+      }
+    } else {
       if (this.videoEl) {
         this.videoEl.muted = muted;
         if (!muted) {
-          this.videoEl.volume = Math.min(1, this.currentVolumePercent / 100);
+          this.videoEl.volume = 1.0;
         }
       }
+    }
+
+    if (this.dspBypass) {
+      this.notifyTelemetry();
       return;
     }
 
-    const hasWebAudio = Boolean(this.gainNode || this.spatialAudio || this.mediaSourceNode);
-    if (this.videoEl) {
-      this.videoEl.muted = muted;
-      if (!muted && hasWebAudio) {
-        this.videoEl.volume = 1.0;
-      }
-    }
-    const targetVolume = muted ? 0 : this.currentVolumePercent / 100;
+    const targetGain = muted ? 0 : smoothGain * (this.currentVolumePercent > 100 ? this.currentVolumePercent / 100 : 1.0);
     if (this.spatialAudio) {
-      this.spatialAudio.setMasterVolume(targetVolume);
+      this.spatialAudio.setMasterVolume(targetGain);
     } else if (this.gainNode && this.audioCtx) {
-      this.gainNode.gain.setValueAtTime(targetVolume, this.audioCtx.currentTime);
+      this.gainNode.gain.setValueAtTime(targetGain, this.audioCtx.currentTime);
     }
+
+    this.notifyTelemetry();
   }
 
   async setPlaybackRate(rate: number): Promise<void> {

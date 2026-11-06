@@ -347,13 +347,13 @@ export const MusicPlayerView: React.FC = () => {
           <input
             type="range"
             min={0}
-            max={2.0}
-            step={0.05}
+            max={100}
+            step={1}
             value={storeVolume}
             onChange={handleVolumeChange}
             className="w-20 h-1.5 bg-white/10 rounded-full appearance-none accent-purple-500 cursor-pointer"
           />
-          <span className="text-[10px] font-mono text-white/60">{(storeVolume * 100).toFixed(0)}%</span>
+          <span className="text-[10px] font-mono text-white/60">{Math.round(storeVolume)}%</span>
         </div>
       </div>
 

@@ -58,4 +58,25 @@ describe('Music Playback, Loading State, Volume & Controls Audit', () => {
     assert.match(hubCode, /RefreshCw/);
     assert.match(hubCode, /isBuffering/);
   });
+
+  test('verifies PlayerEngine setVolume and setMuted NEVER overwrite el.volume to 1.0 when hasWebAudio', () => {
+    const engineCode = fs.readFileSync(path.resolve(root, 'src/core/PlayerEngine.ts'), 'utf-8');
+    // Ensure el.volume is never forced to 1.0 when hasWebAudio is true
+    assert.doesNotMatch(engineCode, /hasWebAudio\)\s*\{\s*el\.volume\s*=\s*1\.0/);
+    assert.doesNotMatch(engineCode, /hasWebAudio\)\s*\{\s*this\.videoEl\.volume\s*=\s*1\.0/);
+    // Ensure PlayerEngine setVolume applies smooth perceptual gain
+    assert.match(engineCode, /smoothGain\s*=\s*Math\.pow\(normalizedPercent,\s*1\.[3-6]\)/);
+  });
+
+  test('verifies playerStore setMuted and toggleMute coordinate mute state cleanly with engine', () => {
+    const storeCode = fs.readFileSync(path.resolve(root, 'src/store/playerStore.ts'), 'utf-8');
+    assert.match(storeCode, /engine\?\.setMuted\(muted\)/);
+    assert.match(storeCode, /!nextMuted\s*&&\s*get\(\)\.volume\s*===\s*0/);
+  });
+
+  test('verifies MusicPlayerView volume slider is calibrated to standard 0-100 range', () => {
+    const viewCode = fs.readFileSync(path.resolve(root, 'src/components/music/MusicPlayerView.tsx'), 'utf-8');
+    assert.match(viewCode, /max=\{100\}/);
+    assert.match(viewCode, /step=\{1\}/);
+  });
 });

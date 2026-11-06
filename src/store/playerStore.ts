@@ -1622,7 +1622,7 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
       }
     }
 
-    await get().engine?.setVolume(effectiveVol);
+    await get().engine?.setMuted(muted);
 
     if (typeof window !== 'undefined') {
       window.dispatchEvent(
@@ -1643,7 +1643,11 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
 
   toggleMute: async () => {
     const nextMuted = !get().isMuted;
-    await get().setMuted(nextMuted);
+    if (!nextMuted && get().volume === 0) {
+      await get().setVolume(80);
+    } else {
+      await get().setMuted(nextMuted);
+    }
   },
 
   setPlaybackRate: async (rate) => {
