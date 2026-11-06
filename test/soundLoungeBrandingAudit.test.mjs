@@ -25,3 +25,4 @@ describe('Task 6: Clean Sound Lounge Branding & UI Audit', () => {
     assert.match(viewCode, /isTopPlayerHidden|isScrolledDown|hideTopPlayer/);
   });
 });
+

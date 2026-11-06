@@ -34,7 +34,7 @@ export function cleanTrackSearchQuery(rawTitle: string, rawArtist?: string): { t
   // Remove common YouTube suffixes and junk in brackets/parentheses
   title = title
     .replace(/\s*[\(\[](?:Official\s*(?:Music\s*)?Video|Full\s*(?:Song\s*)?Audio|Audio|Video|Lyric\s*Video|HD|4K|Lyrics)[\)\]]/gi, '')
-    .replace(/\s*[\(\[][^\)\]]*\)/g, '') // remove non-latin or extra info in parens
+    .replace(/\s*[\(\[][^\)\]]*[\)\]]/g, '') // remove non-latin or extra info in parens and brackets
     .trim();
 
   // If title has pipes or dashes: e.g. "Title | Tag | Artist" or "Artist - Title"
@@ -152,6 +152,10 @@ export async function fetchTrackLyrics(title: string, rawArtist?: string): Promi
         plainLyrics: data.plainLyrics || null,
         source: 'LRCLIB Public Database',
       };
+      if (lyricsCache.size > 200) {
+        const oldest = lyricsCache.keys().next().value;
+        if (oldest) lyricsCache.delete(oldest);
+      }
       lyricsCache.set(cacheKey, result);
       return result;
     }
@@ -159,6 +163,11 @@ export async function fetchTrackLyrics(title: string, rawArtist?: string): Promi
     console.warn('[Miki Lyrics] Fetch error:', err);
   }
 
+  if (lyricsCache.size > 200) {
+    const oldest = lyricsCache.keys().next().value;
+    if (oldest) lyricsCache.delete(oldest);
+  }
   lyricsCache.set(cacheKey, null);
   return null;
 }
+

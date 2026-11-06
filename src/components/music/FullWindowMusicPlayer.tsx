@@ -114,15 +114,28 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
     };
   }, [activeTrack?.title, activeTrack?.artist]);
 
-  // Auto-scroll active lyric line into view
+  const lastActiveIndexRef = useRef<number>(-1);
+
+  // Auto-scroll active lyric line into view only when active line transitions
   useEffect(() => {
-    if (isLyricsOpen && activeLyricRef.current) {
-      activeLyricRef.current.scrollIntoView({
+    if (!isLyricsOpen || !lyricsData?.syncedLyrics) return;
+    const synced = lyricsData.syncedLyrics;
+    let activeIdx = -1;
+    for (let i = 0; i < synced.length; i++) {
+      if (synced[i].timeMs <= positionMs) {
+        activeIdx = i;
+      } else {
+        break;
+      }
+    }
+    if (activeIdx !== -1 && activeIdx !== lastActiveIndexRef.current) {
+      lastActiveIndexRef.current = activeIdx;
+      activeLyricRef.current?.scrollIntoView({
         behavior: 'smooth',
         block: 'center',
       });
     }
-  }, [positionMs, isLyricsOpen]);
+  }, [positionMs, isLyricsOpen, lyricsData?.syncedLyrics]);
 
   // Revoke created blob URLs on unmount to eliminate memory leaks
   useEffect(() => {

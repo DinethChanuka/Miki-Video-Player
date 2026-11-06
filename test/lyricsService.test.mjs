@@ -37,3 +37,4 @@ describe('Task 1: Lyrics Service & LRC Synchronized Parser', () => {
     assert.deepEqual(parseLrcLyrics('No timestamp text line'), []);
   });
 });
+

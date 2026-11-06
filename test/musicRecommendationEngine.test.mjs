@@ -29,3 +29,4 @@ describe('Task 5: Song Recommendation Algorithm', () => {
     assert.equal(recommendations.length, 3);
   });
 });
+
