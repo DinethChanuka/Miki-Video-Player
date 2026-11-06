@@ -118,6 +118,22 @@ export interface MediaBookmark {
   createdAt: number;
 }
 
+export interface CustomPlaylistTrack {
+  id: string;
+  title: string;
+  artist: string;
+  url: string;
+  coverUrl?: string;
+  durationSec?: number;
+}
+
+export interface CustomPlaylist {
+  id: string;
+  name: string;
+  createdAt: number;
+  tracks: CustomPlaylistTrack[];
+}
+
 export interface YouTubeHistoryItem {
   id: string;
   url: string;
@@ -224,6 +240,12 @@ export interface PlayerStoreState {
   setMusicPlayerOpen: (open: boolean) => void;
 
   // Track & Playlist Navigation
+  customPlaylists: CustomPlaylist[];
+  createPlaylist: (name: string) => string;
+  addTrackToPlaylist: (playlistId: string, track: CustomPlaylistTrack) => void;
+  removeTrackFromPlaylist: (playlistId: string, trackId: string) => void;
+  deletePlaylist: (playlistId: string) => void;
+  playPlaylist: (playlistId: string) => Promise<void>;
   playNextMedia: () => Promise<void>;
   playPreviousMedia: () => Promise<void>;
 
@@ -418,6 +440,25 @@ const saveStoredYouTubeHistory = (items: YouTubeHistoryItem[]) => {
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(STORAGE_KEY_YOUTUBE, JSON.stringify(items.slice(0, 30)));
+  } catch {}
+};
+
+const STORAGE_KEY_PLAYLISTS = 'miki_custom_playlists_v2';
+
+const loadStoredCustomPlaylists = (): CustomPlaylist[] => {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_PLAYLISTS);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveStoredCustomPlaylists = (playlists: CustomPlaylist[]) => {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(STORAGE_KEY_PLAYLISTS, JSON.stringify(playlists.slice(0, 50)));
   } catch {}
 };
 
@@ -694,6 +735,69 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     return get().bookmarkedWebsites.some((b) => b.url === url.trim() || (domain && b.domain === domain));
   },
   youtubeHistory: loadStoredYouTubeHistory(),
+  customPlaylists: loadStoredCustomPlaylists(),
+
+  createPlaylist: (name: string) => {
+    const cleanName = (name || '').trim() || `Playlist ${get().customPlaylists.length + 1}`;
+    const newPlaylist: CustomPlaylist = {
+      id: `pl_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      name: cleanName,
+      createdAt: Date.now(),
+      tracks: [],
+    };
+    const updated = [newPlaylist, ...get().customPlaylists];
+    set({ customPlaylists: updated });
+    saveStoredCustomPlaylists(updated);
+    return newPlaylist.id;
+  },
+
+  addTrackToPlaylist: (playlistId: string, track: CustomPlaylistTrack) => {
+    const playlists = get().customPlaylists;
+    const targetIdx = playlists.findIndex((p) => p.id === playlistId);
+    if (targetIdx === -1) return;
+
+    const target = playlists[targetIdx];
+    // Prevent duplicate track
+    if (target.tracks.some((t) => t.id === track.id || t.url === track.url)) return;
+
+    const updatedTarget: CustomPlaylist = {
+      ...target,
+      tracks: [...target.tracks, track],
+    };
+    const updated = [...playlists];
+    updated[targetIdx] = updatedTarget;
+    set({ customPlaylists: updated });
+    saveStoredCustomPlaylists(updated);
+  },
+
+  removeTrackFromPlaylist: (playlistId: string, trackId: string) => {
+    const playlists = get().customPlaylists;
+    const targetIdx = playlists.findIndex((p) => p.id === playlistId);
+    if (targetIdx === -1) return;
+
+    const target = playlists[targetIdx];
+    const updatedTarget: CustomPlaylist = {
+      ...target,
+      tracks: target.tracks.filter((t) => t.id !== trackId && t.url !== trackId),
+    };
+    const updated = [...playlists];
+    updated[targetIdx] = updatedTarget;
+    set({ customPlaylists: updated });
+    saveStoredCustomPlaylists(updated);
+  },
+
+  deletePlaylist: (playlistId: string) => {
+    const updated = get().customPlaylists.filter((p) => p.id !== playlistId);
+    set({ customPlaylists: updated });
+    saveStoredCustomPlaylists(updated);
+  },
+
+  playPlaylist: async (playlistId: string) => {
+    const playlist = get().customPlaylists.find((p) => p.id === playlistId);
+    if (!playlist || playlist.tracks.length === 0) return;
+    const first = playlist.tracks[0];
+    await get().openMedia(first.url, `${first.title} - ${first.artist}`, true, 0, first.coverUrl, 'music');
+  },
   resumeBannerPositionMs: null,
   screenshotDirectory: loadStoredScreenshotDirectory(),
   setScreenshotDirectory: (dir) => {

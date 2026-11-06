@@ -16,8 +16,8 @@ import {
   fetchLiveMusicDiscovery,
   MusicTrack,
   MusicPlatform,
-  PLATFORM_INFO,
 } from '../../utils/musicDiscoveryService';
+import { getRecommendedTracks } from '../../utils/musicRecommendationEngine';
 import {
   Film,
   Play,
@@ -37,6 +37,8 @@ import {
   VolumeX,
   MessageSquareText,
   ListMusic,
+  ListPlus,
+  Shuffle,
   Heart,
   Download,
   Bell,
@@ -602,7 +604,13 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
   const [cinesubzTvList, setCinesubzTvList] = useState<CineSubzTvShow[]>(CINESUBZ_TV_SHOWS);
   const [selectedMusicCategory, setSelectedMusicCategory] = useState<string>('all');
   const [selectedMusicPlatform, setSelectedMusicPlatform] = useState<MusicPlatform | 'all'>('youtube');
-  const [musicDiscoveryList, setMusicDiscoveryList] = useState<MusicTrack[]>(MUSIC_DISCOVERY_CATALOG);
+  const [musicDiscoveryList, setMusicDiscoveryList] = useState<MusicTrack[]>(() =>
+    [...MUSIC_DISCOVERY_CATALOG].sort(() => Math.random() - 0.5)
+  );
+  const [isTopPlayerHidden, setIsTopPlayerHidden] = useState<boolean>(false);
+  const [isPlaylistModalOpen, setIsPlaylistModalOpen] = useState<boolean>(false);
+  const [selectedTrackForPlaylist, setSelectedTrackForPlaylist] = useState<any>(null);
+  const [newPlaylistName, setNewPlaylistName] = useState<string>('');
   const [liveSearchedTracks, setLiveSearchedTracks] = useState<MusicTrack[]>([]);
   const [liveCinesubzMovies, setLiveCinesubzMovies] = useState<CineSubzMovie[]>([]);
   const [isSearchingCinesubz, setIsSearchingCinesubz] = useState<boolean>(false);
@@ -657,6 +665,20 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
   const togglePlay = usePlayerStore((s) => s.togglePlay);
   const activePlaybackMode = usePlayerStore((s) => s.activePlaybackMode);
   const currentUri = usePlayerStore((s) => s.currentUri);
+  const customPlaylists = usePlayerStore((s) => s.customPlaylists);
+  const createPlaylist = usePlayerStore((s) => s.createPlaylist);
+  const addTrackToPlaylist = usePlayerStore((s) => s.addTrackToPlaylist);
+
+  const handleShuffleDiscovery = () => {
+    setMusicDiscoveryList((prev) => [...prev].sort(() => Math.random() - 0.5));
+    const categories = ['romantic', 'hindi', 'english', 'sinhala', 'phonk', 'lo-fi', 'all'];
+    const randomCat = categories[Math.floor(Math.random() * categories.length)];
+    setSelectedMusicCategory(randomCat);
+  };
+
+  const recommendedTracks = useMemo(() => {
+    return getRecommendedTracks(musicDiscoveryList, recentMedia, currentUri, 6);
+  }, [musicDiscoveryList, recentMedia, currentUri]);
 
   const activeAlbum = COVER_FLOW_ALBUMS[activeAlbumIdx] || COVER_FLOW_ALBUMS[0];
 
@@ -1801,7 +1823,18 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
         </header>
 
         {/* SCROLLABLE HOME VIEWPORT */}
-        <div ref={scrollViewportRef} className="flex-1 overflow-y-auto p-6 sm:p-8 flex flex-col gap-8 scrollbar-thin">
+        <div
+          ref={scrollViewportRef}
+          onScroll={(e) => {
+            const top = e.currentTarget.scrollTop;
+            if (top > 120 && !isTopPlayerHidden) {
+              setIsTopPlayerHidden(true);
+            } else if (top < 50 && isTopPlayerHidden) {
+              setIsTopPlayerHidden(false);
+            }
+          }}
+          className="flex-1 overflow-y-auto p-6 sm:p-8 flex flex-col gap-8 scrollbar-thin"
+        >
           {/* ============================================================ */}
           {/* 0. DYNAMIC SECTION: MY FILES & LOCAL MEDIA HUB               */}
           {/* ============================================================ */}
@@ -2069,11 +2102,19 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
             </div>
           ) : effectiveSection === 'music' ? (
             <div className="flex flex-col gap-6 items-center w-full pt-2 pb-12">
-              {/* 3D Perspective Carousel Container */}
+              {/* Collapsible 3D Perspective Carousel & Top Player Container */}
               <div
-                className="relative w-full max-w-4xl h-72 sm:h-80 flex items-center justify-center pt-4 pb-2"
-                style={{ perspective: '1200px' }}
+                className={`transition-all duration-500 ease-in-out overflow-hidden flex flex-col items-center w-full ${
+                  isTopPlayerHidden
+                    ? 'max-h-0 opacity-0 -translate-y-8 pointer-events-none mb-0 scale-95'
+                    : 'max-h-[600px] opacity-100 translate-y-0 mb-4 scale-100'
+                }`}
               >
+                {/* 3D Perspective Carousel Container */}
+                <div
+                  className="relative w-full max-w-4xl h-72 sm:h-80 flex items-center justify-center pt-4 pb-2"
+                  style={{ perspective: '1200px' }}
+                >
                 {COVER_FLOW_ALBUMS.map((album, idx) => {
                   const offset = idx - activeAlbumIdx;
                   const isCenter = offset === 0;
@@ -2277,9 +2318,10 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                   </button>
                 </div>
               </div>
+            </div>
 
-              {/* YouTube Music Discovery & Live Search */}
-              <div className="w-full max-w-5xl flex flex-col gap-5 mt-6">
+              {/* Sound Lounge Discovery & Live Search */}
+              <div className="w-full max-w-5xl flex flex-col gap-5 mt-2">
                 {/* In-Section Live Music Search Bar */}
                 <div className="relative w-full">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
@@ -2287,8 +2329,8 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Live search songs, artists & genres on YouTube Music..."
-                    className="w-full pl-11 pr-24 py-3 rounded-2xl bg-white/5 border border-white/10 text-xs text-white placeholder-white/40 focus:outline-none focus:border-red-500/60 focus:bg-white/10 transition-all font-medium"
+                    placeholder="Live search songs, artists & soundscapes..."
+                    className="w-full pl-11 pr-24 py-3 rounded-2xl bg-white/5 border border-white/10 text-xs text-white placeholder-white/40 focus:outline-none focus:border-cyan-500/60 focus:bg-white/10 transition-all font-medium"
                   />
                   {searchQuery && (
                     <button
@@ -2302,26 +2344,35 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
 
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-rose-600 via-orange-500 to-amber-500 flex items-center justify-center text-white shadow-lg shadow-rose-500/20">
+                    <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-cyan-600 via-purple-600 to-pink-500 flex items-center justify-center text-white shadow-lg shadow-cyan-500/20">
                       <Sparkles className="w-4 h-4" />
                     </div>
                     <div>
                       <h3 className="text-sm font-bold text-white tracking-wide uppercase flex items-center gap-2">
-                        Online Music Discovery & Search — YouTube Music
-                        <span className="text-[10px] font-normal normal-case px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/30">
+                        Sound Lounge
+                        <span className="text-[10px] font-normal normal-case px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
                           {filteredMusicTracks.length} Songs
                         </span>
                       </h3>
                       <p className="text-[11px] text-white/50">
-                        Stream authentic full-length songs powered exclusively by YouTube Music
+                        Lossless Studio Soundscapes & Spatial Discovery
                       </p>
                     </div>
                   </div>
 
-                  {/* YouTube Music Category Filter Buttons */}
+                  {/* Category Filter Buttons & Shuffle */}
                   <div className="flex items-center gap-1.5 flex-wrap">
+                    <button
+                      onClick={handleShuffleDiscovery}
+                      className="px-3 py-1 rounded-xl text-xs font-semibold bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 transition-all cursor-pointer flex items-center gap-1.5 shadow-sm active:scale-95"
+                      title="Shuffle & Discover Random Tracks"
+                    >
+                      <Shuffle className="w-3.5 h-3.5 text-purple-400" />
+                      <span>Shuffle Discovery</span>
+                    </button>
+
                     {[
-                      { id: 'all', label: 'All YouTube Songs', color: 'bg-red-500' },
+                      { id: 'all', label: 'All Songs', color: 'bg-rose-500' },
                       { id: 'romantic', label: 'Romantic', color: 'bg-pink-400' },
                       { id: 'hindi', label: 'Hindi', color: 'bg-amber-400' },
                       { id: 'english', label: 'English', color: 'bg-cyan-400' },
@@ -2336,7 +2387,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                           onClick={() => setSelectedMusicCategory(p.id)}
                           className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
                             isActive
-                              ? 'bg-red-600 text-white font-bold shadow-md shadow-red-500/20'
+                              ? 'bg-gradient-to-r from-cyan-600 to-purple-600 text-white font-bold shadow-md shadow-cyan-500/20'
                               : 'bg-white/5 text-white/70 hover:bg-white/10 hover:text-white border border-white/10'
                           }`}
                         >
@@ -2365,6 +2416,54 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                   </div>
                 </div>
 
+                {/* Algorithmic Recommendations: Suggested For You */}
+                {!searchQuery && recommendedTracks.length > 0 && (
+                  <div className="flex flex-col gap-3 p-4 rounded-3xl bg-gradient-to-r from-purple-950/20 via-slate-900/40 to-cyan-950/20 border border-white/10 backdrop-blur-md">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-cyan-400" />
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-white/90">
+                          Suggested For You
+                        </h4>
+                      </div>
+                      <span className="text-[10px] text-white/40 font-mono">Personalized Stream Engine</span>
+                    </div>
+
+                    <div className="flex items-center gap-3 overflow-x-auto pb-1 scrollbar-none">
+                      {recommendedTracks.map((rTrack) => (
+                        <div
+                          key={`rec-${rTrack.id}`}
+                          onClick={() => {
+                            if (rTrack.streamUrl) {
+                              openMedia(rTrack.streamUrl, `${rTrack.title} - ${rTrack.artist}`, true, 0, rTrack.coverUrl, 'music');
+                              setMusicPlayerOpen(true);
+                              if (onOpenMusic) onOpenMusic();
+                            }
+                          }}
+                          className="flex items-center gap-3 p-2 rounded-2xl bg-white/5 hover:bg-white/15 border border-white/10 cursor-pointer min-w-[220px] max-w-[240px] shrink-0 transition-all hover:scale-[1.02] group"
+                        >
+                          <img
+                            src={rTrack.coverUrl}
+                            alt=""
+                            className="w-12 h-12 rounded-xl object-cover shrink-0"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLImageElement).src =
+                                'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&auto=format&fit=crop&q=80';
+                            }}
+                          />
+                          <div className="flex flex-col min-w-0 flex-1">
+                            <span className="text-xs font-bold text-white truncate group-hover:text-cyan-400 transition-colors">
+                              {rTrack.title}
+                            </span>
+                            <span className="text-[10px] text-white/50 truncate">{rTrack.artist}</span>
+                          </div>
+                          <Play className="w-4 h-4 text-cyan-400 fill-current opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Music Cards Grid */}
                 {filteredMusicTracks.length === 0 ? (
                   <div className="p-8 rounded-2xl bg-white/5 border border-white/10 text-center flex flex-col items-center gap-2">
@@ -2384,7 +2483,6 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                   <div className="flex flex-col gap-6 w-full">
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                       {paginatedMusicTracks.map((track) => {
-                        const platformMeta = PLATFORM_INFO[track.platform];
                         return (
                           <div
                             key={track.id}
@@ -2395,7 +2493,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                                 if (onOpenMusic) onOpenMusic();
                               }
                             }}
-                            className="group relative flex flex-col rounded-2xl bg-white/5 border border-white/10 overflow-hidden hover:border-emerald-500/50 hover:bg-white/10 transition-all shadow-xl hover:shadow-2xl cursor-pointer"
+                            className="group relative flex flex-col rounded-2xl bg-white/5 border border-white/10 overflow-hidden hover:border-cyan-500/50 hover:bg-white/10 transition-all shadow-xl hover:shadow-2xl cursor-pointer"
                           >
                             {/* Cover Image Container with Preview Zoom */}
                             <div className="relative aspect-square w-full overflow-hidden bg-black/60">
@@ -2411,13 +2509,43 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                               />
                               <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-80 group-hover:opacity-60 transition-opacity" />
 
-                              {/* Platform Badge */}
+                              {/* Audio Quality / Genre Badge */}
                               <div
                                 className="absolute top-2 left-2 flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold text-white shadow-md backdrop-blur-md border border-white/20"
-                                style={{ backgroundColor: `${platformMeta.brandColor}cc` }}
+                                style={{
+                                  background:
+                                    track.category === 'romantic'
+                                      ? 'linear-gradient(135deg, #ec4899, #f43f5e)'
+                                      : track.category === 'phonk'
+                                      ? 'linear-gradient(135deg, #8b5cf6, #6366f1)'
+                                      : track.category === 'hindi'
+                                      ? 'linear-gradient(135deg, #f59e0b, #d97706)'
+                                      : track.category === 'sinhala'
+                                      ? 'linear-gradient(135deg, #10b981, #059669)'
+                                      : 'linear-gradient(135deg, #06b6d4, #2563eb)',
+                                }}
                               >
-                                <span>{platformMeta.name.split(' ')[0]}</span>
+                                <span>{track.category ? track.category.toUpperCase() : 'HI-FI STUDIO'}</span>
                               </div>
+
+                              {/* Add to Playlist button */}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedTrackForPlaylist({
+                                    id: track.id,
+                                    title: track.title,
+                                    artist: track.artist,
+                                    url: track.streamUrl,
+                                    coverUrl: track.coverUrl,
+                                  });
+                                  setIsPlaylistModalOpen(true);
+                                }}
+                                className="absolute bottom-2 right-2 p-1.5 rounded-xl bg-black/60 hover:bg-cyan-500 text-white/80 hover:text-white backdrop-blur-md border border-white/20 opacity-0 group-hover:opacity-100 transition-all cursor-pointer shadow-lg"
+                                title="Add to Playlist"
+                              >
+                                <ListPlus className="w-3.5 h-3.5" />
+                              </button>
 
                               {/* Duration / Plays Badge */}
                               {(track.duration || track.plays) && (
@@ -2438,7 +2566,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                                     }
                                   }}
                                   className="w-11 h-11 rounded-full bg-white text-black hover:scale-110 flex items-center justify-center shadow-xl transition-all cursor-pointer"
-                                  title="Stream Song in Miki Player"
+                                  title="Play in Miki Player"
                                 >
                                   <Play className="w-5 h-5 fill-current ml-0.5 text-black" />
                                 </button>
@@ -4072,6 +4200,98 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                 alt={previewImage.title}
                 className="max-w-full max-h-[70vh] object-contain rounded-xl"
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Playlist Modal */}
+      {isPlaylistModalOpen && selectedTrackForPlaylist && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-in fade-in duration-200"
+          onClick={() => {
+            setIsPlaylistModalOpen(false);
+            setSelectedTrackForPlaylist(null);
+          }}
+        >
+          <div
+            className="relative w-full max-w-md bg-[#0c101b] border border-white/15 rounded-3xl p-6 flex flex-col gap-4 shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div className="flex items-center gap-2">
+                <ListPlus className="w-5 h-5 text-cyan-400" />
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider">Add to Playlist</h3>
+              </div>
+              <button
+                onClick={() => {
+                  setIsPlaylistModalOpen(false);
+                  setSelectedTrackForPlaylist(null);
+                }}
+                className="p-1 rounded-lg text-white/50 hover:text-white transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex items-center gap-3 p-3 rounded-2xl bg-white/5 border border-white/10">
+              <img
+                src={selectedTrackForPlaylist.coverUrl || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&auto=format&fit=crop&q=80'}
+                alt=""
+                className="w-12 h-12 rounded-xl object-cover shrink-0"
+              />
+              <div className="flex flex-col min-w-0 flex-1">
+                <span className="text-xs font-bold text-white truncate">{selectedTrackForPlaylist.title}</span>
+                <span className="text-[10px] text-white/50 truncate">{selectedTrackForPlaylist.artist}</span>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <span className="text-xs font-semibold text-white/70">Your Playlists</span>
+              <div className="max-h-48 overflow-y-auto space-y-1.5 scrollbar-thin">
+                {customPlaylists.map((pl) => (
+                  <button
+                    key={pl.id}
+                    onClick={() => {
+                      addTrackToPlaylist(pl.id, selectedTrackForPlaylist);
+                      setIsPlaylistModalOpen(false);
+                      setSelectedTrackForPlaylist(null);
+                    }}
+                    className="w-full flex items-center justify-between p-2.5 rounded-xl bg-white/5 hover:bg-cyan-500/20 text-white/80 hover:text-white border border-white/10 transition-all text-xs font-medium cursor-pointer"
+                  >
+                    <span>{pl.name}</span>
+                    <span className="text-[10px] text-white/40 font-mono">{pl.tracks.length} tracks</span>
+                  </button>
+                ))}
+                {customPlaylists.length === 0 && (
+                  <p className="text-xs text-white/40 italic py-2 text-center">No playlists created yet.</p>
+                )}
+              </div>
+            </div>
+
+            {/* Create New Playlist Inline */}
+            <div className="flex items-center gap-2 pt-2 border-t border-white/10">
+              <input
+                type="text"
+                value={newPlaylistName}
+                onChange={(e) => setNewPlaylistName(e.target.value)}
+                placeholder="New playlist title..."
+                className="flex-1 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder-white/40 focus:outline-none focus:border-cyan-400"
+              />
+              <button
+                onClick={() => {
+                  if (newPlaylistName.trim()) {
+                    const id = createPlaylist(newPlaylistName.trim());
+                    addTrackToPlaylist(id, selectedTrackForPlaylist);
+                    setNewPlaylistName('');
+                    setIsPlaylistModalOpen(false);
+                    setSelectedTrackForPlaylist(null);
+                  }
+                }}
+                className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold transition-all cursor-pointer"
+              >
+                Create
+              </button>
             </div>
           </div>
         </div>

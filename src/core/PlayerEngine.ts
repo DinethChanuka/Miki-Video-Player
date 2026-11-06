@@ -4,6 +4,7 @@ import { SpatialAudioEngine } from './SpatialAudioEngine';
 import { HlsStreamController } from './HlsStreamController.ts';
 import { ChunkedAudioStreamController } from './ChunkedAudioStreamController.ts';
 import { parseYouTubeId } from '../utils/webStreamUtils.ts';
+import { audioStreamCache } from '../utils/audioStreamCache.ts';
 
 export type EngineType = 'tauri-mpv' | 'web-media';
 
@@ -104,6 +105,7 @@ export interface IPlayerEngine {
   setQualityLevel?(level: number): void;
   setDspBypass?(bypass: boolean): void;
   getDspBypass?(): boolean;
+  getFrequencyData?(): Uint8Array | null;
   onTelemetry(callback: (telemetry: PlaybackTelemetry) => void): () => void;
   onError(callback: (error: PlayerErrorEnvelope) => void): () => void;
   destroy(): Promise<void>;
@@ -299,6 +301,8 @@ export class WebMediaEngine implements IPlayerEngine {
   private gainNode: GainNode | null = null;
   private eqBands: BiquadFilterNode[] = [];
   private compressorNode: DynamicsCompressorNode | null = null;
+  private analyserNode: AnalyserNode | null = null;
+  private frequencyDataArray: Uint8Array | null = null;
   private spatialAudio: SpatialAudioEngine | null = null;
   private mediaSourceNode: MediaElementAudioSourceNode | null = null;
   private lastEqNode: AudioNode | null = null;
@@ -492,17 +496,38 @@ export class WebMediaEngine implements IPlayerEngine {
         }
         this.lastEqNode = currentNode;
 
+        if (!this.analyserNode && this.audioCtx) {
+          this.analyserNode = this.audioCtx.createAnalyser();
+          this.analyserNode.fftSize = 128;
+          this.analyserNode.smoothingTimeConstant = 0.8;
+        }
+
         if (this.spatialAudio) {
           this.spatialAudio.init(this.audioCtx, this.lastEqNode, this.audioCtx.destination);
+          if (this.analyserNode) {
+            try { this.lastEqNode.connect(this.analyserNode); } catch {}
+          }
         } else {
           this.lastEqNode.connect(this.compressorNode);
           this.compressorNode.connect(this.gainNode);
+          if (this.analyserNode) {
+            try { this.gainNode.connect(this.analyserNode); } catch {}
+          }
           this.gainNode.connect(this.audioCtx.destination);
         }
       }
     } catch (err) {
       logWarn('WebAudio advanced routing optional or bypassed for CORS stream: ' + String(err));
     }
+  }
+
+  public getFrequencyData(): Uint8Array | null {
+    if (!this.analyserNode) return null;
+    if (!this.frequencyDataArray || this.frequencyDataArray.length !== this.analyserNode.frequencyBinCount) {
+      this.frequencyDataArray = new Uint8Array(this.analyserNode.frequencyBinCount);
+    }
+    this.analyserNode.getByteFrequencyData(this.frequencyDataArray as any);
+    return this.frequencyDataArray;
   }
 
   async load(uri: string, startPositionMs = 0): Promise<void> {
@@ -540,11 +565,28 @@ export class WebMediaEngine implements IPlayerEngine {
       }
 
       try {
-        console.log(
-          `%c[Miki Music Processing] Resolving audio stream for ID: ${youtubeId}...`,
-          'color: #f59e0b; font-weight: bold;'
-        );
-        const directAudioUrl = await resolveYouTubeAudioStream(youtubeId);
+        const cached = audioStreamCache.get(youtubeId);
+        let directAudioUrl = cached?.streamUrl;
+
+        if (!directAudioUrl) {
+          console.log(
+            `%c[Miki Music Processing] Resolving audio stream for ID: ${youtubeId}...`,
+            'color: #f59e0b; font-weight: bold;'
+          );
+          directAudioUrl = await resolveYouTubeAudioStream(youtubeId);
+          audioStreamCache.set(youtubeId, {
+            id: youtubeId,
+            streamUrl: directAudioUrl,
+            title: this.videoEl?.title || youtubeId,
+            artist: 'Sound Lounge',
+          });
+        } else {
+          console.log(
+            `%c[Miki Music Cache] Instant cache hit for track ID: ${youtubeId}`,
+            'color: #10b981; font-weight: bold;'
+          );
+        }
+
         console.log(
           `%c[Miki Music Response] Direct stream URL ready: ${directAudioUrl}`,
           'color: #10b981; font-weight: bold;'

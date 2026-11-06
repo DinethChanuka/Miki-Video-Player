@@ -20,6 +20,7 @@ export interface MusicTrack {
   duration: string;
   plays?: string;
   badge?: string;
+  category?: string;
   isLiveUpdate?: boolean;
 }
 
