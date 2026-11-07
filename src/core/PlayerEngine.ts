@@ -763,7 +763,7 @@ export class WebMediaEngine implements IPlayerEngine {
     const webAudioGain = isMuted ? 0 : smoothGain * (clamped > 100 ? clamped / 100 : 1.0);
 
     if (this.gainNode && this.audioCtx) {
-      this.gainNode.gain.setValueAtTime(webAudioGain, this.audioCtx.currentTime);
+      this.gainNode.gain.setTargetAtTime(webAudioGain, this.audioCtx.currentTime, 0.025);
     }
 
     if (this.spatialAudio) {
@@ -803,7 +803,7 @@ export class WebMediaEngine implements IPlayerEngine {
     if (this.spatialAudio) {
       this.spatialAudio.setMasterVolume(targetGain);
     } else if (this.gainNode && this.audioCtx) {
-      this.gainNode.gain.setValueAtTime(targetGain, this.audioCtx.currentTime);
+      this.gainNode.gain.setTargetAtTime(targetGain, this.audioCtx.currentTime, 0.025);
     }
 
     this.notifyTelemetry();

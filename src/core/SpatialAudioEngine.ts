@@ -44,6 +44,14 @@ export interface SpatialAudioState {
   preampGain: number;     // 1.0 to 2.5 (100% to 250% Boost)
 }
 
+/**
+ * ITU-R BS.775 Normalized Downmix Factor
+ * Prevents 6 discrete speaker gains (FL, C, FR, SL, SR, LFE) from summing to 6.95x gain,
+ * ensuring total stereo sum strictly normalizes to unity gain (1.0).
+ */
+export const BS775_DOWNMIX_NORM = 1.0 / (1.0 + 0.707 + 0.707 + 0.5); // ≈ 0.343
+export const DOWNMIX_NORM = BS775_DOWNMIX_NORM;
+
 export const DEFAULT_SPATIAL_STATE: SpatialAudioState = {
   enabled: true,
   outputMode: 'binaural',
@@ -76,6 +84,7 @@ export class SpatialAudioEngine {
   private lfeGain: GainNode | null = null;
   private lfeFilter: BiquadFilterNode | null = null;
   private channelMergerNode: ChannelMergerNode | null = null;
+  private preampGainNode: GainNode | null = null;
   private masterGain: GainNode | null = null;
   private dynamicsCompressor: DynamicsCompressorNode | null = null;
   private masterVolume: number = 1.0; // 0.0 to 2.0 (supports 200% overdrive)
@@ -126,15 +135,19 @@ export class SpatialAudioEngine {
       }
 
       // 7. Master Preamp Gain & Limiter Compressor (prevents clipping distortion at up to 200% overdrive)
-      this.masterGain = audioCtx.createGain();
-      this.masterGain.gain.setValueAtTime(this.state.preampGain, audioCtx.currentTime);
+      this.preampGainNode = audioCtx.createGain();
+      this.preampGainNode.gain.setValueAtTime(this.state.preampGain ?? 1.0, audioCtx.currentTime);
 
+      this.masterGain = audioCtx.createGain();
+      this.masterGain.gain.setValueAtTime(this.masterVolume, audioCtx.currentTime);
+
+      // True-Peak Brickwall Limiter (ratio 20:1, threshold -0.5dB, attack 1ms, release 50ms)
       this.dynamicsCompressor = audioCtx.createDynamicsCompressor();
-      this.dynamicsCompressor.threshold.setValueAtTime(-12, audioCtx.currentTime);
-      this.dynamicsCompressor.knee.setValueAtTime(20, audioCtx.currentTime);
-      this.dynamicsCompressor.ratio.setValueAtTime(8, audioCtx.currentTime);
-      this.dynamicsCompressor.attack.setValueAtTime(0.003, audioCtx.currentTime);
-      this.dynamicsCompressor.release.setValueAtTime(0.25, audioCtx.currentTime);
+      this.dynamicsCompressor.threshold.setValueAtTime(-0.5, audioCtx.currentTime);
+      this.dynamicsCompressor.knee.setValueAtTime(0, audioCtx.currentTime);
+      this.dynamicsCompressor.ratio.setValueAtTime(20, audioCtx.currentTime);
+      this.dynamicsCompressor.attack.setValueAtTime(0.001, audioCtx.currentTime);
+      this.dynamicsCompressor.release.setValueAtTime(0.05, audioCtx.currentTime);
 
       // Connect source into analyser and panner
       sourceNode.connect(this.analyserNode);
@@ -159,7 +172,7 @@ export class SpatialAudioEngine {
   }
 
   private routeGraph(): void {
-    if (!this.audioCtx || !this.cachedDestinationNode || !this.masterGain || !this.dynamicsCompressor) return;
+    if (!this.audioCtx || !this.cachedDestinationNode || !this.masterGain || !this.dynamicsCompressor || !this.preampGainNode) return;
 
     // Disconnect speakers before re-routing
     try {
@@ -171,8 +184,9 @@ export class SpatialAudioEngine {
       this.lfeGain?.disconnect();
       this.stereoPanNode?.disconnect();
       this.channelMergerNode?.disconnect();
-      this.masterGain.disconnect();
+      this.preampGainNode.disconnect();
       this.dynamicsCompressor.disconnect();
+      this.masterGain.disconnect();
     } catch {
       // Ignore disconnect errors on initial routing
     }
@@ -201,11 +215,11 @@ export class SpatialAudioEngine {
       this.slGain?.connect(this.channelMergerNode, 0, 4);
       this.srGain?.connect(this.channelMergerNode, 0, 5);
 
-      this.channelMergerNode.connect(this.masterGain);
+      this.channelMergerNode.connect(this.preampGainNode);
     } else {
       // Binaural Stereo / Headphone Routing:
-      // Feeds into stereo panning balance and master gain
-      const intermediateNode = this.stereoPanNode || this.masterGain;
+      // Feeds into stereo panning balance and preamp gain
+      const intermediateNode = this.stereoPanNode || this.preampGainNode;
 
       this.flGain?.connect(intermediateNode);
       this.cGain?.connect(intermediateNode);
@@ -215,13 +229,15 @@ export class SpatialAudioEngine {
       this.lfeGain?.connect(intermediateNode);
 
       if (this.stereoPanNode) {
-        this.stereoPanNode.connect(this.masterGain);
+        this.stereoPanNode.connect(this.preampGainNode);
       }
     }
 
-    // Safety peak limiter before final destination
-    this.masterGain.connect(this.dynamicsCompressor);
-    this.dynamicsCompressor.connect(this.cachedDestinationNode);
+    // Hi-Fi 4-Stage Signal Chain:
+    // Spatial (downmix) -> Preamp Gain -> True-Peak Limiter -> Master Volume -> Destination
+    this.preampGainNode.connect(this.dynamicsCompressor);
+    this.dynamicsCompressor.connect(this.masterGain);
+    this.masterGain.connect(this.cachedDestinationNode);
   }
 
   public setOutputMode(mode: SpatialOutputMode): void {
@@ -254,29 +270,23 @@ export class SpatialAudioEngine {
 
   public setSpeakerVolume(speaker: keyof SpeakerLevels, volume: number): void {
     this.state.speakers[speaker] = Math.max(0, Math.min(2.0, volume));
+    this.applySpeakerGains(this.state.speakers);
+  }
+
+  private applySpeakerGains(speakers: SpeakerLevels): void {
     if (!this.audioCtx) return;
 
     const time = this.audioCtx.currentTime;
-    switch (speaker) {
-      case 'frontLeft':
-        this.flGain?.gain.setTargetAtTime(this.state.speakers.frontLeft, time, 0.05);
-        break;
-      case 'center':
-        this.cGain?.gain.setTargetAtTime(this.state.speakers.center, time, 0.05);
-        break;
-      case 'frontRight':
-        this.frGain?.gain.setTargetAtTime(this.state.speakers.frontRight, time, 0.05);
-        break;
-      case 'surroundLeft':
-        this.slGain?.gain.setTargetAtTime(this.state.speakers.surroundLeft, time, 0.05);
-        break;
-      case 'surroundRight':
-        this.srGain?.gain.setTargetAtTime(this.state.speakers.surroundRight, time, 0.05);
-        break;
-      case 'subwoofer':
-        this.lfeGain?.gain.setTargetAtTime(this.state.speakers.subwoofer, time, 0.05);
-        break;
-    }
+    const isStereo = this.state.outputMode !== 'discrete_51';
+    // ITU-R BS.775 normalized downmix factor ensures stereo sum <= 1.0 (unity gain)
+    const downmixNorm = isStereo ? BS775_DOWNMIX_NORM : 1.0;
+
+    this.flGain?.gain.setTargetAtTime(speakers.frontLeft * downmixNorm, time, 0.025);
+    this.cGain?.gain.setTargetAtTime(speakers.center * downmixNorm * (isStereo ? 0.707 : 1.0), time, 0.025);
+    this.frGain?.gain.setTargetAtTime(speakers.frontRight * downmixNorm, time, 0.025);
+    this.slGain?.gain.setTargetAtTime(speakers.surroundLeft * downmixNorm * (isStereo ? 0.707 : 1.0), time, 0.025);
+    this.srGain?.gain.setTargetAtTime(speakers.surroundRight * downmixNorm * (isStereo ? 0.707 : 1.0), time, 0.025);
+    this.lfeGain?.gain.setTargetAtTime(speakers.subwoofer * downmixNorm * (isStereo ? 0.5 : 1.0), time, 0.025);
   }
 
   public setStereoPan(pan: number): void {
@@ -290,19 +300,16 @@ export class SpatialAudioEngine {
   public setMasterVolume(multiplier: number): void {
     const clamped = Math.max(0, Math.min(2.0, multiplier));
     this.masterVolume = clamped;
-    this.updateMasterGain();
+    if (this.masterGain && this.audioCtx) {
+      this.masterGain.gain.setTargetAtTime(clamped, this.audioCtx.currentTime, 0.025);
+    }
   }
 
   public setPreampGain(gainMultiplier: number): void {
     const clamped = Math.max(0.5, Math.min(2.5, gainMultiplier));
     this.state.preampGain = clamped;
-    this.updateMasterGain();
-  }
-
-  private updateMasterGain(): void {
-    if (this.masterGain && this.audioCtx) {
-      const totalGain = this.masterVolume * (this.state.preampGain ?? 1.0);
-      this.masterGain.gain.setValueAtTime(totalGain, this.audioCtx.currentTime);
+    if (this.preampGainNode && this.audioCtx) {
+      this.preampGainNode.gain.setTargetAtTime(clamped, this.audioCtx.currentTime, 0.025);
     }
   }
 
@@ -447,10 +454,10 @@ export class SpatialAudioEngine {
         surroundRight: 1.0,
         subwoofer: 1.0,
       };
-      (Object.keys(neutralSpeakers) as (keyof SpeakerLevels)[]).forEach((spk) => {
-        this.setSpeakerVolume(spk, neutralSpeakers[spk]);
-      });
-      this.updateMasterGain();
+      this.state.speakers = neutralSpeakers;
+      this.applySpeakerGains(neutralSpeakers);
+      this.setMasterVolume(this.masterVolume);
+      this.setPreampGain(this.state.preampGain ?? 1.0);
     }
   }
 
@@ -461,13 +468,12 @@ export class SpatialAudioEngine {
   public applyState(state: SpatialAudioState): void {
     this.state = { ...state };
     this.setCoordinates(state.coordinates.x, state.coordinates.y, state.coordinates.z);
-    (Object.keys(state.speakers) as (keyof SpeakerLevels)[]).forEach((spk) => {
-      this.setSpeakerVolume(spk, state.speakers[spk]);
-    });
+    this.applySpeakerGains(state.speakers);
     if (this.lfeFilter && this.audioCtx) {
       this.lfeFilter.frequency.setValueAtTime(state.lfeCrossoverHz, this.audioCtx.currentTime);
     }
     this.setStereoPan(state.stereoPan ?? 0.0);
     this.setPreampGain(state.preampGain ?? 1.0);
+    this.setMasterVolume(this.masterVolume);
   }
 }
