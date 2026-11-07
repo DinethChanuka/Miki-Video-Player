@@ -1039,13 +1039,6 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
     const current = get().engine;
     if (current) await current.destroy();
 
-    const router = new MediaEngineRouter();
-    router.setDspBypass(get().dspBypass);
-    try {
-      await router.initialize(videoEl);
-    } catch {}
-    set({ router });
-
     const targetType: EngineType =
       preferred ?? (isTauriRuntime() ? 'tauri-mpv' : 'web-media');
 
