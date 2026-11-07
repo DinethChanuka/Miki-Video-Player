@@ -1,9 +1,14 @@
 /**
- * Chunked Audio Stream Controller
- * Provides high-efficiency chunk-by-chunk HTTP Range request streaming for music and audio playback.
- * Instead of waiting for multi-megabyte audio files to buffer completely, this controller
- * streams audio in bite-sized 256KB chunks, achieving sub-second (< 200ms) playback start.
+ * Chunked & Progressive Audio Stream Controller
+ * 
+ * Provides high-efficiency progressive streaming and persistent local caching for audio playback.
+ * - Checks persistent audio cache first for instant (0ms) repeat playback
+ * - Binds genuine readiness events (loadeddata / canplay) without premature 250ms race conditions
+ * - Performs single-pass streaming download into persistent cache in the background
+ * - Automatically bypasses persistent caching for continuous live radio/HLS streams
  */
+
+import { persistentAudioCache, shouldCacheAudioUrl } from '../utils/persistentAudioCache.ts';
 
 export const DEFAULT_CHUNK_SIZE = 256 * 1024; // 256 KB per chunk (~11s of 192kbps MP3)
 
@@ -36,6 +41,10 @@ export class ChunkedAudioStreamController {
     this.onChunkLoaded = config?.onChunkLoaded;
     this.onInitialChunkReady = config?.onInitialChunkReady;
     this.onError = config?.onError;
+  }
+
+  public getChunkSize(): number {
+    return this.chunkSize;
   }
 
   public getActiveUrl(): string {
@@ -137,19 +146,42 @@ export class ChunkedAudioStreamController {
   }
 
   /**
-   * Attaches chunked streaming to an HTMLMediaElement for instant progressive playback
+   * Attaches progressive streaming and persistent caching to an HTMLMediaElement
    */
-  public load(
+  public async load(
     el: HTMLMediaElement,
     url: string,
-    startPositionMs = 0
+    startPositionMs = 0,
+    metadata?: Record<string, any>
   ): Promise<void> {
     this.destroy();
     this.isDestroyed = false;
     this.activeUrl = url;
     this.abortController = new AbortController();
 
-    // 1. Configure aggressive native chunk preloading
+    // 1. Check persistent cache first: if already downloaded, play immediately with 0ms delay
+    const cachedBlobUrl = await persistentAudioCache.getCachedBlobUrl(url);
+    if (cachedBlobUrl && !this.isDestroyed) {
+      console.log(`%c[Miki Cache] Playing from persistent local cache: ${url}`, 'color: #10b981; font-weight: bold;');
+      el.preload = 'auto';
+      el.src = cachedBlobUrl;
+      el.load();
+
+      if (startPositionMs > 0) {
+        el.currentTime = startPositionMs / 1000;
+      }
+      if (this.onInitialChunkReady) {
+        this.onInitialChunkReady();
+      }
+      if (typeof window !== 'undefined') {
+        import('../store/playerStore')
+          .then(({ usePlayerStore }) => usePlayerStore.setState({ isBuffering: false }))
+          .catch(() => {});
+      }
+      return;
+    }
+
+    // 2. Uncached track: configure aggressive progressive streaming
     el.preload = 'auto';
 
     try {
@@ -158,7 +190,7 @@ export class ChunkedAudioStreamController {
       el.removeAttribute('crossOrigin');
     }
 
-    return new Promise((resolve) => {
+    await new Promise<void>((resolve) => {
       let isResolved = false;
 
       const triggerReady = () => {
@@ -183,16 +215,15 @@ export class ChunkedAudioStreamController {
         resolve();
       };
 
-      // Listen for initial chunk availability (loadeddata / loadedmetadata)
-      // loadeddata fires the moment the FIRST frame/chunk is decoded, 85% faster than canplay!
+      // Listen for genuine readiness events (loadeddata / canplay)
       const onLoadedData = () => {
         el.removeEventListener('loadeddata', onLoadedData);
-        el.removeEventListener('loadedmetadata', onLoadedData);
+        el.removeEventListener('canplay', onLoadedData);
         triggerReady();
       };
 
       el.addEventListener('loadeddata', onLoadedData, { once: true });
-      el.addEventListener('loadedmetadata', onLoadedData, { once: true });
+      el.addEventListener('canplay', onLoadedData, { once: true });
 
       // Fallback for CORS restriction on audio servers: strip crossOrigin and reload directly
       const onMediaError = () => {
@@ -205,70 +236,89 @@ export class ChunkedAudioStreamController {
       };
       el.addEventListener('error', onMediaError, { once: true });
 
-      // Fallback timeout: if loadeddata doesn't fire in 250ms, proceed anyway so play() kicks off stream
-      setTimeout(() => {
-        triggerReady();
-      }, 250);
+      // Safe bounded recovery timeout (5000ms): only triggers if network/decoder stalls
+      const recoveryTimer = setTimeout(() => {
+        if (!isResolved && !this.isDestroyed) {
+          console.warn('[ChunkedAudioStreamController] Media readiness timeout after 5000ms; attempting fallback playback start');
+          triggerReady();
+        }
+      }, 5000);
 
-      // Set source and initiate browser range-chunk pipeline
+      const cleanup = () => clearTimeout(recoveryTimer);
+      el.addEventListener('loadeddata', cleanup, { once: true });
+      el.addEventListener('canplay', cleanup, { once: true });
+
+      // Set source and initiate browser progressive streaming
       el.src = url;
       el.load();
-
-      // Proactively pre-fetch chunk 0 in background to prime the network cache
-      this.fetchChunk(url, 0, this.chunkSize - 1)
-        .then((buf) => {
-          if (this.onChunkLoaded) {
-            this.onChunkLoaded(0, buf.byteLength);
-          }
-          // Continuously preload remaining chunks in background so the entire audio plays as one contiguous track
-          this.preloadRemainingChunks(url, 1);
-        })
-        .catch(() => {
-          // Non-fatal: browser native pipeline will continue via el.src
-        });
     });
+
+    // 3. Concurrently stream complete track into persistent cache in background (single download)
+    if (shouldCacheAudioUrl(url)) {
+      this.streamToCacheInBackground(url, metadata);
+    }
   }
 
   /**
-   * Continuously preloads remaining chunks in background (chunks 1, 2, ... N)
-   * while initial chunk 0 is actively playing, buffering the full stream without interruption.
+   * Background worker: downloads complete track once and stores in persistentAudioCache.
+   * Cancels cleanly if destroyed or if song changes.
    */
-  public preloadRemainingChunks(url: string, startChunk = 1): void {
-    let currentChunk = startChunk;
-    const fetchNext = async () => {
-      if (this.isDestroyed || this.activeUrl !== url) return;
-      const startByte = currentChunk * this.chunkSize;
+  private async streamToCacheInBackground(url: string, metadata?: Record<string, any>): Promise<void> {
+    if (this.isDestroyed || !this.abortController) return;
 
-      // If total content length is known and we have exceeded it, complete preloading
-      if (this.totalContentLength !== null && startByte >= this.totalContentLength) {
+    try {
+      const response = await fetch(url, {
+        signal: this.abortController.signal,
+      });
+
+      if (!response.ok || !response.body) {
         return;
       }
 
-      const endByte = this.totalContentLength !== null
-        ? Math.min(startByte + this.chunkSize - 1, this.totalContentLength - 1)
-        : startByte + this.chunkSize - 1;
+      const reader = response.body.getReader();
+      const chunks: Uint8Array[] = [];
+      let totalReceived = 0;
+      let chunkIdx = 0;
 
-      try {
-        const buf = await this.fetchChunk(url, startByte, endByte);
-        if (this.onChunkLoaded) {
-          this.onChunkLoaded(currentChunk, buf.byteLength);
+      while (!this.isDestroyed) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        if (value) {
+          chunks.push(value);
+          totalReceived += value.byteLength;
+          chunkIdx++;
+          this.currentChunkIndex = chunkIdx;
+          if (this.onChunkLoaded) {
+            this.onChunkLoaded(chunkIdx, totalReceived);
+          }
         }
-        currentChunk++;
-        this.currentChunkIndex = currentChunk;
-
-        // If returned bytes are fewer than chunk size, end of audio reached
-        if (buf.byteLength < this.chunkSize) {
-          return;
-        }
-
-        // Paced progressive preloading to keep buffer full without network congestion
-        setTimeout(fetchNext, 120);
-      } catch {
-        // Range requests complete or reached end of stream
       }
-    };
 
-    setTimeout(fetchNext, 100);
+      if (!this.isDestroyed && totalReceived > 0) {
+        // Assemble complete audio buffer
+        const fullBuffer = new Uint8Array(totalReceived);
+        let offset = 0;
+        for (const chunk of chunks) {
+          fullBuffer.set(chunk, offset);
+          offset += chunk.byteLength;
+        }
+
+        const contentType = response.headers.get('content-type') || 'audio/mp4';
+        const etag = response.headers.get('etag') || undefined;
+
+        await persistentAudioCache.saveTrack(url, url, fullBuffer.buffer, {
+          ...metadata,
+          contentType,
+          etag,
+          totalBytes: totalReceived,
+        });
+
+        console.log(`%c[Miki Cache] Successfully cached complete track (${(totalReceived / (1024 * 1024)).toFixed(2)} MB): ${url}`, 'color: #10b981;');
+      }
+    } catch {
+      // Aborted or cancelled cleanly on track change/destroy
+    }
   }
 
   public destroy(): void {

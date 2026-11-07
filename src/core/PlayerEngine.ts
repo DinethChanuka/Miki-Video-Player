@@ -5,6 +5,7 @@ import { HlsStreamController } from './HlsStreamController.ts';
 import { ChunkedAudioStreamController } from './ChunkedAudioStreamController.ts';
 import { parseYouTubeId } from '../utils/webStreamUtils.ts';
 import { audioStreamCache } from '../utils/audioStreamCache.ts';
+import { persistentAudioCache } from '../utils/persistentAudioCache.ts';
 
 export type EngineType = 'tauri-mpv' | 'web-media';
 
@@ -565,8 +566,14 @@ export class WebMediaEngine implements IPlayerEngine {
       }
 
       try {
-        const cached = audioStreamCache.get(youtubeId);
-        let directAudioUrl = cached?.streamUrl;
+        // Check persistent local binary cache first (0ms instant playback)
+        const localBlob = await persistentAudioCache.getCachedBlobUrl(youtubeId);
+        let directAudioUrl = localBlob;
+
+        if (!directAudioUrl) {
+          const cached = audioStreamCache.get(youtubeId);
+          directAudioUrl = cached?.streamUrl || null;
+        }
 
         if (!directAudioUrl) {
           console.log(
