@@ -73,6 +73,8 @@ export type HomeViewCategory =
   | 'Music'
   | 'Radio';
 
+export const HOME_VIEW_CATEGORIES: HomeViewCategory[] = ['All', 'My Files', 'Movies', 'Tv series', 'Animation', 'Live TV', 'Games', 'Music', 'Radio'];
+
 export type HomeNavTab =
   | 'browse'
   | 'my_files'
@@ -1749,33 +1751,6 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                 </div>
               )}
             </div>
-          </div>
-
-          {/* Top Category Pills */}
-          <div className="hidden lg:flex items-center gap-1.5">
-            {(['All', 'My Files', 'Movies', 'Tv series', 'Animation', 'Live TV', 'Games', 'Music', 'Radio'] as HomeViewCategory[]).map(
-              (cat) => (
-                <button
-                  key={cat}
-                  onClick={() => {
-                    setActiveCategory(cat);
-                    if (cat === 'My Files') setActiveNav('my_files');
-                    else if (cat === 'Live TV') setActiveNav('channels');
-                    else if (cat === 'Games') setActiveNav('games');
-                    else if (cat === 'Music') setActiveNav('music');
-                    else if (cat === 'Radio') setActiveNav('radio');
-                    else setActiveNav('browse');
-                  }}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                    activeCategory === cat
-                      ? 'bg-rose-600 text-white font-bold shadow-md shadow-rose-600/30'
-                      : 'text-white/60 hover:text-white hover:bg-white/5'
-                  }`}
-                >
-                  {cat}
-                </button>
-              )
-            )}
           </div>
 
           {/* Right Header Icons: Bell & User Authentication Status */}

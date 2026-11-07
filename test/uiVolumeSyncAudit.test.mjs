@@ -41,3 +41,4 @@ describe('Task 6 Audit: UI Volume & Preamp Synchronization', () => {
     );
   });
 });
+
