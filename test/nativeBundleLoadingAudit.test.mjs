@@ -2,6 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
+import { execSync } from 'node:child_process';
 
 describe('Native macOS Bundle Loading & Scheme Handler Audit', () => {
   const viteConfigPath = path.resolve(process.cwd(), 'vite.config.ts');
@@ -48,10 +49,35 @@ describe('Native macOS Bundle Loading & Scheme Handler Audit', () => {
   });
 
   it('verifies packaged macOS bundle contains dist/index.html with relative asset references', () => {
+    const zipPath = path.resolve(process.cwd(), 'Build/MacOs/Miki-Player-macOS.zip');
+    assert.ok(fs.existsSync(zipPath), 'Build/MacOs/Miki-Player-macOS.zip must exist');
+    assert.ok(fs.statSync(zipPath).size > 1000000, 'Zip file must be larger than 1MB');
+
     const packagedIndexPath = path.resolve(
       process.cwd(),
       'Build/MacOs/Miki Player.app/Contents/Resources/dist/index.html'
     );
+
+    // In a clean git checkout or Linux CI runner where .app is gitignored, restore/extract from tracked release zip
+    if (!fs.existsSync(packagedIndexPath) && fs.existsSync(zipPath)) {
+      try {
+        execSync(`unzip -q -o "${zipPath}" -d "Build/MacOs"`, { stdio: 'ignore' });
+      } catch {
+        try {
+          const extractedHtml = execSync(
+            `unzip -p "${zipPath}" "Miki Player.app/Contents/Resources/dist/index.html"`,
+            { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] }
+          );
+          if (extractedHtml) {
+            fs.mkdirSync(path.dirname(packagedIndexPath), { recursive: true });
+            fs.writeFileSync(packagedIndexPath, extractedHtml, 'utf-8');
+          }
+        } catch {
+          // ignore
+        }
+      }
+    }
+
     assert.ok(fs.existsSync(packagedIndexPath), 'Packaged dist/index.html must exist');
     const htmlContent = fs.readFileSync(packagedIndexPath, 'utf-8');
     assert.match(
@@ -59,9 +85,5 @@ describe('Native macOS Bundle Loading & Scheme Handler Audit', () => {
       /\.\/assets\//,
       'Packaged index.html must use relative asset paths'
     );
-
-    const zipPath = path.resolve(process.cwd(), 'Build/MacOs/Miki-Player-macOS.zip');
-    assert.ok(fs.existsSync(zipPath), 'Build/MacOs/Miki-Player-macOS.zip must exist');
-    assert.ok(fs.statSync(zipPath).size > 1000000, 'Zip file must be larger than 1MB');
   });
 });
