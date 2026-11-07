@@ -292,6 +292,14 @@ impl MpvController {
             .get_property_string("mute")
             .map(|s| s == "yes")
             .unwrap_or(false);
+        let demuxer_cache_sec: f64 = self
+            .get_property_string("demuxer-cache-time")
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0.0);
+        let is_buffering: bool = self
+            .get_property_string("paused-for-cache")
+            .map(|s| s == "yes")
+            .unwrap_or(false);
 
         // Throttle expensive track-list and chapter-list queries to once every 1000ms
         // instead of querying dozens of string FFI properties on every 16ms frame (60 FPS)
@@ -311,9 +319,9 @@ impl MpvController {
         PlaybackState {
             position_ms: (pos_sec * 1000.0).round() as i64,
             duration_ms: (duration_sec * 1000.0).round() as i64,
-            buffered_ms: 0,
+            buffered_ms: ((pos_sec + demuxer_cache_sec) * 1000.0).round() as i64,
             is_paused,
-            is_buffering: false,
+            is_buffering,
             playback_rate: speed,
             volume,
             is_muted,

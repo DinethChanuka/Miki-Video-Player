@@ -31,4 +31,25 @@ describe('Rust Backend & Tauri Commands Audit', () => {
       'guard.load_file must be called with &uri and start_position_ms'
     );
   });
+
+  it('verifies mpv_controller queries demuxer-cache-time and paused-for-cache for genuine telemetry', () => {
+    const mpvControllerPath = path.join(rootDir, 'src-tauri/src/engine/mpv_controller.rs');
+    const mpvCode = fs.readFileSync(mpvControllerPath, 'utf8');
+
+    assert.match(
+      mpvCode,
+      /demuxer-cache-time/,
+      'mpv_controller must query demuxer-cache-time property'
+    );
+    assert.match(
+      mpvCode,
+      /paused-for-cache/,
+      'mpv_controller must query paused-for-cache property'
+    );
+    assert.match(
+      mpvCode,
+      /buffered_ms:\s*\(\(pos_sec\s*\+\s*demuxer_cache_sec\)/,
+      'mpv_controller must calculate buffered_ms from pos_sec + demuxer_cache_sec'
+    );
+  });
 });
