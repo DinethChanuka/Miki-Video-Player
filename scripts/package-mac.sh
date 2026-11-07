@@ -5,7 +5,7 @@ echo "[Miki Player] Building web assets..."
 npm run build
 
 echo "[Miki Player] Compiling native Swift Cocoa borderless binary..."
-swiftc -O -o MikiPlayer MikiPlayerApp.swift -framework Cocoa -framework WebKit
+swiftc -O -o MikiPlayer MikiPlayerApp.swift -framework Cocoa -framework WebKit -framework Network
 
 echo "[Miki Player] Generating macOS Application bundle structure..."
 mkdir -p "Miki Player.app/Contents/MacOS" "Miki Player.app/Contents/Resources" AppIcon.iconset
@@ -80,6 +80,11 @@ EOF
 echo "[Miki Player] Copying embedded dist web assets..."
 rm -rf "Miki Player.app/Contents/Resources/dist"
 cp -r dist "Miki Player.app/Contents/Resources/dist"
+
+echo "[Miki Player] Bundling yt-dlp native audio engine..."
+mkdir -p "Miki Player.app/Contents/Resources/bin"
+cp bin/yt-dlp "Miki Player.app/Contents/Resources/bin/yt-dlp"
+chmod +x "Miki Player.app/Contents/Resources/bin/yt-dlp"
 
 echo "[Miki Player] Installing native executable binary..."
 cp MikiPlayer "Miki Player.app/Contents/MacOS/Miki Player"

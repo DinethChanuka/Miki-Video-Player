@@ -299,9 +299,13 @@ export const App: React.FC = () => {
     originalUrl: string;
   } | null>(null);
 
-  const webStream = useMemo(() => (currentUri ? parseWebStream(currentUri) : null), [currentUri]);
-  const activeWebStream = webStream || fallbackWebEmbed;
-  const youtubeId = activeWebStream?.platform === 'youtube' ? (webStream?.id || null) : null;
+  const isAudioMode = activePlaybackMode === 'music' || activePlaybackMode === 'radio';
+  const webStream = useMemo(
+    () => (!isAudioMode && currentUri ? parseWebStream(currentUri) : null),
+    [currentUri, isAudioMode]
+  );
+  const activeWebStream = !isAudioMode ? (webStream || fallbackWebEmbed) : null;
+  const youtubeId = !isAudioMode && activeWebStream?.platform === 'youtube' ? (webStream?.id || null) : null;
 
   useEffect(() => {
     setFallbackWebEmbed(null);

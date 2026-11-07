@@ -88,6 +88,9 @@ declare module 'lucide-react' {
   export const Gamepad2: LucideIcon;
   export const Music: LucideIcon;
   export const ListMusic: LucideIcon;
+  export const ListPlus: LucideIcon;
+  export const Shuffle: LucideIcon;
+  export const Waves: LucideIcon;
   export const MessageSquareText: LucideIcon;
   export const Maximize2: LucideIcon;
   export const Minimize2: LucideIcon;

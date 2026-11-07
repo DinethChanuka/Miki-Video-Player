@@ -276,6 +276,7 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
         onLoad={sendListeningPing}
         title="YouTube video player"
         className="w-full h-full border-0 pointer-events-auto"
+        referrerPolicy="unsafe-url"
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
         allowFullScreen
       />

@@ -172,11 +172,7 @@ export class MediaEngineRouter implements MediaEngine {
   private errorListeners = new Set<(e: PlayerErrorEnvelope) => void>();
 
   constructor() {
-    this.webMediaEngine = new WebMediaEngine();
-    this.webEmbedEngine = new WebEmbedMediaEngine();
-    if (isTauriEnvironment()) {
-      this.nativeEngine = new TauriMpvEngine();
-    }
+    // Lazily initialized on demand to prevent redundant competing engine creation
   }
 
   public get engineType(): UnifiedEngineType {
@@ -434,8 +430,21 @@ export class MediaEngineRouter implements MediaEngine {
   }
 
   private getEngineInstance(type: UnifiedEngineType): MediaEngine | IPlayerEngine | null {
-    if (type === 'tauri-mpv') return this.nativeEngine;
-    if (type === 'web-embed') return this.webEmbedEngine;
+    if (type === 'tauri-mpv') {
+      if (!this.nativeEngine && isTauriEnvironment()) {
+        this.nativeEngine = new TauriMpvEngine();
+      }
+      return this.nativeEngine;
+    }
+    if (type === 'web-embed') {
+      if (!this.webEmbedEngine) {
+        this.webEmbedEngine = new WebEmbedMediaEngine();
+      }
+      return this.webEmbedEngine;
+    }
+    if (!this.webMediaEngine) {
+      this.webMediaEngine = new WebMediaEngine();
+    }
     return this.webMediaEngine;
   }
 

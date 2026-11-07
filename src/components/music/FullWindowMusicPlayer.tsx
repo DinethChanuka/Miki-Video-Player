@@ -6,17 +6,31 @@ import {
   SkipBack,
   SkipForward,
   Volume2,
+  Volume1,
   VolumeX,
   Sliders,
   X,
   ChevronDown,
   ListMusic,
+  ListPlus,
   MessageSquareText,
   Sparkles,
   Music,
   FolderOpen,
+  RefreshCw,
+  Activity,
+  Radio,
+  Waves,
+  Check,
 } from 'lucide-react';
 import { FEATURED_MUSIC_TRACKS } from './MusicPlayerView';
+import { fetchTrackLyrics, LyricsResult } from '../../utils/lyricsService';
+import {
+  renderCyberSpectrum,
+  renderOrbitalSoundwave,
+  renderLiquidOscilloscope,
+  VisualizerMode,
+} from './canvasVisualizers';
 
 export interface FullWindowMusicPlayerProps {
   isOpen: boolean;
@@ -35,10 +49,12 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
   const currentTitle = usePlayerStore((s) => s.currentTitle);
   const currentArtwork = usePlayerStore((s) => s.currentArtwork);
   const isPaused = usePlayerStore((s) => s.isPaused);
+  const isBuffering = usePlayerStore((s) => s.isBuffering);
   const positionMs = usePlayerStore((s) => s.positionMs);
   const durationMs = usePlayerStore((s) => s.durationMs);
   const volume = usePlayerStore((s) => s.volume);
   const isMuted = usePlayerStore((s) => s.isMuted);
+  const preampGain = usePlayerStore((s) => s.preampGain);
   const setVolume = usePlayerStore((s) => s.setVolume);
   const setMuted = usePlayerStore((s) => s.setMuted);
   const togglePlay = usePlayerStore((s) => s.togglePlay);
@@ -46,15 +62,81 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
   const openMedia = usePlayerStore((s) => s.openMedia);
   const closeMedia = usePlayerStore((s) => s.closeMedia);
 
+  const customPlaylists = usePlayerStore((s) => s.customPlaylists);
+  const createPlaylist = usePlayerStore((s) => s.createPlaylist);
+  const addTrackToPlaylist = usePlayerStore((s) => s.addTrackToPlaylist);
+
   const [tracks, setTracks] = useState(FEATURED_MUSIC_TRACKS);
   const [activeIndex, setActiveIndex] = useState(0);
   const [isLyricsOpen, setIsLyricsOpen] = useState(false);
   const [isQueueOpen, setIsQueueOpen] = useState(false);
+  const [visualizerMode, setVisualizerMode] = useState<VisualizerMode>('spectrum');
+  const [syncAudio, setSyncAudio] = useState(true);
+
+  // Synchronized lyrics state
+  const [lyricsData, setLyricsData] = useState<LyricsResult | null>(null);
+  const [isLoadingLyrics, setIsLoadingLyrics] = useState(false);
+  const activeLyricRef = useRef<HTMLDivElement | null>(null);
+
+  // Custom playlist modal state
+  const [isPlaylistModalOpen, setIsPlaylistModalOpen] = useState(false);
+  const [newPlaylistName, setNewPlaylistName] = useState('');
+  const [playlistAddedTrackId, setPlaylistAddedTrackId] = useState<string | null>(null);
+
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const createdBlobUrlsRef = useRef<string[]>([]);
 
   const activeTrack = tracks[activeIndex] || tracks[0];
-  const isYouTubeTrack = Boolean(currentUri?.match(/(?:youtube\.com|youtu\.be)/i));
+  // Detect if current audio is an online stream or YouTube direct audio bridge
+  const isYouTubeAudioStream = Boolean(currentUri?.match(/(?:youtube\.com|youtu\.be)/i));
+
+  // Fetch synchronized lyrics on track change
+  useEffect(() => {
+    if (!activeTrack) return;
+    let isCancelled = false;
+    setIsLoadingLyrics(true);
+
+    fetchTrackLyrics(activeTrack.title, activeTrack.artist)
+      .then((res) => {
+        if (!isCancelled) {
+          setLyricsData(res);
+          setIsLoadingLyrics(false);
+        }
+      })
+      .catch(() => {
+        if (!isCancelled) {
+          setLyricsData(null);
+          setIsLoadingLyrics(false);
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [activeTrack?.title, activeTrack?.artist]);
+
+  const lastActiveIndexRef = useRef<number>(-1);
+
+  // Auto-scroll active lyric line into view only when active line transitions
+  useEffect(() => {
+    if (!isLyricsOpen || !lyricsData?.syncedLyrics) return;
+    const synced = lyricsData.syncedLyrics;
+    let activeIdx = -1;
+    for (let i = 0; i < synced.length; i++) {
+      if (synced[i].timeMs <= positionMs) {
+        activeIdx = i;
+      } else {
+        break;
+      }
+    }
+    if (activeIdx !== -1 && activeIdx !== lastActiveIndexRef.current) {
+      lastActiveIndexRef.current = activeIdx;
+      activeLyricRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+      });
+    }
+  }, [positionMs, isLyricsOpen, lyricsData?.syncedLyrics]);
 
   // Revoke created blob URLs on unmount to eliminate memory leaks
   useEffect(() => {
@@ -75,15 +157,28 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
         const idx = prev.findIndex((t) => t.url === currentUri);
         if (idx !== -1) {
           setActiveIndex(idx);
+          if (durationMs > 0 && prev[idx].durationSec !== Math.floor(durationMs / 1000)) {
+            const updated = [...prev];
+            updated[idx] = { ...updated[idx], durationSec: Math.floor(durationMs / 1000) };
+            return updated;
+          }
           return prev;
         } else if (currentTitle) {
-          const parts = currentTitle.split(' - ');
-          const title = parts[0]?.trim() || currentTitle;
-          const artist = parts[1]?.trim() || 'Featured Artist';
+          let songTitle = currentTitle;
+          let songArtist = 'Studio Master';
+          if (currentTitle.includes(' - ')) {
+            const parts = currentTitle.split(' - ');
+            songTitle = parts[1]?.trim() || parts[0]?.trim() || currentTitle;
+            songArtist = parts[0]?.trim() || 'Studio Master';
+          } else if (currentTitle.includes(' | ')) {
+            const parts = currentTitle.split(' | ');
+            songTitle = parts[0]?.trim() || currentTitle;
+            songArtist = parts[1]?.trim() || 'Studio Master';
+          }
           const newTrack = {
             id: `current-${Date.now()}`,
-            title,
-            artist,
+            title: songTitle,
+            artist: songArtist,
             url: currentUri,
             durationSec: durationMs ? Math.floor(durationMs / 1000) : 210,
             albumArt: currentArtwork || 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=500&auto=format&fit=crop&q=80',
@@ -94,13 +189,21 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
         return prev;
       });
     }
-  }, [currentUri, currentTitle, currentArtwork, durationMs]);
+  }, [currentUri, currentTitle, currentArtwork]);
 
   const handleSelectTrack = (idx: number) => {
     setActiveIndex(idx);
     const tr = tracks[idx];
     if (tr) {
       openMedia(tr.url, tr.title, true, 0, tr.albumArt, 'music');
+    }
+  };
+
+  const handlePlayToggle = () => {
+    if (!currentUri && activeTrack) {
+      openMedia(activeTrack.url, activeTrack.title, true, 0, activeTrack.albumArt, 'music');
+    } else {
+      togglePlay();
     }
   };
 
@@ -112,6 +215,20 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
   const handleNext = () => {
     const nextIdx = (activeIndex + 1) % tracks.length;
     handleSelectTrack(nextIdx);
+  };
+
+  const handleVolumeChange = (newVal: number) => {
+    // 1. Instantaneous direct hardware volume update with smooth perceptual logarithmic curve:
+    const video = (document.getElementById('aether-video-viewport') as HTMLVideoElement) || null;
+    if (video) {
+      const isMutedNow = newVal === 0;
+      video.muted = isMutedNow;
+      const normalizedPercent = Math.min(100, newVal) / 100;
+      const smoothGain = Math.pow(normalizedPercent, 1.4);
+      video.volume = Math.max(0, Math.min(1.0, smoothGain));
+    }
+    // 2. Synchronous player store dispatch
+    setVolume(newVal);
   };
 
   const handleOpenLocalAudio = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -139,7 +256,7 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
     const handleKey = (e: KeyboardEvent) => {
       if (e.code === 'Space') {
         e.preventDefault();
-        togglePlay();
+        handlePlayToggle();
       } else if (e.code === 'ArrowLeft') {
         e.preventDefault();
         handlePrev();
@@ -154,7 +271,7 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
     return () => window.removeEventListener('keydown', handleKey);
   }, [isOpen, activeIndex, togglePlay, onClose]);
 
-  // Ambient Audio Reactive Visualizer Canvas
+  // Tri-Mode Premium Audio Reactive Visualizer Canvas
   useEffect(() => {
     if (!isOpen || !canvasRef.current) return;
     const canvas = canvasRef.current;
@@ -166,58 +283,37 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
 
     const render = () => {
       phase += 0.03;
-      const w = (canvas.width = canvas.offsetWidth);
-      const h = (canvas.height = canvas.offsetHeight);
+      const dpr = window.devicePixelRatio || 1;
+      const w = canvas.offsetWidth;
+      const h = canvas.offsetHeight;
+      if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
+        canvas.width = w * dpr;
+        canvas.height = h * dpr;
+      }
+      ctx.save();
+      ctx.scale(dpr, dpr);
 
-      ctx.clearRect(0, 0, w, h);
+      const engine = usePlayerStore.getState().engine;
+      const freqData = engine?.getFrequencyData ? engine.getFrequencyData() : null;
 
-      // Atmospheric glowing gradient
-      const bgGrad = ctx.createRadialGradient(w / 2, h / 2, 40, w / 2, h / 2, w * 0.7);
-      bgGrad.addColorStop(0, 'rgba(30, 27, 75, 0.45)');
-      bgGrad.addColorStop(0.5, 'rgba(15, 23, 42, 0.65)');
-      bgGrad.addColorStop(1, 'rgba(5, 6, 10, 0.95)');
-      ctx.fillStyle = bgGrad;
-      ctx.fillRect(0, 0, w, h);
-
-      // Atmospheric sound stage visualizer behind Cover Flow
-      const barCount = 64;
-      const barWidth = w / barCount;
-      const isAudible = !isPaused;
-      const floorY = h * 0.72; // Anchored to studio floor horizon
-
-      for (let i = 0; i < barCount; i++) {
-        const centerDist = Math.abs(i - barCount / 2) / (barCount / 2);
-        const archFactor = Math.cos(centerDist * Math.PI * 0.45);
-        const wave = Math.sin(phase + i * 0.22) * 0.5 + Math.cos(phase * 0.7 + i * 0.15) * 0.5;
-        const normalizedAmp = (wave * 0.5 + 0.5) * archFactor;
-
-        const amp = isAudible ? normalizedAmp * (h * 0.28) + 12 : Math.sin(phase * 0.5 + i * 0.2) * 4 + 6;
-        const x = i * barWidth;
-        const barH = amp * 1.6;
-
-        const grad = ctx.createLinearGradient(x, floorY - barH, x, floorY);
-        grad.addColorStop(0, 'rgba(56, 189, 248, 0.85)'); // Cyan top
-        grad.addColorStop(0.5, 'rgba(168, 85, 247, 0.65)'); // Purple mid tone
-        grad.addColorStop(1, 'rgba(236, 72, 153, 0.15)'); // Soft base
-
-        ctx.fillStyle = grad;
-        ctx.beginPath();
-        if (ctx.roundRect) {
-          ctx.roundRect(x + barWidth * 0.15, floorY - barH, barWidth * 0.7, barH, [4, 4, 0, 0]);
-          ctx.fill();
-        } else {
-          ctx.fillRect(x + barWidth * 0.15, floorY - barH, barWidth * 0.7, barH);
-        }
+      if (visualizerMode === 'orbital') {
+        renderOrbitalSoundwave(ctx, w, h, freqData, phase, !isPaused, syncAudio);
+      } else if (visualizerMode === 'ribbon') {
+        renderLiquidOscilloscope(ctx, w, h, freqData, phase, !isPaused, syncAudio);
+      } else {
+        renderCyberSpectrum(ctx, w, h, freqData, phase, !isPaused, syncAudio);
       }
 
+      ctx.restore();
       animId = requestAnimationFrame(render);
     };
 
     render();
     return () => cancelAnimationFrame(animId);
-  }, [isOpen, isPaused]);
+  }, [isOpen, isPaused, visualizerMode, syncAudio]);
 
-  const progressPercent = durationMs > 0 ? (positionMs / durationMs) * 100 : 0;
+  const effectiveDuration = durationMs > 0 ? durationMs : (activeTrack?.durationSec ? activeTrack.durationSec * 1000 : 0);
+  const progressPercent = effectiveDuration > 0 ? Math.min(100, (positionMs / effectiveDuration) * 100) : 0;
 
   const formatTime = (ms: number) => {
     const s = Math.floor(ms / 1000);
@@ -275,18 +371,83 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
               </span>
             </h1>
             <p className="text-[11px] text-white/50">
-              {isYouTubeTrack ? 'YouTube Music Hi-Fi Audio (Full Track)' : 'Studio Master 24-Bit / 192kHz Audio'}
+              {isYouTubeAudioStream
+                ? 'Studio Master Lossless Audio & Spatial Soundstage'
+                : 'Studio Master 24-Bit / 192kHz Audio'}
             </p>
           </div>
         </div>
 
         <div
-          className="flex items-center gap-2.5"
+          className="flex items-center gap-2"
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
+          {/* Visualizer Mode Switcher */}
+          <div className="flex items-center gap-1 bg-white/5 p-1 rounded-2xl border border-white/10">
+            <button
+              onClick={() => setVisualizerMode('spectrum')}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-semibold transition-all ${
+                visualizerMode === 'spectrum'
+                  ? 'bg-cyan-500/25 text-cyan-300 border border-cyan-400/30 shadow-sm'
+                  : 'text-white/60 hover:text-white'
+              }`}
+              title="Cyber Spectrum Bars"
+            >
+              <Activity className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Spectrum</span>
+            </button>
+            <button
+              onClick={() => setVisualizerMode('orbital')}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-semibold transition-all ${
+                visualizerMode === 'orbital'
+                  ? 'bg-purple-500/25 text-purple-300 border border-purple-400/30 shadow-sm'
+                  : 'text-white/60 hover:text-white'
+              }`}
+              title="Orbital Pulsar Soundwave"
+            >
+              <Radio className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Orbital</span>
+            </button>
+            <button
+              onClick={() => setVisualizerMode('ribbon')}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-semibold transition-all ${
+                visualizerMode === 'ribbon'
+                  ? 'bg-pink-500/25 text-pink-300 border border-pink-400/30 shadow-sm'
+                  : 'text-white/60 hover:text-white'
+              }`}
+              title="Liquid Oscilloscope Ribbon"
+            >
+              <Waves className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Ribbon</span>
+            </button>
+          </div>
+
+          {/* Sync to Audio Toggle Button */}
+          <button
+            onClick={() => setSyncAudio(!syncAudio)}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
+              syncAudio
+                ? 'bg-cyan-500/20 text-cyan-300 border-cyan-400/40 shadow-[0_0_12px_rgba(6,182,212,0.3)] animate-pulse'
+                : 'bg-white/5 text-white/40 border-white/10 hover:text-white/70'
+            }`}
+            title="Toggle Music-Sync Animation"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span className="hidden md:inline">Sync Audio</span>
+          </button>
+
+          {/* Add Track to Playlist Button */}
+          <button
+            onClick={() => setIsPlaylistModalOpen(true)}
+            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/70 hover:text-white border border-white/10 transition-all active:scale-95"
+            title="Add Track to Custom Playlist"
+          >
+            <ListPlus className="w-4 h-4 text-cyan-400" />
+          </button>
+
           <label className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/10 text-xs font-semibold text-white/80 hover:text-white cursor-pointer transition-all active:scale-95">
             <FolderOpen className="w-3.5 h-3.5 text-cyan-400" />
-            <span>Open Audio File</span>
+            <span className="hidden lg:inline">Open Audio</span>
             <input type="file" accept="audio/*" onChange={handleOpenLocalAudio} className="hidden" />
           </label>
 
@@ -305,7 +466,7 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
             className={`p-2 rounded-xl border transition-all ${
               isLyricsOpen ? 'bg-purple-500/20 text-purple-300 border-purple-400/40' : 'bg-white/5 text-white/70 hover:text-white border-white/10'
             }`}
-            title="Lyrics Viewer"
+            title="Synchronized Lyrics"
           >
             <MessageSquareText className="w-4 h-4" />
           </button>
@@ -376,7 +537,7 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
             return (
               <div
                 key={track.id}
-                onClick={() => handleSelectTrack(idx)}
+                onClick={() => (isCenter ? handlePlayToggle() : handleSelectTrack(idx))}
                 className="absolute w-64 h-64 cursor-pointer transition-all duration-500 ease-out flex flex-col items-center group select-none"
                 style={{
                   transform,
@@ -395,9 +556,27 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
                       (e.target as HTMLElement).style.display = 'none';
                     }}
                   />
-                  {isCenter && !isPaused && (
-                    <div className="absolute top-3 right-3 px-2 py-1 rounded-full bg-cyan-500/80 backdrop-blur-md text-[10px] font-mono text-black font-bold flex items-center gap-1 shadow-lg">
-                      <Sparkles className="w-3 h-3 animate-spin" /> PLAYING
+                  {isCenter && (
+                    isBuffering ? (
+                      <div className="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-amber-500/90 backdrop-blur-md text-[10px] font-mono text-slate-950 font-bold flex items-center gap-1.5 shadow-lg animate-pulse z-30">
+                        <RefreshCw className="w-3 h-3 animate-spin" /> LOADING STREAM...
+                      </div>
+                    ) : !isPaused ? (
+                      <div className="absolute top-3 right-3 px-2 py-1 rounded-full bg-cyan-500/80 backdrop-blur-md text-[10px] font-mono text-black font-bold flex items-center gap-1 shadow-lg z-30">
+                        <Sparkles className="w-3 h-3 animate-spin" /> PLAYING
+                      </div>
+                    ) : null
+                  )}
+
+                  {/* Frosted Loading Indicator Overlay when Stream is Buffering */}
+                  {isCenter && isBuffering && (
+                    <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm flex flex-col items-center justify-center gap-2 rounded-2xl z-20 pointer-events-none animate-in fade-in duration-200">
+                      <div className="p-3 rounded-full bg-cyan-500/20 border border-cyan-400/40 text-cyan-300 shadow-xl">
+                        <RefreshCw className="w-7 h-7 animate-spin" />
+                      </div>
+                      <span className="text-[11px] font-mono font-bold tracking-wider text-white uppercase drop-shadow">
+                        Buffering Audio Stream...
+                      </span>
                     </div>
                   )}
                 </div>
@@ -462,11 +641,17 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
               <SkipBack className="w-5 h-5 fill-white/80" />
             </button>
             <button
-              onClick={togglePlay}
+              onClick={handlePlayToggle}
               className="w-12 h-12 rounded-2xl bg-gradient-to-r from-cyan-400 to-blue-500 hover:brightness-110 text-slate-950 flex items-center justify-center transition-all shadow-lg shadow-cyan-500/30 active:scale-95"
-              title="Play / Pause (Space)"
+              title={isBuffering ? "Loading Audio Stream..." : isPaused ? "Play (Space)" : "Pause (Space)"}
             >
-              {isPaused ? <Play className="w-5 h-5 fill-current ml-0.5" /> : <Pause className="w-5 h-5 fill-current" />}
+              {isBuffering ? (
+                <RefreshCw className="w-5 h-5 animate-spin text-slate-950" />
+              ) : isPaused ? (
+                <Play className="w-5 h-5 fill-current ml-0.5" />
+              ) : (
+                <Pause className="w-5 h-5 fill-current" />
+              )}
             </button>
             <button
               onClick={handleNext}
@@ -477,14 +662,17 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
             </button>
           </div>
 
-          {/* Center: Mini Track Badge & Interactive Scrubber Bar */}
+          {/* Center: Mini Track Badge & Interactive Scrubber Bar with Indeterminate Buffering Animation */}
           <div className="flex-1 flex flex-col gap-1.5 min-w-0 px-2">
             <div className="flex items-center justify-between text-[11px] font-mono text-white/50">
-              <span className="truncate max-w-[200px] font-semibold text-white/90">
+              <span className="truncate max-w-[200px] font-semibold text-white/90 flex items-center gap-1.5">
+                {isBuffering && <RefreshCw className="w-3 h-3 animate-spin text-cyan-400 shrink-0" />}
                 {activeTrack?.title}
               </span>
-              <span>
-                {formatTime(positionMs)} / {formatTime(durationMs)}
+              <span className={isBuffering && positionMs === 0 ? "text-cyan-400 font-semibold animate-pulse" : ""}>
+                {isBuffering && positionMs === 0
+                  ? 'Buffering Audio...'
+                  : `${formatTime(positionMs)} / ${formatTime(effectiveDuration)}`}
               </span>
             </div>
             {/* Scrubber */}
@@ -492,12 +680,14 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
               onClick={(e) => {
                 const rect = e.currentTarget.getBoundingClientRect();
                 const pos = (e.clientX - rect.left) / rect.width;
-                if (durationMs > 0) {
-                  seek(pos * durationMs, true);
+                if (effectiveDuration > 0) {
+                  seek(pos * effectiveDuration, true);
                 }
               }}
               className="relative w-full h-2 rounded-full bg-white/10 cursor-pointer overflow-hidden group"
             >
+              {/* Indeterminate Shimmer Beam when Buffering */}
+              {isBuffering && <div className="miki-timeline-buffering-beam z-10" />}
               <div
                 className="h-full bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-500 transition-all rounded-full group-hover:brightness-125"
                 style={{ width: `${progressPercent}%` }}
@@ -507,22 +697,58 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
 
           {/* Right: Sound Controls & Drawers */}
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-white/5 border border-white/10 hover:border-white/20 transition-all">
               <button
-                onClick={() => setMuted(!isMuted)}
-                className="p-2 rounded-xl hover:bg-white/10 text-white/70 hover:text-white"
+                onClick={() => {
+                  if (isMuted) {
+                    if (volume === 0) {
+                      handleVolumeChange(80);
+                    } else {
+                      setMuted(false);
+                    }
+                  } else {
+                    setMuted(true);
+                  }
+                }}
+                className="p-1 rounded-lg hover:bg-white/10 text-white/70 hover:text-white transition-colors cursor-pointer"
                 title={isMuted ? 'Unmute' : 'Mute'}
               >
-                {isMuted || volume === 0 ? <VolumeX className="w-4 h-4 text-rose-400" /> : <Volume2 className="w-4 h-4" />}
+                {isMuted || volume === 0 ? (
+                  <VolumeX className="w-4 h-4 text-rose-400" />
+                ) : volume < 50 ? (
+                  <Volume1 className="w-4 h-4 text-white/80" />
+                ) : (
+                  <Volume2 className="w-4 h-4 text-cyan-400" />
+                )}
               </button>
-              <input
-                type="range"
-                min="0"
-                max="200"
-                value={isMuted ? 0 : volume}
-                onChange={(e) => setVolume(Number(e.target.value))}
-                className="w-20 accent-cyan-400 h-1 bg-white/20 rounded-lg cursor-pointer"
-              />
+
+              <div className="relative flex items-center group/vol">
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value={isMuted ? 0 : volume}
+                  onInput={(e) => handleVolumeChange(Number((e.target as HTMLInputElement).value))}
+                  onChange={(e) => handleVolumeChange(Number(e.target.value))}
+                  className="w-24 h-1.5 bg-white/20 rounded-full appearance-none cursor-pointer accent-cyan-400 hover:accent-cyan-300 transition-all"
+                  title={`Volume: ${Math.round(isMuted ? 0 : volume)}%`}
+                />
+              </div>
+
+              <span className="text-[10px] font-mono text-white/60 min-w-[28px] text-right font-medium">
+                {isMuted ? '0%' : `${Math.round(volume)}%`}
+              </span>
+
+              {preampGain > 1.0 && (
+                <span
+                  onClick={onOpenEq}
+                  className="hidden sm:inline-block text-[9px] font-mono px-1.5 py-0.5 rounded-md bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 font-bold cursor-pointer hover:bg-cyan-500/30 transition-all select-none"
+                  title={`Preamp Boost Active: ${preampGain.toFixed(1)}x. Click to adjust.`}
+                >
+                  +{Math.round((preampGain - 1.0) * 100)}% BOOST
+                </span>
+              )}
             </div>
 
             <button
@@ -538,24 +764,198 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
         </div>
       </div>
 
-      {/* Slide-In Lyrics Drawer */}
+      {/* Slide-In Synchronized Lyrics Drawer */}
       {isLyricsOpen && (
-        <div className="absolute top-14 right-6 bottom-28 w-80 bg-slate-950/90 backdrop-blur-2xl border border-white/20 rounded-3xl p-5 z-30 shadow-2xl flex flex-col gap-3 animate-in slide-in-from-right duration-200">
-          <div className="flex items-center justify-between border-b border-white/10 pb-2">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-white/50">Synchronized Lyrics</h3>
-            <button onClick={() => setIsLyricsOpen(false)} className="text-white/40 hover:text-white">
+        <div className="absolute top-14 right-6 bottom-28 w-88 bg-slate-950/95 backdrop-blur-2xl border border-white/20 rounded-3xl p-5 z-30 shadow-2xl flex flex-col gap-3 animate-in slide-in-from-right duration-200">
+          <div className="flex items-center justify-between border-b border-white/10 pb-3">
+            <div className="flex items-center gap-2">
+              <MessageSquareText className="w-4 h-4 text-cyan-400" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-white/80">Synchronized Lyrics</h3>
+              {lyricsData?.source && (
+                <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/30">
+                  {lyricsData.source.toUpperCase()}
+                </span>
+              )}
+            </div>
+            <button
+              onClick={() => setIsLyricsOpen(false)}
+              className="p-1.5 rounded-xl hover:bg-white/10 text-white/40 hover:text-white transition-colors"
+            >
               <X className="w-4 h-4" />
             </button>
           </div>
-          <div className="flex-1 overflow-y-auto space-y-4 text-center py-4">
-            <p className="text-sm font-semibold text-cyan-300">♪ {activeTrack?.title} ♪</p>
-            <p className="text-xs text-white/60 leading-relaxed">
-              Drifting across the electric neon horizon,<br />
-              Synthesizers echoing through celestial frequencies.<br />
-              Bassline resonating with high-fidelity depth,<br />
-              The soundscape expands without boundaries.
-            </p>
-            <p className="text-xs text-white/40">Studio Instrumental Master</p>
+
+          {isLoadingLyrics ? (
+            <div className="flex-1 flex flex-col items-center justify-center gap-3 text-white/50 py-12">
+              <RefreshCw className="w-6 h-6 animate-spin text-cyan-400" />
+              <p className="text-xs font-mono font-medium tracking-wide">Syncing real-time lyrics...</p>
+            </div>
+          ) : lyricsData?.syncedLyrics && lyricsData.syncedLyrics.length > 0 ? (
+            <div className="flex-1 overflow-y-auto space-y-3 py-4 px-2 scroll-smooth">
+              <div className="text-center pb-2 border-b border-white/5">
+                <p className="text-xs font-bold text-white/90 truncate">{activeTrack?.title}</p>
+                <p className="text-[11px] text-cyan-400/70 truncate">{activeTrack?.artist}</p>
+              </div>
+              {lyricsData.syncedLyrics.map((line, idx) => {
+                const isPastOrCurrent = line.timeMs <= positionMs;
+                const nextLine = lyricsData.syncedLyrics![idx + 1];
+                const isActive = isPastOrCurrent && (!nextLine || nextLine.timeMs > positionMs);
+
+                return (
+                  <div
+                    key={`${line.timeMs}-${idx}`}
+                    ref={isActive ? activeLyricRef : null}
+                    onClick={() => seek(line.timeMs, true)}
+                    className={`cursor-pointer transition-all duration-300 px-3 py-2 rounded-xl text-center select-none ${
+                      isActive
+                        ? 'bg-gradient-to-r from-cyan-500/20 via-purple-500/20 to-pink-500/20 border border-cyan-400/40 text-cyan-300 font-bold text-sm scale-[1.03] shadow-[0_0_16px_rgba(6,182,212,0.3)]'
+                        : isPastOrCurrent
+                        ? 'text-white/80 text-xs hover:text-white hover:bg-white/5'
+                        : 'text-white/35 text-xs hover:text-white/60 hover:bg-white/5'
+                    }`}
+                  >
+                    <p className="leading-relaxed">{line.text || '♪'}</p>
+                    <span className="text-[9px] font-mono text-white/20 mt-0.5 block">
+                      {formatTime(line.timeMs)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          ) : lyricsData?.plainLyrics ? (
+            <div className="flex-1 overflow-y-auto space-y-3 py-4 px-2 text-center">
+              <div className="pb-2 border-b border-white/5">
+                <p className="text-xs font-bold text-white/90 truncate">{activeTrack?.title}</p>
+                <p className="text-[11px] text-cyan-400/70 truncate">{activeTrack?.artist}</p>
+              </div>
+              <div className="text-xs text-white/70 leading-relaxed whitespace-pre-line py-2">
+                {lyricsData.plainLyrics}
+              </div>
+            </div>
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center py-12 px-4">
+              <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-cyan-400">
+                <Music className="w-6 h-6" />
+              </div>
+              <p className="text-sm font-bold text-white/90">Studio Instrumental Master</p>
+              <p className="text-xs text-white/50 leading-relaxed max-w-[220px]">
+                Lyrics are not published or track is an instrumental studio soundscape.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Custom Playlist Selection & Creation Modal */}
+      {isPlaylistModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-md rounded-3xl bg-slate-950 border border-white/15 p-6 shadow-2xl flex flex-col gap-4">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div className="flex items-center gap-2">
+                <ListPlus className="w-5 h-5 text-cyan-400" />
+                <h3 className="text-base font-bold text-white">Add to Playlist</h3>
+              </div>
+              <button
+                onClick={() => setIsPlaylistModalOpen(false)}
+                className="p-1.5 rounded-xl hover:bg-white/10 text-white/40 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Quick Create New Playlist */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (newPlaylistName.trim()) {
+                  const newId = createPlaylist(newPlaylistName.trim());
+                  if (activeTrack) {
+                    addTrackToPlaylist(newId, {
+                      id: activeTrack.id,
+                      title: activeTrack.title,
+                      artist: activeTrack.artist,
+                      url: activeTrack.url,
+                      coverUrl: activeTrack.albumArt,
+                      durationSec: activeTrack.durationSec,
+                    });
+                    setPlaylistAddedTrackId(newId);
+                    setTimeout(() => setPlaylistAddedTrackId(null), 2000);
+                  }
+                  setNewPlaylistName('');
+                }
+              }}
+              className="flex items-center gap-2"
+            >
+              <input
+                type="text"
+                placeholder="New Playlist Name..."
+                value={newPlaylistName}
+                onChange={(e) => setNewPlaylistName(e.target.value)}
+                className="flex-1 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-white placeholder-white/30 focus:outline-none focus:border-cyan-400 transition-colors"
+              />
+              <button
+                type="submit"
+                disabled={!newPlaylistName.trim()}
+                className="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 disabled:opacity-40 text-slate-950 text-xs font-bold transition-all"
+              >
+                Create
+              </button>
+            </form>
+
+            {/* Existing Playlists List */}
+            <div className="max-h-60 overflow-y-auto space-y-2 py-2">
+              <p className="text-[11px] font-mono uppercase tracking-wider text-white/40">Select Existing Playlist</p>
+              {customPlaylists.length === 0 ? (
+                <p className="text-xs text-white/30 italic py-4 text-center">No playlists created yet. Type a name above to create one!</p>
+              ) : (
+                customPlaylists.map((pl) => {
+                  const isAdded = playlistAddedTrackId === pl.id;
+                  return (
+                    <div
+                      key={pl.id}
+                      onClick={() => {
+                        if (activeTrack) {
+                          addTrackToPlaylist(pl.id, {
+                            id: activeTrack.id,
+                            title: activeTrack.title,
+                            artist: activeTrack.artist,
+                            url: activeTrack.url,
+                            coverUrl: activeTrack.albumArt,
+                            durationSec: activeTrack.durationSec,
+                          });
+                          setPlaylistAddedTrackId(pl.id);
+                          setTimeout(() => setPlaylistAddedTrackId(null), 2000);
+                        }
+                      }}
+                      className="flex items-center justify-between p-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 cursor-pointer transition-all group"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-8 h-8 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold text-xs shrink-0">
+                          {pl.name.slice(0, 1).toUpperCase()}
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-sm font-semibold text-white/90 truncate group-hover:text-cyan-300">
+                            {pl.name}
+                          </span>
+                          <span className="text-[10px] text-white/40 font-mono">
+                            {pl.tracks.length} {pl.tracks.length === 1 ? 'track' : 'tracks'}
+                          </span>
+                        </div>
+                      </div>
+                      {isAdded ? (
+                        <span className="flex items-center gap-1 text-xs font-bold text-emerald-400 bg-emerald-500/20 px-2 py-1 rounded-lg">
+                          <Check className="w-3.5 h-3.5" /> Added
+                        </span>
+                      ) : (
+                        <span className="text-xs text-white/40 group-hover:text-white font-medium">
+                          + Add
+                        </span>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
           </div>
         </div>
       )}

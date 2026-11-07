@@ -15,6 +15,8 @@ export const EqualizerModal: React.FC<EqualizerModalProps> = ({ isOpen, onClose 
   const setEqualizer = usePlayerStore((s) => s.setEqualizer);
   const dspBypass = usePlayerStore((s) => s.dspBypass);
   const toggleDspBypass = usePlayerStore((s) => s.toggleDspBypass);
+  const preampGain = usePlayerStore((s) => s.preampGain);
+  const setPreampGain = usePlayerStore((s) => s.setPreampGain);
 
   if (!isOpen) return null;
 
@@ -75,6 +77,31 @@ export const EqualizerModal: React.FC<EqualizerModalProps> = ({ isOpen, onClose 
               </div>
             );
           })}
+        </div>
+
+        {/* Dedicated Preamp Gain Stage (Independent Audio Boost) */}
+        <div className="flex items-center justify-between px-4 py-3 rounded-xl bg-white/5 border border-white/10">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-white/90">Preamp Gain</span>
+            <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/30">
+              {preampGain.toFixed(1)}x ({Math.round(preampGain * 100)}%)
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-[10px] text-white/50">1.0x</span>
+            <input
+              type="range"
+              min="1.0"
+              max="2.5"
+              step="0.1"
+              value={preampGain}
+              onChange={(e) => setPreampGain(parseFloat(e.target.value))}
+              disabled={dspBypass}
+              className="w-40 h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-cyan-400 disabled:opacity-40"
+              title={`Preamp Boost: ${preampGain.toFixed(1)}x`}
+            />
+            <span className="text-[10px] text-white/50">2.5x</span>
+          </div>
         </div>
 
         {/* Footer Actions: Night Mode, DSP Bypass & Reset */}

@@ -3,6 +3,9 @@ import Hls from 'hls.js';
 import { SpatialAudioEngine } from './SpatialAudioEngine';
 import { HlsStreamController } from './HlsStreamController.ts';
 import { ChunkedAudioStreamController } from './ChunkedAudioStreamController.ts';
+import { parseYouTubeId } from '../utils/webStreamUtils.ts';
+import { audioStreamCache } from '../utils/audioStreamCache.ts';
+import { persistentAudioCache } from '../utils/persistentAudioCache.ts';
 
 export type EngineType = 'tauri-mpv' | 'web-media';
 
@@ -103,6 +106,7 @@ export interface IPlayerEngine {
   setQualityLevel?(level: number): void;
   setDspBypass?(bypass: boolean): void;
   getDspBypass?(): boolean;
+  getFrequencyData?(): Uint8Array | null;
   onTelemetry(callback: (telemetry: PlaybackTelemetry) => void): () => void;
   onError(callback: (error: PlayerErrorEnvelope) => void): () => void;
   destroy(): Promise<void>;
@@ -227,6 +231,21 @@ export class TauriMpvEngine implements IPlayerEngine {
   }
 }
 
+/**
+ * Resolves a direct audio stream URL for a YouTube track via the local stream-audio backend.
+ * Adopts the Hidara architecture pattern using yt-dlp direct Opus/WebM extraction.
+ */
+export async function resolveYouTubeAudioStream(youtubeId: string): Promise<string> {
+  const origin =
+    typeof window !== 'undefined' && window.location?.origin?.startsWith('http')
+      ? window.location.origin
+      : 'http://127.0.0.1:39281';
+
+  // Hidara pattern: Return direct local audio streaming proxy endpoint
+  // Ensures same-origin, Range byte-seeking, and CORS headers for WebAudio DSP
+  return `${origin}/api/stream-audio?id=${encodeURIComponent(youtubeId)}&stream=true`;
+}
+
 export function resolveMediaStreamUrl(uri: string): string {
   if (!uri) return uri;
   if (
@@ -283,6 +302,8 @@ export class WebMediaEngine implements IPlayerEngine {
   private gainNode: GainNode | null = null;
   private eqBands: BiquadFilterNode[] = [];
   private compressorNode: DynamicsCompressorNode | null = null;
+  private analyserNode: AnalyserNode | null = null;
+  private frequencyDataArray: Uint8Array | null = null;
   private spatialAudio: SpatialAudioEngine | null = null;
   private mediaSourceNode: MediaElementAudioSourceNode | null = null;
   private lastEqNode: AudioNode | null = null;
@@ -294,13 +315,15 @@ export class WebMediaEngine implements IPlayerEngine {
 
   private static readonly EQ_FREQUENCIES = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
 
-  private dspBypass: boolean = false;
+  private dspBypass: boolean = true;
+  private isDirectAudioStream: boolean = false;
 
   public setDspBypass(bypass: boolean): void {
     this.dspBypass = bypass;
     if (bypass) {
       if (this.videoEl) {
-        this.videoEl.volume = Math.min(1, this.currentVolumePercent / 100);
+        const normalizedPercent = Math.min(100, this.currentVolumePercent) / 100;
+        this.videoEl.volume = Math.max(0, Math.min(1.0, Math.pow(normalizedPercent, 1.4)));
       }
     } else {
       this.setupWebAudioGraph();
@@ -344,13 +367,44 @@ export class WebMediaEngine implements IPlayerEngine {
     this.videoEl.preload = 'auto';
     this.setupWebAudioGraph();
 
-    // Hook critical HTML5 video events
-    this.videoEl.onplay = () => this.notifyTelemetry();
-    this.videoEl.onpause = () => this.notifyTelemetry();
-    this.videoEl.onended = () => this.notifyTelemetry();
+    // Hook critical HTML5 video events with detailed console logs
+    this.videoEl.onplay = () => {
+      console.log(`%c[Miki Music Action] Play event fired on HTML5 element`, 'color: #10b981;');
+      this.notifyTelemetry();
+    };
+    this.videoEl.onpause = () => {
+      console.log(`%c[Miki Music Action] Pause event fired on HTML5 element`, 'color: #8b5cf6;');
+      this.notifyTelemetry();
+    };
+    this.videoEl.onended = () => {
+      console.log(`%c[Miki Music Status] Playback ended on HTML5 element`, 'color: #06b6d4;');
+      this.notifyTelemetry();
+    };
     this.videoEl.ontimeupdate = () => this.notifyTelemetry();
+    this.videoEl.onwaiting = () => {
+      console.log(`%c[Miki Music Status] Audio buffering / waiting for stream data...`, 'color: #f59e0b; font-weight: bold;');
+      if (typeof window !== 'undefined') {
+        import('../store/playerStore').then(({ usePlayerStore }) => usePlayerStore.setState({ isBuffering: true })).catch(() => {});
+      }
+      this.notifyTelemetry();
+    };
+    this.videoEl.onplaying = () => {
+      console.log(`%c[Miki Music Status] Audio stream active & playing (time: ${this.videoEl?.currentTime.toFixed(2)}s)`, 'color: #10b981; font-weight: bold;');
+      if (typeof window !== 'undefined') {
+        import('../store/playerStore').then(({ usePlayerStore }) => usePlayerStore.setState({ isBuffering: false, isPaused: false })).catch(() => {});
+      }
+      this.notifyTelemetry();
+    };
+    this.videoEl.oncanplay = () => {
+      console.log(`%c[Miki Music Status] Audio canplay ready (readyState: ${this.videoEl?.readyState})`, 'color: #06b6d4;');
+      if (typeof window !== 'undefined') {
+        import('../store/playerStore').then(({ usePlayerStore }) => usePlayerStore.setState({ isBuffering: false })).catch(() => {});
+      }
+      this.notifyTelemetry();
+    };
     this.videoEl.onerror = () => {
       const src = this.videoEl?.src || '';
+      console.error(`[Miki Music Error] HTML5 element error code:`, this.videoEl?.error?.code, `message:`, this.videoEl?.error?.message, `src:`, src);
       // Completely ignore video errors for YouTube links or blank sources
       if (!src || src.includes('youtube.com') || src.includes('youtu.be')) return;
 
@@ -443,11 +497,23 @@ export class WebMediaEngine implements IPlayerEngine {
         }
         this.lastEqNode = currentNode;
 
+        if (!this.analyserNode && this.audioCtx) {
+          this.analyserNode = this.audioCtx.createAnalyser();
+          this.analyserNode.fftSize = 128;
+          this.analyserNode.smoothingTimeConstant = 0.8;
+        }
+
         if (this.spatialAudio) {
           this.spatialAudio.init(this.audioCtx, this.lastEqNode, this.audioCtx.destination);
+          if (this.analyserNode) {
+            try { this.lastEqNode.connect(this.analyserNode); } catch {}
+          }
         } else {
           this.lastEqNode.connect(this.compressorNode);
           this.compressorNode.connect(this.gainNode);
+          if (this.analyserNode) {
+            try { this.gainNode.connect(this.analyserNode); } catch {}
+          }
           this.gainNode.connect(this.audioCtx.destination);
         }
       }
@@ -456,19 +522,17 @@ export class WebMediaEngine implements IPlayerEngine {
     }
   }
 
+  public getFrequencyData(): Uint8Array | null {
+    if (!this.analyserNode) return null;
+    if (!this.frequencyDataArray || this.frequencyDataArray.length !== this.analyserNode.frequencyBinCount) {
+      this.frequencyDataArray = new Uint8Array(this.analyserNode.frequencyBinCount);
+    }
+    this.analyserNode.getByteFrequencyData(this.frequencyDataArray as any);
+    return this.frequencyDataArray;
+  }
+
   async load(uri: string, startPositionMs = 0): Promise<void> {
     this.setupWebAudioGraph();
-
-    // If YouTube URL, never pass to <video> src
-    if (/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)/.test(uri)) {
-      const el = this.getVideoEl();
-      if (el) {
-        el.pause();
-        el.removeAttribute('src');
-        el.load();
-      }
-      return;
-    }
 
     const el = this.getVideoEl();
     if (!el) return;
@@ -482,22 +546,85 @@ export class WebMediaEngine implements IPlayerEngine {
       this.chunkedAudioController = null;
     }
 
+    // Direct YouTube Music Audio Stream Resolution (Hidara Architecture)
+    const youtubeId = parseYouTubeId(uri);
+    if (youtubeId) {
+      this.isDirectAudioStream = true;
+      // Direct audio bypass: never enforce crossOrigin on YouTube audio streams to prevent CORS block
+      el.removeAttribute('crossOrigin');
+
+      console.log(
+        `%c[Miki Music Request] Loading YouTube track ID: ${youtubeId}, URI: ${uri}`,
+        'color: #06b6d4; font-weight: bold;'
+      );
+
+      // Explicitly set isBuffering: true on starting so UI displays loading animation immediately
+      if (typeof window !== 'undefined') {
+        import('../store/playerStore')
+          .then(({ usePlayerStore }) => usePlayerStore.setState({ isBuffering: true, positionMs: 0 }))
+          .catch(() => {});
+      }
+
+      try {
+        // Check persistent local binary cache first (0ms instant playback)
+        const localBlob = await persistentAudioCache.getCachedBlobUrl(youtubeId);
+        let directAudioUrl = localBlob;
+
+        if (!directAudioUrl) {
+          const cached = audioStreamCache.get(youtubeId);
+          directAudioUrl = cached?.streamUrl || null;
+        }
+
+        if (!directAudioUrl) {
+          console.log(
+            `%c[Miki Music Processing] Resolving audio stream for ID: ${youtubeId}...`,
+            'color: #f59e0b; font-weight: bold;'
+          );
+          directAudioUrl = await resolveYouTubeAudioStream(youtubeId);
+          audioStreamCache.set(youtubeId, {
+            id: youtubeId,
+            streamUrl: directAudioUrl,
+            title: this.videoEl?.title || youtubeId,
+            artist: 'Sound Lounge',
+          });
+        } else {
+          console.log(
+            `%c[Miki Music Cache] Instant cache hit for track ID: ${youtubeId}`,
+            'color: #10b981; font-weight: bold;'
+          );
+        }
+
+        console.log(
+          `%c[Miki Music Response] Direct stream URL ready: ${directAudioUrl}`,
+          'color: #10b981; font-weight: bold;'
+        );
+
+        el.src = directAudioUrl;
+        el.muted = false;
+        const normalizedPercent = Math.min(100, this.currentVolumePercent) / 100;
+        el.volume = Math.max(0, Math.min(1.0, Math.pow(normalizedPercent, 1.4)));
+        if (startPositionMs > 0) {
+          el.currentTime = startPositionMs / 1000;
+        }
+
+        console.log(
+          `%c[Miki Music Processing] Starting HTML5 playback (hardware direct CoreAudio)...`,
+          'color: #a855f7; font-weight: bold;'
+        );
+        await this.play().catch((playErr) => {
+          console.warn('[Miki Music Status] Autoplay waiting for user gesture or audio buffer:', playErr);
+        });
+        return;
+      } catch (err) {
+        console.error('[Miki Music Error] Failed to resolve YouTube audio stream:', err);
+        logWarn('YouTube direct audio stream loading fallback: ' + String(err));
+      }
+    }
+
     const resolvedUri = resolveMediaStreamUrl(uri);
     const isHls = HlsStreamController.isHlsUrl(resolvedUri);
     const isAudio = ChunkedAudioStreamController.isAudioUrl(resolvedUri);
-
-    // YouTube URLs are played via the YouTube Audio Bridge iframe in FullWindowMusicPlayer,
-    // NOT through the native HTML5 audio element. Skip engine load entirely.
-    const isYouTubeUrl = /(?:youtube\.com\/(?:watch\?|embed\/|shorts\/)|youtu\.be\/)/i.test(resolvedUri);
-    if (isYouTubeUrl) {
-      // Clear buffering state — the YouTube iframe bridge handles playback independently
-      if (typeof window !== 'undefined') {
-        import('../store/playerStore')
-          .then(({ usePlayerStore }) => usePlayerStore.setState({ isBuffering: false, isPaused: false }))
-          .catch(() => {});
-      }
-      return;
-    }
+    this.isDirectAudioStream = isAudio;
 
     // Enable crossOrigin = 'anonymous' so WebAudio createMediaElementSource receives authorized audio
     // Adaptive CORS recovery in onerror will automatically remove crossOrigin if the remote server rejects it
@@ -611,66 +738,82 @@ export class WebMediaEngine implements IPlayerEngine {
     const clamped = Math.max(0, Math.min(200, volume));
     this.currentVolumePercent = clamped;
 
-    if (this.videoEl && clamped > 0 && this.videoEl.muted) {
-      this.videoEl.muted = false;
+    const el = this.getVideoEl();
+    const isMuted = clamped === 0;
+
+    // Perceptually smooth logarithmic audio curve (gamma 1.4):
+    // ensures human ear perceives smooth, linear loudness transition across the entire slider range
+    const normalizedPercent = Math.min(100, clamped) / 100;
+    const smoothGain = Math.pow(normalizedPercent, 1.4);
+
+    if (this.isDirectAudioStream || this.dspBypass) {
+      if (el) {
+        el.muted = isMuted;
+        el.volume = Math.max(0, Math.min(1.0, smoothGain));
+      }
+    } else {
+      if (this.videoEl) {
+        this.videoEl.muted = isMuted;
+        this.videoEl.volume = 1.0;
+      }
     }
 
+    console.log(`%c[Miki Music Action] PlayerEngine.setVolume: ${clamped}% (hardware volume: ${(Math.min(1, clamped / 100) * 100).toFixed(0)}%)`, 'color: #06b6d4;');
+
     if (this.dspBypass) {
-      if (this.videoEl) {
-        this.videoEl.volume = Math.min(1, clamped / 100);
-      }
+      this.notifyTelemetry();
       return;
     }
 
     this.setupWebAudioGraph();
 
-    const hasWebAudio = Boolean(this.gainNode || this.spatialAudio || this.mediaSourceNode);
-
-    if (this.videoEl) {
-      if (hasWebAudio) {
-        // Authoritative Volume Control:
-        // When WebAudio is handling the DSP chain, keep HTMLVideoElement unattenuated at 1.0 (unity gain)
-        // to prevent double volume multiplication (videoEl.volume * gainNode.gain).
-        this.videoEl.volume = 1.0;
-      } else {
-        // Fallback for CORS or bypassed audio context
-        this.videoEl.volume = Math.min(1, clamped / 100);
-      }
-    }
+    const webAudioGain = isMuted ? 0 : smoothGain * (clamped > 100 ? clamped / 100 : 1.0);
 
     if (this.gainNode && this.audioCtx) {
-      this.gainNode.gain.setValueAtTime(clamped / 100, this.audioCtx.currentTime);
+      this.gainNode.gain.setTargetAtTime(webAudioGain, this.audioCtx.currentTime, 0.025);
     }
 
     if (this.spatialAudio) {
-      this.spatialAudio.setMasterVolume(clamped / 100);
+      this.spatialAudio.setMasterVolume(webAudioGain);
     }
+
+    this.notifyTelemetry();
   }
 
   async setMuted(muted: boolean): Promise<void> {
-    if (this.dspBypass) {
+    const el = this.getVideoEl();
+    const normalizedPercent = Math.min(100, this.currentVolumePercent) / 100;
+    const smoothGain = Math.pow(normalizedPercent, 1.4);
+
+    if (this.isDirectAudioStream || this.dspBypass) {
+      if (el) {
+        el.muted = muted;
+        if (!muted) {
+          el.volume = Math.max(0, Math.min(1.0, smoothGain));
+        }
+      }
+    } else {
       if (this.videoEl) {
         this.videoEl.muted = muted;
         if (!muted) {
-          this.videoEl.volume = Math.min(1, this.currentVolumePercent / 100);
+          this.videoEl.volume = 1.0;
         }
       }
+    }
+
+    if (this.dspBypass) {
+      this.notifyTelemetry();
       return;
     }
 
-    const hasWebAudio = Boolean(this.gainNode || this.spatialAudio || this.mediaSourceNode);
-    if (this.videoEl) {
-      this.videoEl.muted = muted;
-      if (!muted && hasWebAudio) {
-        this.videoEl.volume = 1.0;
-      }
-    }
-    const targetVolume = muted ? 0 : this.currentVolumePercent / 100;
+    const targetGain = muted ? 0 : smoothGain * (this.currentVolumePercent > 100 ? this.currentVolumePercent / 100 : 1.0);
     if (this.spatialAudio) {
-      this.spatialAudio.setMasterVolume(targetVolume);
+      this.spatialAudio.setMasterVolume(targetGain);
     } else if (this.gainNode && this.audioCtx) {
-      this.gainNode.gain.setValueAtTime(targetVolume, this.audioCtx.currentTime);
+      this.gainNode.gain.setTargetAtTime(targetGain, this.audioCtx.currentTime, 0.025);
     }
+
+    this.notifyTelemetry();
   }
 
   async setPlaybackRate(rate: number): Promise<void> {

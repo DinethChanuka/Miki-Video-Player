@@ -2,6 +2,8 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import fs from 'node:fs';
 import path from 'node:path';
+import https from 'node:https';
+import { execFile } from 'node:child_process';
 
 const host = process.env.TAURI_DEV_HOST;
 
@@ -43,9 +45,153 @@ const MIME_MAP: Record<string, string> = {
 
 // Hardened local media streaming middleware (HTTP 206 Partial Content)
 function localMediaStreamerPlugin() {
+  const ytStreamCache = new Map<string, { url: string; expires: number }>();
+
   return {
     name: 'local-media-streamer',
     configureServer(server: any) {
+      server.middlewares.use('/api/stream-audio', (req: any, res: any) => {
+        try {
+          const urlObj = new URL(req.url || '', 'http://localhost:1420');
+          const id = urlObj.searchParams.get('id') || '';
+          const rawUrl = urlObj.searchParams.get('url') || '';
+          const redirect = urlObj.searchParams.get('redirect') === 'true';
+          const isStream = urlObj.searchParams.get('stream') === 'true' || Boolean(req.headers.range);
+
+          const pipeAudioStream = (streamUrl: string) => {
+            try {
+              const parsedTarget = new URL(streamUrl);
+              const clientRange = req.headers.range || 'bytes=0-';
+              const upstreamReq = https.request(
+                parsedTarget,
+                {
+                  method: 'GET',
+                  headers: {
+                    'User-Agent':
+                      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36',
+                    Range: clientRange,
+                  },
+                },
+                (upstreamRes) => {
+                  res.statusCode = upstreamRes.statusCode || 200;
+                  res.setHeader('Content-Type', upstreamRes.headers['content-type'] || 'audio/mp4');
+                  res.setHeader('Accept-Ranges', 'bytes');
+                  res.setHeader('Access-Control-Allow-Origin', '*');
+                  res.setHeader(
+                    'Access-Control-Expose-Headers',
+                    'Content-Length, Content-Range, Accept-Ranges'
+                  );
+                  res.setHeader('Cache-Control', 'no-store');
+                  if (upstreamRes.headers['content-length']) {
+                    res.setHeader('Content-Length', upstreamRes.headers['content-length']);
+                  }
+                  if (upstreamRes.headers['content-range']) {
+                    res.setHeader('Content-Range', upstreamRes.headers['content-range']);
+                  }
+                  upstreamRes.pipe(res);
+                }
+              );
+              upstreamReq.on('error', () => {
+                if (!res.headersSent) {
+                  res.statusCode = 502;
+                  res.end();
+                }
+              });
+              upstreamReq.end();
+            } catch {
+              if (!res.headersSent) {
+                res.statusCode = 500;
+                res.end();
+              }
+            }
+          };
+
+          let videoId = id.trim();
+          if (!videoId && rawUrl) {
+            const match = rawUrl.match(/([a-zA-Z0-9_-]{11})/);
+            if (match) videoId = match[1];
+          }
+
+          if (!videoId) {
+            res.statusCode = 400;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: 'missing_id' }));
+            return;
+          }
+
+          const cached = ytStreamCache.get(videoId);
+          if (cached && cached.expires > Date.now()) {
+            if (redirect) {
+              res.statusCode = 302;
+              res.setHeader('Location', cached.url);
+              res.setHeader('Access-Control-Allow-Origin', '*');
+              res.end();
+              return;
+            }
+            if (isStream) {
+              pipeAudioStream(cached.url);
+              return;
+            }
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'application/json');
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            res.end(JSON.stringify({ url: cached.url, id: videoId, source: 'youtube', kind: 'direct_stream' }));
+            return;
+          }
+
+          const ytDlpPath = path.resolve(process.cwd(), 'bin/yt-dlp');
+          execFile(
+            ytDlpPath,
+            [
+              '--force-ipv4',
+              '--no-check-certificates',
+              '--geo-bypass',
+              '--extractor-args', 'youtube:skip=hls,dash,translated_subs',
+              '-f', 'bestaudio[ext=m4a]/bestaudio[ext=mp4]/bestaudio',
+              '--no-warnings',
+              '--no-playlist',
+              '-g',
+              `https://www.youtube.com/watch?v=${videoId}`
+            ],
+            { timeout: 15000 },
+            (err, stdout) => {
+              if (err || !stdout.trim()) {
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'application/json');
+                res.setHeader('Access-Control-Allow-Origin', '*');
+                res.end(JSON.stringify({ url: `https://www.youtube.com/watch?v=${videoId}`, id: videoId, fallback: true }));
+                return;
+              }
+
+              const directUrl = stdout.trim().split('\n')[0].trim();
+              ytStreamCache.set(videoId, { url: directUrl, expires: Date.now() + 14400 * 1000 });
+
+              if (redirect) {
+                res.statusCode = 302;
+                res.setHeader('Location', directUrl);
+                res.setHeader('Access-Control-Allow-Origin', '*');
+                res.end();
+                return;
+              }
+
+              if (isStream) {
+                pipeAudioStream(directUrl);
+                return;
+              }
+
+              res.statusCode = 200;
+              res.setHeader('Content-Type', 'application/json');
+              res.setHeader('Access-Control-Allow-Origin', '*');
+              res.end(JSON.stringify({ url: directUrl, id: videoId, source: 'youtube', kind: 'direct_stream' }));
+            }
+          );
+        } catch (e: any) {
+          res.statusCode = 500;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ error: e?.message || 'Server error' }));
+        }
+      });
+
       server.middlewares.use('/@media-stream', (req: any, res: any) => {
         try {
           const urlObj = new URL(req.url || '', 'http://localhost:1420');

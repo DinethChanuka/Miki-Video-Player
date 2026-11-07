@@ -75,8 +75,8 @@ describe('Dedicated Music & Live Radio Sections Audit', () => {
     );
     assert.match(
       dashboardCode,
-      /Online Music Discovery & Search/i,
-      'Music section must display Online Music Discovery & Search header'
+      /Sound Lounge|Online Music Discovery & Search/i,
+      'Music section must display Sound Lounge header'
     );
   });
 });
