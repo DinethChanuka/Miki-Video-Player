@@ -54,6 +54,7 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
   const durationMs = usePlayerStore((s) => s.durationMs);
   const volume = usePlayerStore((s) => s.volume);
   const isMuted = usePlayerStore((s) => s.isMuted);
+  const preampGain = usePlayerStore((s) => s.preampGain);
   const setVolume = usePlayerStore((s) => s.setVolume);
   const setMuted = usePlayerStore((s) => s.setMuted);
   const togglePlay = usePlayerStore((s) => s.togglePlay);
@@ -738,6 +739,16 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
               <span className="text-[10px] font-mono text-white/60 min-w-[28px] text-right font-medium">
                 {isMuted ? '0%' : `${Math.round(volume)}%`}
               </span>
+
+              {preampGain > 1.0 && (
+                <span
+                  onClick={onOpenEq}
+                  className="hidden sm:inline-block text-[9px] font-mono px-1.5 py-0.5 rounded-md bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 font-bold cursor-pointer hover:bg-cyan-500/30 transition-all select-none"
+                  title={`Preamp Boost Active: ${preampGain.toFixed(1)}x. Click to adjust.`}
+                >
+                  +{Math.round((preampGain - 1.0) * 100)}% BOOST
+                </span>
+              )}
             </div>
 
             <button
