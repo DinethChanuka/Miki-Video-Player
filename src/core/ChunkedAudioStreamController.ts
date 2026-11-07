@@ -255,8 +255,16 @@ export class ChunkedAudioStreamController {
 
     // 3. Concurrently stream complete track into persistent cache in background (single download)
     if (shouldCacheAudioUrl(url)) {
-      this.streamToCacheInBackground(url, metadata);
+      this.preloadRemainingChunks(url, metadata);
     }
+  }
+
+  /**
+   * Continuous background preloading: streams complete audio track into persistentAudioCache
+   * so playback never stutters and repeat plays are 100% instant and offline.
+   */
+  public preloadRemainingChunks(url: string, metadata?: Record<string, any>): void {
+    this.streamToCacheInBackground(url, metadata);
   }
 
   /**
