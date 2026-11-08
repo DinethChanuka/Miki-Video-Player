@@ -142,11 +142,21 @@ describe('Task 5: Cyber Spectrum Full-Width Animation & Holographic Prism Visibi
     // Check upward bars across the second half of the screen (bars 24..47)
     // Upward bars have y < centerY (where centerY = 600 * 0.65 = 390) and height > 8px
     const upwardBars = barsDrawn.filter((b) => b.y < 390 && b.h > 8);
+    const leftSideBars = upwardBars.filter((b) => b.x <= 500);
     const rightSideBars = upwardBars.filter((b) => b.x > 500);
 
     assert.ok(
-      rightSideBars.length >= 15,
+      rightSideBars.length >= 20,
       `Cyber Spectrum right half must not be flat or dead; expected active right-side bars, got ${rightSideBars.length}`
+    );
+
+    const leftAvgHeight = leftSideBars.reduce((sum, b) => sum + b.h, 0) / (leftSideBars.length || 1);
+    const rightAvgHeight = rightSideBars.reduce((sum, b) => sum + b.h, 0) / (rightSideBars.length || 1);
+
+    // Right side must be energetically balanced with left side (at least 45% of left side average height, not a 25% cliff drop)
+    assert.ok(
+      rightAvgHeight >= leftAvgHeight * 0.45,
+      `Cyber Spectrum right side height (${rightAvgHeight.toFixed(1)}px) must be balanced with left side (${leftAvgHeight.toFixed(1)}px)`
     );
   });
 
@@ -252,6 +262,22 @@ describe('Task 7: High-Contrast Lyrics UI & Timeline Duration Sanity Audit', () 
       code,
       /durationSec[\s\S]*?(?:correctedDurationMs|effectiveDuration)[\s\S]*?(?:1\.7|1\.8|2\.2|\* 2|\/ 2)/,
       'Must contain logic to detect and correct doubled duration'
+    );
+  });
+
+  test('FullWindowMusicPlayer correctly assigns title and artist from currentTitle without inverting them', () => {
+    const code = fs.readFileSync(path.resolve(process.cwd(), 'src/components/music/FullWindowMusicPlayer.tsx'), 'utf-8');
+
+    // Must assign parts[0] to songTitle and parts[1] to songArtist
+    assert.match(
+      code,
+      /songTitle\s*=\s*parts\[0\]\?\.trim\(\)/,
+      'Must assign parts[0] as songTitle for standard Title - Artist format'
+    );
+    assert.match(
+      code,
+      /songArtist\s*=\s*parts\[1\]\?\.trim\(\)/,
+      'Must assign parts[1] as songArtist for standard Title - Artist format'
     );
   });
 });

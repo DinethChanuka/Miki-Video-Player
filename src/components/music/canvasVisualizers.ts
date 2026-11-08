@@ -649,23 +649,24 @@ export function renderCyberSpectrum(
 
     if (isPlaying) {
       if (syncAudio && data && data.length > 0) {
-        // Perceptual logarithmic mapping across audio bins
-        const logFrac = Math.pow(i / (barCount - 1), 1.45);
-        const maxBin = Math.max(2, Math.floor(data.length * 0.72));
-        const binExact = logFrac * maxBin;
-        const binLow = Math.floor(binExact);
-        const binHigh = Math.min(data.length - 1, binLow + 1);
-        const binFraction = binExact - binLow;
-        const rawVal = (data[binLow] || 0) * (1 - binFraction) + (data[binHigh] || 0) * binFraction;
+        // Map all 48 bars across the active musical spectrum (bins 0 to ~22 in 64-bin FFT)
+        const t = i / (barCount - 1);
+        const maxActiveBin = Math.max(8, Math.min(data.length - 1, Math.floor(data.length * 0.35)));
+        const binPos = Math.pow(t, 1.15) * maxActiveBin;
+        const binLow = Math.floor(binPos);
+        const binHigh = Math.min(maxActiveBin, binLow + 1);
+        const binFrac = binPos - binLow;
+        const directVal = (data[binLow] || 0) * (1 - binFrac) + (data[binHigh] || 0) * binFrac;
 
-        // Treble compensation curve so higher frequencies (naturally lower dB) have balanced visual weight
-        const trebleCurve = 1.0 + Math.pow(i / (barCount - 1), 1.2) * 2.8;
+        // Smooth treble acoustic compensation
+        const trebleBoost = 1.0 + Math.pow(t, 0.75) * 1.35;
 
-        // Dynamic harmonic rhythm pulse: keep high-frequency bars responsive to underlying beat harmonics
-        const subHarmonicIdx = Math.floor((i % 16) * (maxBin / 32));
-        const harmonicEnergy = (data[subHarmonicIdx] || 0) * 0.32;
+        // Harmonic continuity to maintain rhythmic response across upper octaves
+        const harmonicBin = Math.floor((i % 16) * (maxActiveBin / 24));
+        const harmonicVal = (data[harmonicBin] || 0) * 0.45;
+        const blended = Math.max(directVal * trebleBoost, harmonicVal * (0.8 + 0.4 * t));
 
-        intensity = Math.min(1.0, Math.max(0.12, (rawVal * trebleCurve + harmonicEnergy) / 255));
+        intensity = Math.min(1.0, Math.max(0.18, blended / 220));
       } else {
         const wave1 = Math.sin(phase * 1.2 + i * 0.18) * 0.5 + 0.5;
         const wave2 = Math.cos(phase * 0.8 + i * 0.28) * 0.35 + 0.35;
@@ -674,12 +675,13 @@ export function renderCyberSpectrum(
     }
 
     // Wide acoustic envelope that never zeros out edge bars
-    const envelope = 0.82 + 0.18 * Math.sin((i / (barCount - 1)) * Math.PI);
-    const maxBarHeight = height * 0.52;
-    const barHeight = Math.max(8, intensity * envelope * maxBarHeight);
+    const tNorm = i / (barCount - 1);
+    const envelope = 0.88 + 0.12 * Math.sin(tNorm * Math.PI);
+    const maxBarHeight = height * 0.48;
+    const barHeight = Math.max(10, intensity * envelope * maxBarHeight);
 
-    // Falling peak physics
-    spectrumPeaks[i] = Math.max(barHeight, (spectrumPeaks[i] || 0) - 1.4);
+    // Falling peak physics with capped overshoot
+    spectrumPeaks[i] = Math.min(barHeight + 28, Math.max(barHeight, (spectrumPeaks[i] || 0) - 2.0));
 
     const x = i * (barWidth + gap) + gap / 2;
     const y = centerY - barHeight;

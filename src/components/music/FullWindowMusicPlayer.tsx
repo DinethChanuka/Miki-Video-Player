@@ -228,8 +228,8 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
     let songArtist = 'Studio Master';
     if (currentTitle.includes(' - ')) {
       const parts = currentTitle.split(' - ');
-      songTitle = parts[1]?.trim() || parts[0]?.trim() || currentTitle;
-      songArtist = parts[0]?.trim() || 'Studio Master';
+      songTitle = parts[0]?.trim() || currentTitle;
+      songArtist = parts[1]?.trim() || 'Studio Master';
     } else if (currentTitle.includes(' | ')) {
       const parts = currentTitle.split(' | ');
       songTitle = parts[0]?.trim() || currentTitle;
