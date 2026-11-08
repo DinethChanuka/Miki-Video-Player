@@ -26,6 +26,8 @@ interface ApplicationMenuProps {
   onOpenGames?: (gameId?: string) => void;
   onOpenMusic?: () => void;
   onOpenChannels?: () => void;
+  customTrigger?: React.ReactNode;
+  align?: 'left' | 'right';
 }
 
 export const ApplicationMenu: React.FC<ApplicationMenuProps> = ({
@@ -39,6 +41,8 @@ export const ApplicationMenu: React.FC<ApplicationMenuProps> = ({
   onOpenGames: _onOpenGames,
   onOpenMusic,
   onOpenChannels,
+  customTrigger,
+  align = 'left',
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [account, setAccount] = useState<StoredGmailAccount | null>(null);
@@ -87,18 +91,24 @@ export const ApplicationMenu: React.FC<ApplicationMenuProps> = ({
   return (
     <div className="relative inline-block select-none" ref={menuRef}>
       {/* Menu Trigger Button */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-2xl bg-white/5 hover:bg-white/15 border border-white/10 text-xs font-semibold text-white/90 hover:text-white transition-all active:scale-95 shadow-sm group"
-        title="Application Menu"
-      >
-        <Menu className="w-3.5 h-3.5 text-cyan-400 group-hover:rotate-90 transition-transform" />
-        <span className="hidden sm:inline">Menu</span>
-        {account && (
-          <span className="w-2 h-2 rounded-full bg-emerald-400 border border-black shadow-[0_0_8px_#34d399]" />
-        )}
-        <ChevronDown className="w-3 h-3 text-white/50 group-hover:text-white transition-colors" />
-      </button>
+      {customTrigger ? (
+        <div onClick={() => setIsOpen(!isOpen)} className="cursor-pointer">
+          {customTrigger}
+        </div>
+      ) : (
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-2xl bg-white/5 hover:bg-white/15 border border-white/10 text-xs font-semibold text-white/90 hover:text-white transition-all active:scale-95 shadow-sm group"
+          title="Application Menu"
+        >
+          <Menu className="w-3.5 h-3.5 text-cyan-400 group-hover:rotate-90 transition-transform" />
+          <span className="hidden sm:inline">Menu</span>
+          {account && (
+            <span className="w-2 h-2 rounded-full bg-emerald-400 border border-black shadow-[0_0_8px_#34d399]" />
+          )}
+          <ChevronDown className="w-3 h-3 text-white/50 group-hover:text-white transition-colors" />
+        </button>
+      )}
 
       {/* Solid High-Contrast Dropdown Panel with Dimming Backdrop Scrim */}
       {isOpen && (
@@ -112,7 +122,7 @@ export const ApplicationMenu: React.FC<ApplicationMenuProps> = ({
 
           {/* Solid High-Contrast Dropdown Panel */}
           <div
-            className="absolute left-0 mt-2.5 w-72 sm:w-80 rounded-3xl border border-slate-700/80 p-3.5 z-50 flex flex-col gap-2.5 shadow-2xl animate-in fade-in zoom-in-95 duration-150 select-none"
+            className={`absolute ${align === 'right' ? 'right-0' : 'left-0'} mt-2.5 w-72 sm:w-80 rounded-3xl border border-slate-700/80 p-3.5 z-50 flex flex-col gap-2.5 shadow-2xl animate-in fade-in zoom-in-95 duration-150 select-none`}
             style={{
               backgroundColor: '#0a0e1a',
               boxShadow: '0 25px 60px rgba(0, 0, 0, 0.98), 0 0 25px rgba(255, 255, 255, 0.08)',

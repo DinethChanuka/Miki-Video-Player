@@ -91,3 +91,18 @@ describe('Task 3: Approach A 3-Column Playback Dock Audit', () => {
     assert.match(code, /handlePlayToggle/);
   });
 });
+
+describe('Task 4: Single User Profile Shower & Header Menu Audit', () => {
+  test('verifies single user profile shower and header menu button removal', () => {
+    const appCode = fs.readFileSync(path.resolve(process.cwd(), 'src/App.tsx'), 'utf-8');
+    const homeCode = fs.readFileSync(path.resolve(process.cwd(), 'src/components/home/HomeDashboardView.tsx'), 'utf-8');
+    
+    // Titlebar must not contain the duplicate user profile widget
+    assert.ok(!appCode.includes('title="Logged in as Suriya Sharma • Online"'));
+    // Titlebar must not render standalone ApplicationMenu button
+    assert.ok(!appCode.includes('<ApplicationMenu'));
+    
+    // HomeDashboardView must provide the single profile menu trigger
+    assert.match(homeCode, /ApplicationMenu|onOpenSettings/);
+  });
+});

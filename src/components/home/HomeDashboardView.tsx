@@ -18,6 +18,7 @@ import {
   MusicPlatform,
 } from '../../utils/musicDiscoveryService';
 import { getRecommendedTracks } from '../../utils/musicRecommendationEngine';
+import { ApplicationMenu } from '../hud/ApplicationMenu';
 import {
   Film,
   Play,
@@ -90,10 +91,14 @@ export type HomeNavTab =
 interface HomeDashboardViewProps {
   onOpenGames?: (gameId?: string) => void;
   onOpenMusic?: () => void;
-  onOpenWebBrowser?: (url: string) => void;
+  onOpenWebBrowser?: (url?: string) => void;
   onOpenSettings?: () => void;
   onOpenEq?: () => void;
   onOpenLocalFile?: () => void;
+  onOpenGmailSignIn?: () => void;
+  onOpenLibrary?: (initialTab?: 'youtube' | 'tiktok' | 'instagram' | 'recent' | 'bookmarks' | 'cinema' | 'social' | 'games' | 'music') => void;
+  onOpenSystemAccess?: () => void;
+  onOpenChannels?: () => void;
 }
 
 // Cover Flow Albums inspired directly by user-uploaded Image 1
@@ -570,6 +575,10 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
   onOpenSettings,
   onOpenEq,
   onOpenLocalFile,
+  onOpenGmailSignIn,
+  onOpenLibrary,
+  onOpenSystemAccess,
+  onOpenChannels,
 }) => {
   const lastActiveNav = usePlayerStore((s) => s.lastActiveNav);
   const setLastActiveNav = usePlayerStore((s) => s.setLastActiveNav);
@@ -1762,12 +1771,27 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
 
             {isUserLoggedIn ? (
               <div className="flex items-center gap-2.5 pl-2 border-l border-white/10">
-                <div className="relative">
-                  <div className="w-8 h-8 rounded-full bg-slate-800 border border-white/20 flex items-center justify-center text-xs font-bold text-white shadow-md">
-                    S
-                  </div>
-                  <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border border-[#07090e]" />
-                </div>
+                <ApplicationMenu
+                  align="right"
+                  onOpenGmailSignIn={onOpenGmailSignIn || (() => {})}
+                  onOpenLibrary={onOpenLibrary || (() => {})}
+                  onOpenWebBrowser={(url) => onOpenWebBrowser?.(url || '')}
+                  onOpenSettings={onOpenSettings || (() => {})}
+                  onOpenEq={onOpenEq || (() => {})}
+                  onOpenLocalFile={onOpenLocalFile || (() => {})}
+                  onOpenSystemAccess={onOpenSystemAccess || (() => {})}
+                  onOpenGames={onOpenGames}
+                  onOpenMusic={onOpenMusic}
+                  onOpenChannels={onOpenChannels}
+                  customTrigger={
+                    <div className="relative group cursor-pointer" title="Open User & Application Menu">
+                      <div className="w-8 h-8 rounded-full bg-slate-800 border border-white/20 group-hover:border-cyan-400 flex items-center justify-center text-xs font-bold text-white shadow-md transition-all group-hover:scale-105">
+                        S
+                      </div>
+                      <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border border-[#07090e]" />
+                    </div>
+                  }
+                />
                 <div className="hidden sm:flex flex-col">
                   <span className="text-xs font-semibold text-white/90">Suriya sharma</span>
                   <button
@@ -1780,9 +1804,24 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
               </div>
             ) : (
               <div className="flex items-center gap-2 pl-2 border-l border-white/10">
-                <div className="w-8 h-8 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-xs font-bold text-white/60">
-                  G
-                </div>
+                <ApplicationMenu
+                  align="right"
+                  onOpenGmailSignIn={onOpenGmailSignIn || (() => {})}
+                  onOpenLibrary={onOpenLibrary || (() => {})}
+                  onOpenWebBrowser={(url) => onOpenWebBrowser?.(url || '')}
+                  onOpenSettings={onOpenSettings || (() => {})}
+                  onOpenEq={onOpenEq || (() => {})}
+                  onOpenLocalFile={onOpenLocalFile || (() => {})}
+                  onOpenSystemAccess={onOpenSystemAccess || (() => {})}
+                  onOpenGames={onOpenGames}
+                  onOpenMusic={onOpenMusic}
+                  onOpenChannels={onOpenChannels}
+                  customTrigger={
+                    <div className="w-8 h-8 rounded-full bg-white/10 border border-white/20 hover:border-cyan-400 flex items-center justify-center text-xs font-bold text-white/60 cursor-pointer transition-all hover:scale-105" title="Open Application Menu">
+                      G
+                    </div>
+                  }
+                />
                 <div className="hidden sm:flex flex-col">
                   <span className="text-xs font-semibold text-white/70">Guest User</span>
                   <button
