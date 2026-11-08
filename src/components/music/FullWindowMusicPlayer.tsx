@@ -19,9 +19,6 @@ import {
   Music,
   FolderOpen,
   RefreshCw,
-  Activity,
-  Radio,
-  Waves,
   Check,
   Shuffle,
   Repeat,
@@ -508,16 +505,16 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
   const sliderMaxSec = Math.max(1, (canSeek ? durationMs : effectiveDuration) / 1000);
   const positionSec = Math.min(positionMs / 1000, sliderMaxSec);
   const bufferedPercent = durationMs > 0 ? Math.min(100, (bufferedMs / durationMs) * 100) : 0;
-  const shownMs = scrubSec !== null ? scrubSec * 1000 : positionMs;
-  const currentTimeFormatted = scrubSec !== null ? formatTime(shownMs) : formatTime(positionMs);
-  const shownVolume = isMuted ? 0 : Math.round(volume);
-
   const formatTime = (ms: number) => {
     const s = Math.floor(ms / 1000);
     const m = Math.floor(s / 60);
     const sec = s % 60;
     return `${m}:${sec < 10 ? '0' : ''}${sec}`;
   };
+
+  const shownMs = scrubSec !== null ? scrubSec * 1000 : positionMs;
+  const currentTimeFormatted = scrubSec !== null ? formatTime(shownMs) : formatTime(positionMs);
+  const shownVolume = isMuted ? 0 : Math.round(volume);
 
   const handleInternalWindowDrag = (e: React.MouseEvent) => {
     if (e.button !== 0) return;

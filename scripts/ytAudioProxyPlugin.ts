@@ -1,33 +1,42 @@
 /**
- * Miki Player - YouTube audio proxy (Vite dev-server middleware)
+ * Miki Player - YouTube audio proxy (Vite dev-server middleware)   [version 2]
+ * Replaces scripts/ytAudioProxyPlugin.ts from the first fix.
  *
  * Endpoints
  *   GET /api/stream-audio?id=<videoId>&stream=true   -> audio bytes, Range supported
  *   GET /api/stream-audio?id=<videoId>               -> JSON { url, id, ... }
  *   GET /api/stream-audio?id=<videoId>&warm=1        -> resolves in the background, answers at once
+ *   GET /api/audio-cache                             -> JSON { files, bytes, downloading }
  *   GET /api/search-youtube?q=<query>                -> JSON array of tracks
  *
- * What makes it faster than the old inline version
- *   1. Resolves the audio URL with one direct YouTube request first (usually well under
- *      a second). yt-dlp, which takes several seconds to start, is only the fallback.
- *   2. Requests for the same video share one resolution (no parallel yt-dlp storms).
- *   3. Open-ended Range requests are answered in 1 MB pieces, so playback starts at once
- *      and seeking is quick.
- *   4. Upstream sockets are reused (keep-alive) and closed as soon as the browser aborts.
- *   5. An expired upstream URL (403/404/410) is re-resolved once and retried.
- *   6. /api/stream-audio?...&warm=1 lets the UI pre-resolve the next track.
+ * New in version 2
+ *   1. DISK CACHE. The first time a song is played, the whole file is also downloaded to
+ *      .miki-cache/audio/<id>.m4a in the background. Every later play (and every seek)
+ *      is served straight from disk: instant start, works offline, no YouTube round trip.
+ *      While the download is still running, bytes that are already on disk are served
+ *      from the partial file, so seeking back never waits on the network.
+ *   2. FULL PLAYBACK. If YouTube drops the connection in the middle of a piece, the proxy
+ *      reconnects and continues from the exact byte where it stopped (up to 2 times)
+ *      instead of cutting the song off.
+ *
+ * From version 1 (unchanged)
+ *   Direct fast-path resolution with yt-dlp as fallback, shared resolution per video,
+ *   1 MB range pieces, keep-alive sockets, retry on expired URL, search endpoint.
  *
  * Environment overrides
- *   YT_DLP_PATH             path to the yt-dlp binary (default: ./bin/yt-dlp, then PATH)
- *   MIKI_YT_FAST_PATH=0     disable the direct-request fast path and always use yt-dlp
- *   MIKI_YT_VR_VERSION      client version string used by the fast path
+ *   YT_DLP_PATH              path to the yt-dlp binary (default: ./bin/yt-dlp, then PATH)
+ *   MIKI_YT_FAST_PATH=0      disable the direct-request fast path and always use yt-dlp
+ *   MIKI_YT_VR_VERSION       client version string used by the fast path
+ *   MIKI_AUDIO_CACHE=0       turn the disk cache off
+ *   MIKI_AUDIO_CACHE_DIR     cache folder (default: ./.miki-cache/audio)
+ *   MIKI_AUDIO_CACHE_MB      total cache size limit in MB (default 1024)
  */
 
 import https from 'node:https';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
-import type { IncomingMessage, ServerResponse } from 'node:http';
+import type { IncomingMessage, ServerResponse, ClientRequest } from 'node:http';
 import type { Plugin } from 'vite';
 
 const DESKTOP_UA =
@@ -42,7 +51,14 @@ const FALLBACK_TTL_MS = 3 * 60 * 60 * 1000;
 const INNERTUBE_TIMEOUT_MS = 3500;
 const SEARCH_TIMEOUT_MS = 6000;
 const YTDLP_TIMEOUT_MS = 20000;
+const UPSTREAM_TIMEOUT_MS = 15000;
 const MAX_CACHE_ENTRIES = 300;
+const MAX_RESUMES = 2;
+
+const CACHE_ENABLED = process.env.MIKI_AUDIO_CACHE !== '0';
+const CACHE_DIR = process.env.MIKI_AUDIO_CACHE_DIR || path.resolve(process.cwd(), '.miki-cache', 'audio');
+const MAX_CACHE_BYTES = Math.max(50, Number(process.env.MIKI_AUDIO_CACHE_MB || 1024)) * 1024 * 1024;
+const MAX_TRACK_BYTES = 80 * 1024 * 1024; // do not cache hour-long mixes
 
 const agent = new https.Agent({ keepAlive: true, maxSockets: 24 });
 
@@ -245,19 +261,284 @@ async function resolveAudio(id: string, force = false): Promise<ResolvedAudio | 
 }
 
 /* ------------------------------------------------------------------ */
-/* Streaming proxy                                                     */
+/* Disk cache                                                          */
 /* ------------------------------------------------------------------ */
 
-function buildUpstreamRange(header: string | undefined): string {
-  const m = /^bytes=(\d+)-(\d*)$/.exec(header || '');
-  if (!m) {
-    if (header && /^bytes=-\d+$/.test(header)) return header; // suffix range, pass through
-    return `bytes=0-${CHUNK_BYTES - 1}`;
-  }
-  const start = Number(m[1]);
-  const end = m[2] === '' ? start + CHUNK_BYTES - 1 : Math.min(Number(m[2]), start + MAX_RANGE_BYTES - 1);
-  return `bytes=${start}-${end}`;
+interface PartialDownload {
+  id: string;
+  partPath: string;
+  size: number | null; // total file size, known after the first piece arrives
+  written: number; // contiguous bytes from 0 that are safely on disk
+  mime: string;
 }
+
+const downloads = new Map<string, PartialDownload>();
+let cacheDirReady = false;
+
+function ensureCacheDir(): boolean {
+  if (cacheDirReady) return true;
+  try {
+    fs.mkdirSync(CACHE_DIR, { recursive: true });
+    cacheDirReady = true;
+  } catch (err) {
+    console.warn('[Miki YT proxy] Cannot create cache folder, disk cache disabled:', (err as Error).message);
+  }
+  return cacheDirReady;
+}
+
+const finalPathOf = (id: string) => path.join(CACHE_DIR, `${id}.m4a`);
+const metaPathOf = (id: string) => path.join(CACHE_DIR, `${id}.json`);
+
+interface CompleteFile {
+  filePath: string;
+  size: number;
+  mime: string;
+}
+
+function getCompleteFile(id: string): CompleteFile | null {
+  if (!CACHE_ENABLED) return null;
+  try {
+    const filePath = finalPathOf(id);
+    const stat = fs.statSync(filePath);
+    if (!stat.isFile() || stat.size === 0) return null;
+    let mime = 'audio/mp4';
+    let expected = stat.size;
+    try {
+      const meta = JSON.parse(fs.readFileSync(metaPathOf(id), 'utf8'));
+      if (typeof meta.mime === 'string') mime = meta.mime;
+      if (typeof meta.size === 'number') expected = meta.size;
+    } catch {
+      // no meta: trust the file
+    }
+    if (expected !== stat.size) return null; // incomplete or damaged
+    return { filePath, size: stat.size, mime };
+  } catch {
+    return null;
+  }
+}
+
+function evictIfNeeded(): void {
+  try {
+    const entries = fs
+      .readdirSync(CACHE_DIR)
+      .filter((f) => f.endsWith('.m4a'))
+      .map((f) => {
+        const p = path.join(CACHE_DIR, f);
+        const st = fs.statSync(p);
+        return { id: f.slice(0, -4), path: p, size: st.size, used: st.mtimeMs };
+      })
+      .sort((a, b) => a.used - b.used);
+    let total = entries.reduce((sum, e) => sum + e.size, 0);
+    for (const e of entries) {
+      if (total <= MAX_CACHE_BYTES) break;
+      if (downloads.has(e.id)) continue;
+      try {
+        fs.unlinkSync(e.path);
+        fs.unlinkSync(metaPathOf(e.id));
+      } catch {
+        // already gone
+      }
+      total -= e.size;
+    }
+  } catch {
+    // ignore
+  }
+}
+
+interface RangeResult {
+  buf: Buffer;
+  total: number | null;
+  mime: string;
+  wholeFile: boolean;
+}
+
+function fetchRange(resolved: ResolvedAudio, start: number, end: number): Promise<RangeResult | null> {
+  return new Promise((resolve) => {
+    let target: URL;
+    try {
+      target = new URL(resolved.url);
+    } catch {
+      resolve(null);
+      return;
+    }
+    const req = https.request(
+      target,
+      {
+        agent,
+        method: 'GET',
+        headers: {
+          'User-Agent': resolved.ua,
+          Range: `bytes=${start}-${end}`,
+          Accept: '*/*',
+          'Accept-Encoding': 'identity',
+          Origin: 'https://www.youtube.com',
+          Referer: 'https://www.youtube.com/',
+        },
+      },
+      (up) => {
+        const status = up.statusCode || 0;
+        if (status !== 200 && status !== 206) {
+          up.resume();
+          resolve(null);
+          return;
+        }
+        const parts: Buffer[] = [];
+        up.on('data', (c: Buffer) => parts.push(c));
+        up.on('error', () => resolve(null));
+        up.on('close', () => {
+          if (!up.complete) {
+            resolve(null);
+            return;
+          }
+          const buf = Buffer.concat(parts);
+          const cr = /\/(\d+)\s*$/.exec(String(up.headers['content-range'] || ''));
+          resolve({
+            buf,
+            total: cr ? Number(cr[1]) : status === 200 ? buf.length : null,
+            mime: String(up.headers['content-type'] || resolved.mime),
+            wholeFile: status === 200,
+          });
+        });
+      }
+    );
+    req.setTimeout(UPSTREAM_TIMEOUT_MS, () => req.destroy(new Error('timeout')));
+    req.on('error', () => resolve(null));
+    req.end();
+  });
+}
+
+/** Downloads the whole track to disk in 1 MB pieces. Safe to call repeatedly. */
+function startDownload(id: string, initial: ResolvedAudio): void {
+  if (!CACHE_ENABLED || downloads.has(id) || getCompleteFile(id) || !ensureCacheDir()) return;
+
+  const state: PartialDownload = {
+    id,
+    partPath: path.join(CACHE_DIR, `${id}.part`),
+    size: null,
+    written: 0,
+    mime: 'audio/mp4',
+  };
+  downloads.set(id, state);
+
+  (async () => {
+    let handle: fs.promises.FileHandle | null = null;
+    let ok = false;
+    try {
+      handle = await fs.promises.open(state.partPath, 'w');
+      let resolved = initial;
+      let offset = 0;
+      let failures = 0;
+
+      while (state.size === null || offset < state.size) {
+        const r = await fetchRange(resolved, offset, offset + CHUNK_BYTES - 1);
+        if (!r || r.buf.length === 0) {
+          failures += 1;
+          if (failures > 2) throw new Error('download failed');
+          const fresh = await resolveAudio(id, true);
+          if (!fresh) throw new Error('re-resolve failed');
+          resolved = fresh;
+          continue;
+        }
+        failures = 0;
+
+        if (state.size === null) {
+          if (!r.total) throw new Error('unknown size (live stream?)');
+          if (r.total > MAX_TRACK_BYTES) throw new Error('track too large to cache');
+          state.size = r.total;
+          state.mime = r.mime.startsWith('audio/') ? r.mime : 'audio/mp4';
+        }
+        const writeAt = r.wholeFile ? 0 : offset;
+        await handle.write(r.buf, 0, r.buf.length, writeAt);
+        offset = writeAt + r.buf.length;
+        state.written = offset;
+        if (r.wholeFile) break;
+      }
+
+      await handle.close();
+      handle = null;
+      if (state.size === null || state.written !== state.size) throw new Error('size mismatch');
+
+      fs.writeFileSync(metaPathOf(id), JSON.stringify({ mime: state.mime, size: state.size, createdAt: Date.now() }));
+      fs.renameSync(state.partPath, finalPathOf(id));
+      ok = true;
+      evictIfNeeded();
+    } catch {
+      // keep playing from upstream; just no cache for this track
+    } finally {
+      if (handle) await handle.close().catch(() => {});
+      if (!ok) fs.promises.unlink(state.partPath).catch(() => {});
+      downloads.delete(id);
+    }
+  })();
+}
+
+/**
+ * Serves a byte range from a file on disk.
+ * `available` is how many bytes (from 0) may be read: the whole size for a finished file,
+ * the downloaded part for a running download. Returns false if the range is not on disk yet.
+ */
+function serveFromFile(
+  req: IncomingMessage,
+  res: ServerResponse,
+  filePath: string,
+  size: number,
+  available: number,
+  mime: string
+): boolean {
+  const header = req.headers.range;
+  let start = 0;
+  let end = available - 1;
+  const complete = available >= size;
+
+  if (header) {
+    const m = /^bytes=(\d*)-(\d*)$/.exec(header);
+    if (!m) return false;
+    if (m[1] === '') {
+      if (!complete) return false;
+      start = Math.max(0, size - Number(m[2]));
+      end = size - 1;
+    } else {
+      start = Number(m[1]);
+      if (m[2] !== '') end = Math.min(Number(m[2]), available - 1);
+    }
+  } else if (!complete) {
+    return false;
+  }
+
+  if (start >= size) {
+    res.statusCode = 416;
+    res.setHeader('Content-Range', `bytes */${size}`);
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.end();
+    return true;
+  }
+  if (start > end || start >= available) return false; // not downloaded yet
+
+  res.statusCode = header ? 206 : 200;
+  res.setHeader('Content-Type', mime);
+  res.setHeader('Accept-Ranges', 'bytes');
+  res.setHeader('Content-Length', String(end - start + 1));
+  if (header) res.setHeader('Content-Range', `bytes ${start}-${end}/${size}`);
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Accept-Ranges');
+  res.setHeader('X-Miki-Source', complete ? 'disk-cache' : 'disk-partial');
+  res.setHeader('Cache-Control', 'no-store');
+
+  const stream = fs.createReadStream(filePath, { start, end });
+  stream.on('error', () => res.destroy());
+  res.on('close', () => stream.destroy());
+  stream.pipe(res);
+
+  if (complete) {
+    const now = new Date();
+    fs.utimes(filePath, now, now, () => {}); // mark as recently used for eviction
+  }
+  return true;
+}
+
+/* ------------------------------------------------------------------ */
+/* Streaming proxy                                                     */
+/* ------------------------------------------------------------------ */
 
 function sendJson(res: ServerResponse, status: number, body: unknown): void {
   res.statusCode = status;
@@ -277,84 +558,142 @@ function failStream(res: ServerResponse, status: number): void {
   }
 }
 
-function pipeAudio(
-  req: IncomingMessage,
-  res: ServerResponse,
-  id: string,
-  resolved: ResolvedAudio,
-  attempt: number
-): void {
+/** Returns the byte window to fetch from upstream, or null for a suffix range. */
+function planRange(header: string | undefined): { start: number; end: number } | null {
+  if (!header) return { start: 0, end: CHUNK_BYTES - 1 };
+  const m = /^bytes=(\d+)-(\d*)$/.exec(header);
+  if (!m) return null;
+  const start = Number(m[1]);
+  const end = m[2] === '' ? start + CHUNK_BYTES - 1 : Math.min(Number(m[2]), start + MAX_RANGE_BYTES - 1);
+  return { start, end };
+}
+
+function pipeAudio(req: IncomingMessage, res: ServerResponse, id: string, initial: ResolvedAudio): void {
   let closed = false;
-  let upstream: ReturnType<typeof https.request> | null = null;
+  let current: ClientRequest | null = null;
   res.on('close', () => {
     closed = true;
-    upstream?.destroy();
+    current?.destroy();
   });
 
-  let target: URL;
-  try {
-    target = new URL(resolved.url);
-  } catch {
-    failStream(res, 502);
-    return;
-  }
+  const plan = planRange(req.headers.range);
+  const suffixHeader = plan ? null : req.headers.range || null;
+  const baseStart = plan ? plan.start : 0;
+  const hardEnd = plan ? plan.end : null;
 
-  upstream = https.request(
-    target,
-    {
-      agent,
-      method: 'GET',
-      headers: {
-        'User-Agent': resolved.ua,
-        Range: buildUpstreamRange(req.headers.range),
-        Accept: '*/*',
-        'Accept-Encoding': 'identity',
-        Origin: 'https://www.youtube.com',
-        Referer: 'https://www.youtube.com/',
-      },
-    },
-    (up) => {
-      const status = up.statusCode || 502;
+  let resolved = initial;
+  let sent = 0; // body bytes already written to the browser
+  let resumes = 0;
+  let refreshed = false;
+  let headersWritten = false;
 
-      // The upstream URL expired or was rejected: resolve a fresh one and retry once.
-      if ((status === 403 || status === 404 || status === 410) && attempt === 0 && !closed) {
-        up.resume();
-        resolvedCache.delete(id);
-        resolveAudio(id, true)
-          .then((fresh) => {
-            if (closed) return;
-            if (fresh) pipeAudio(req, res, id, fresh, 1);
-            else failStream(res, 502);
-          })
-          .catch(() => failStream(res, 502));
-        return;
-      }
-
-      if (status >= 400) {
-        up.resume();
-        failStream(res, 502);
-        return;
-      }
-
-      res.statusCode = status;
-      res.setHeader('Content-Type', up.headers['content-type'] || resolved.mime);
-      res.setHeader('Accept-Ranges', 'bytes');
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Accept-Ranges');
-      res.setHeader('Cache-Control', 'no-store');
-      if (up.headers['content-length']) res.setHeader('Content-Length', up.headers['content-length']);
-      if (up.headers['content-range']) res.setHeader('Content-Range', up.headers['content-range']);
-
-      up.on('error', () => res.destroy());
-      up.pipe(res);
+  const attempt = (): void => {
+    if (closed) return;
+    let target: URL;
+    try {
+      target = new URL(resolved.url);
+    } catch {
+      failStream(res, 502);
+      return;
     }
-  );
 
-  upstream.setTimeout(15000, () => upstream?.destroy(new Error('upstream timeout')));
-  upstream.on('error', () => {
-    if (!closed) failStream(res, 502);
-  });
-  upstream.end();
+    const from = baseStart + sent;
+    const rangeValue = suffixHeader ? suffixHeader : `bytes=${from}-${hardEnd}`;
+
+    const upstream = https.request(
+      target,
+      {
+        agent,
+        method: 'GET',
+        headers: {
+          'User-Agent': resolved.ua,
+          Range: rangeValue,
+          Accept: '*/*',
+          'Accept-Encoding': 'identity',
+          Origin: 'https://www.youtube.com',
+          Referer: 'https://www.youtube.com/',
+        },
+      },
+      (up) => {
+        const status = up.statusCode || 502;
+
+        // The upstream URL expired or was rejected: resolve a fresh one and retry once.
+        if ((status === 403 || status === 404 || status === 410) && !refreshed && !closed) {
+          refreshed = true;
+          up.resume();
+          resolvedCache.delete(id);
+          resolveAudio(id, true)
+            .then((fresh) => {
+              if (closed) return;
+              if (fresh) {
+                resolved = fresh;
+                attempt();
+              } else {
+                failStream(res, 502);
+              }
+            })
+            .catch(() => failStream(res, 502));
+          return;
+        }
+
+        if (status >= 400) {
+          up.resume();
+          failStream(res, 502);
+          return;
+        }
+
+        if (!headersWritten) {
+          headersWritten = true;
+          res.statusCode = status;
+          res.setHeader('Content-Type', up.headers['content-type'] || resolved.mime);
+          res.setHeader('Accept-Ranges', 'bytes');
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Accept-Ranges');
+          res.setHeader('X-Miki-Source', 'upstream');
+          res.setHeader('Cache-Control', 'no-store');
+          if (up.headers['content-length']) res.setHeader('Content-Length', up.headers['content-length']);
+          if (up.headers['content-range']) res.setHeader('Content-Range', up.headers['content-range']);
+        }
+        const canResume = status === 206 && !suffixHeader;
+
+        up.on('data', (chunk: Buffer) => {
+          sent += chunk.length;
+          if (!res.write(chunk)) {
+            up.pause();
+            res.once('drain', () => up.resume());
+          }
+        });
+        up.on('error', () => {});
+        up.on('close', () => {
+          if (closed) return;
+          if (up.complete) {
+            res.end();
+            return;
+          }
+          // The connection dropped before the piece was finished: continue from the same byte.
+          if (canResume && resumes < MAX_RESUMES) {
+            resumes += 1;
+            attempt();
+          } else {
+            res.destroy();
+          }
+        });
+      }
+    );
+
+    current = upstream;
+    upstream.setTimeout(UPSTREAM_TIMEOUT_MS, () => upstream.destroy(new Error('upstream timeout')));
+    upstream.on('error', () => {
+      if (closed) return;
+      if (!headersWritten) {
+        failStream(res, 502);
+      }
+      // After headers: the 'close' handler of the response above decides about resuming.
+    });
+    upstream.end();
+  };
+
+  attempt();
 }
 
 function parseVideoId(searchParams: URLSearchParams): string {
@@ -391,6 +730,10 @@ async function handleStreamAudio(req: IncomingMessage, res: ServerResponse): Pro
   const wantsStream = url.searchParams.get('stream') === 'true' || Boolean(req.headers.range);
 
   if (warm) {
+    if (getCompleteFile(id)) {
+      sendJson(res, 200, { status: 'cached', id });
+      return;
+    }
     const cached = resolvedCache.get(id);
     if (cached && cached.expiresAt > Date.now()) {
       sendJson(res, 200, { status: 'ready', id });
@@ -399,6 +742,18 @@ async function handleStreamAudio(req: IncomingMessage, res: ServerResponse): Pro
       sendJson(res, 202, { status: 'warming', id });
     }
     return;
+  }
+
+  if (wantsStream && !redirect) {
+    // 1. Already downloaded: serve from disk (instant, offline).
+    const done = getCompleteFile(id);
+    if (done && serveFromFile(req, res, done.filePath, done.size, done.size, done.mime)) return;
+
+    // 2. Download in progress and this range is already on disk.
+    const partial = downloads.get(id);
+    if (partial && partial.size !== null && partial.written > 0) {
+      if (serveFromFile(req, res, partial.partPath, partial.size, partial.written, partial.mime)) return;
+    }
   }
 
   const resolved = await resolveAudio(id);
@@ -420,11 +775,27 @@ async function handleStreamAudio(req: IncomingMessage, res: ServerResponse): Pro
   }
 
   if (wantsStream) {
-    pipeAudio(req, res, id, resolved, 0);
+    startDownload(id, resolved); // keep a copy for next time
+    pipeAudio(req, res, id, resolved);
     return;
   }
 
   sendJson(res, 200, { url: resolved.url, id, source: 'youtube', kind: 'direct_stream', via: resolved.via });
+}
+
+function handleCacheInfo(res: ServerResponse): void {
+  let files = 0;
+  let bytes = 0;
+  try {
+    for (const f of fs.readdirSync(CACHE_DIR)) {
+      if (!f.endsWith('.m4a')) continue;
+      files += 1;
+      bytes += fs.statSync(path.join(CACHE_DIR, f)).size;
+    }
+  } catch {
+    // folder not created yet
+  }
+  sendJson(res, 200, { enabled: CACHE_ENABLED, dir: CACHE_DIR, files, bytes, downloading: downloads.size });
 }
 
 /* ------------------------------------------------------------------ */
@@ -535,6 +906,7 @@ function register(middlewares: Middlewares): void {
   middlewares.use('/api/stream-audio', (req, res) => {
     handleStreamAudio(req, res).catch(() => failStream(res, 500));
   });
+  middlewares.use('/api/audio-cache', (_req, res) => handleCacheInfo(res));
   middlewares.use('/api/search-youtube', (req, res) => {
     handleSearch(req, res).catch(() => sendJson(res, 500, { error: 'search_failed' }));
   });
