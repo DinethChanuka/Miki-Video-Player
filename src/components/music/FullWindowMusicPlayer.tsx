@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { usePlayerStore } from '../../store/playerStore';
 import {
   Play,
@@ -9,6 +9,7 @@ import {
   Volume1,
   VolumeX,
   Sliders,
+  SlidersHorizontal,
   X,
   ChevronDown,
   ListMusic,
@@ -22,14 +23,25 @@ import {
   Radio,
   Waves,
   Check,
+  Shuffle,
+  Repeat,
+  Repeat1,
 } from 'lucide-react';
 import { FEATURED_MUSIC_TRACKS } from './MusicPlayerView';
 import { fetchTrackLyrics, LyricsResult } from '../../utils/lyricsService';
+import { RangeSlider } from '../common/RangeSlider';
+import { warmYouTubeAudio } from '../../utils/youtubePrefetch';
 import {
+  renderAmbientAurora,
+  renderWarpTunnel,
+  renderHolographicPrism,
+  renderNeonPulseHalo,
+  renderQuantumNebula,
   renderCyberSpectrum,
   renderOrbitalSoundwave,
   renderLiquidOscilloscope,
   VisualizerMode,
+  VISUALIZER_THEMES,
 } from './canvasVisualizers';
 
 export interface FullWindowMusicPlayerProps {
@@ -38,6 +50,22 @@ export interface FullWindowMusicPlayerProps {
   onOpenEq?: () => void;
   onStartWindowDrag?: (e: React.MouseEvent) => void;
 }
+
+type RepeatMode = 'off' | 'all' | 'one';
+
+const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
+
+const isEditableTarget = (t: EventTarget | null): boolean => {
+  const el = t as HTMLElement | null;
+  if (!el || !el.tagName) return false;
+  return (
+    el.tagName === 'INPUT' ||
+    el.tagName === 'TEXTAREA' ||
+    el.tagName === 'SELECT' ||
+    el.isContentEditable ||
+    el.getAttribute('role') === 'slider'
+  );
+};
 
 export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
   isOpen,
@@ -52,11 +80,12 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
   const isBuffering = usePlayerStore((s) => s.isBuffering);
   const positionMs = usePlayerStore((s) => s.positionMs);
   const durationMs = usePlayerStore((s) => s.durationMs);
+  const bufferedMs = usePlayerStore((s) => s.bufferedMs);
   const volume = usePlayerStore((s) => s.volume);
   const isMuted = usePlayerStore((s) => s.isMuted);
   const preampGain = usePlayerStore((s) => s.preampGain);
   const setVolume = usePlayerStore((s) => s.setVolume);
-  const setMuted = usePlayerStore((s) => s.setMuted);
+  const toggleMute = usePlayerStore((s) => s.toggleMute);
   const togglePlay = usePlayerStore((s) => s.togglePlay);
   const seek = usePlayerStore((s) => s.seek);
   const openMedia = usePlayerStore((s) => s.openMedia);
@@ -72,6 +101,18 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
   const [isQueueOpen, setIsQueueOpen] = useState(false);
   const [visualizerMode, setVisualizerMode] = useState<VisualizerMode>('spectrum');
   const [syncAudio, setSyncAudio] = useState(true);
+  const [shuffle, setShuffle] = useState(false);
+  const [repeatMode, setRepeatMode] = useState<RepeatMode>('off');
+  const [scrubSec, setScrubSec] = useState<number | null>(null);
+  const [isStudioSettingsOpen, setIsStudioSettingsOpen] = useState(false);
+
+  // Supported visualizer mode switcher handlers for direct mode activation:
+  const selectVisualizer = (mode: VisualizerMode) => {
+    if (mode === 'spectrum') setVisualizerMode('spectrum');
+    else if (mode === 'orbital') setVisualizerMode('orbital');
+    else if (mode === 'ribbon') setVisualizerMode('ribbon');
+    else setVisualizerMode(mode);
+  };
 
   // Synchronized lyrics state
   const [lyricsData, setLyricsData] = useState<LyricsResult | null>(null);
@@ -89,6 +130,30 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
   const activeTrack = tracks[activeIndex] || tracks[0];
   // Detect if current audio is an online stream or YouTube direct audio bridge
   const isYouTubeAudioStream = Boolean(currentUri?.match(/(?:youtube\.com|youtu\.be)/i));
+
+  // Always-fresh values for event listeners (avoids stale closures in key / ended handlers)
+  const latest = useRef({
+    tracks,
+    activeIndex,
+    shuffle,
+    repeatMode,
+    positionMs,
+    durationMs,
+    volume,
+    currentUri,
+    activeTrack,
+  });
+  latest.current = {
+    tracks,
+    activeIndex,
+    shuffle,
+    repeatMode,
+    positionMs,
+    durationMs,
+    volume,
+    currentUri,
+    activeTrack,
+  };
 
   // Fetch synchronized lyrics on track change
   useEffect(() => {
@@ -144,92 +209,162 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
       createdBlobUrlsRef.current.forEach((url) => {
         try {
           URL.revokeObjectURL(url);
-        } catch {}
+        } catch { }
       });
       createdBlobUrlsRef.current = [];
     };
   }, []);
 
-  // Sync activeIndex with currentUri if playing a track from list or dynamic stream
+  // Keep the queue in step with whatever the store is playing (list click, search result, etc.)
   useEffect(() => {
-    if (currentUri) {
-      setTracks((prev) => {
-        const idx = prev.findIndex((t) => t.url === currentUri);
-        if (idx !== -1) {
-          setActiveIndex(idx);
-          if (durationMs > 0 && prev[idx].durationSec !== Math.floor(durationMs / 1000)) {
-            const updated = [...prev];
-            updated[idx] = { ...updated[idx], durationSec: Math.floor(durationMs / 1000) };
-            return updated;
-          }
-          return prev;
-        } else if (currentTitle) {
-          let songTitle = currentTitle;
-          let songArtist = 'Studio Master';
-          if (currentTitle.includes(' - ')) {
-            const parts = currentTitle.split(' - ');
-            songTitle = parts[1]?.trim() || parts[0]?.trim() || currentTitle;
-            songArtist = parts[0]?.trim() || 'Studio Master';
-          } else if (currentTitle.includes(' | ')) {
-            const parts = currentTitle.split(' | ');
-            songTitle = parts[0]?.trim() || currentTitle;
-            songArtist = parts[1]?.trim() || 'Studio Master';
-          }
-          const newTrack = {
-            id: `current-${Date.now()}`,
-            title: songTitle,
-            artist: songArtist,
-            url: currentUri,
-            durationSec: durationMs ? Math.floor(durationMs / 1000) : 210,
-            albumArt: currentArtwork || 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=500&auto=format&fit=crop&q=80',
-          };
-          setActiveIndex(0);
-          return [newTrack, ...prev.filter((t) => t.url !== currentUri)];
-        }
-        return prev;
-      });
+    if (!currentUri) return;
+
+    const idx = tracks.findIndex((t) => t.url === currentUri);
+    if (idx !== -1) {
+      if (idx !== activeIndex) setActiveIndex(idx);
+      return;
     }
+    if (!currentTitle) return;
+
+    let songTitle = currentTitle;
+    let songArtist = 'Studio Master';
+    if (currentTitle.includes(' - ')) {
+      const parts = currentTitle.split(' - ');
+      songTitle = parts[1]?.trim() || parts[0]?.trim() || currentTitle;
+      songArtist = parts[0]?.trim() || 'Studio Master';
+    } else if (currentTitle.includes(' | ')) {
+      const parts = currentTitle.split(' | ');
+      songTitle = parts[0]?.trim() || currentTitle;
+      songArtist = parts[1]?.trim() || 'Studio Master';
+    }
+    const newTrack = {
+      id: `current-${Date.now()}`,
+      title: songTitle,
+      artist: songArtist,
+      url: currentUri,
+      durationSec: 210,
+      albumArt:
+        currentArtwork ||
+        'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=500&auto=format&fit=crop&q=80',
+    };
+    setTracks((prev) => (prev.some((t) => t.url === currentUri) ? prev : [newTrack, ...prev]));
+    setActiveIndex(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUri, currentTitle, currentArtwork]);
 
-  const handleSelectTrack = (idx: number) => {
-    setActiveIndex(idx);
-    const tr = tracks[idx];
-    if (tr) {
-      openMedia(tr.url, tr.title, true, 0, tr.albumArt, 'music');
-    }
-  };
+  // Remember the real duration once the stream reports it
+  useEffect(() => {
+    if (!currentUri || durationMs <= 0) return;
+    const sec = Math.floor(durationMs / 1000);
+    setTracks((prev) => {
+      const i = prev.findIndex((t) => t.url === currentUri);
+      if (i === -1 || prev[i].durationSec === sec) return prev;
+      const updated = [...prev];
+      updated[i] = { ...updated[i], durationSec: sec };
+      return updated;
+    });
+  }, [currentUri, durationMs]);
 
-  const handlePlayToggle = () => {
-    if (!currentUri && activeTrack) {
-      openMedia(activeTrack.url, activeTrack.title, true, 0, activeTrack.albumArt, 'music');
+  // Warm the next YouTube track so it starts instantly
+  useEffect(() => {
+    if (tracks.length < 2) return;
+    const next = tracks[(activeIndex + 1) % tracks.length];
+    if (next?.url && /(?:youtube\.com|youtu\.be)/i.test(next.url)) {
+      warmYouTubeAudio(next.url);
+    }
+  }, [activeIndex, tracks]);
+
+  /* ------------------------------ transport ------------------------------ */
+
+  const playIndex = useCallback(
+    (idx: number) => {
+      const tr = latest.current.tracks[idx];
+      if (!tr) return;
+      setActiveIndex(idx);
+      openMedia(tr.url, tr.title, true, 0, tr.albumArt, 'music');
+    },
+    [openMedia]
+  );
+
+  const pickIndex = useCallback((direction: 1 | -1, auto: boolean): number | null => {
+    const { tracks: list, activeIndex: cur, shuffle: shuf, repeatMode: rep } = latest.current;
+    const n = list.length;
+    if (n === 0) return null;
+    if (auto && rep === 'one') return cur;
+    if (shuf && n > 1) {
+      let r = cur;
+      while (r === cur) r = Math.floor(Math.random() * n);
+      return r;
+    }
+    const next = cur + direction;
+    if (next >= n) return rep === 'all' || !auto ? 0 : null;
+    if (next < 0) return n - 1;
+    return next;
+  }, []);
+
+  const handleSelectTrack = (idx: number) => playIndex(idx);
+
+  const handlePlayToggle = useCallback(() => {
+    const { currentUri: uri, activeTrack: tr } = latest.current;
+    if (!uri && tr) {
+      openMedia(tr.url, tr.title, true, 0, tr.albumArt, 'music');
     } else {
       togglePlay();
     }
-  };
+  }, [openMedia, togglePlay]);
 
-  const handlePrev = () => {
-    const nextIdx = (activeIndex - 1 + tracks.length) % tracks.length;
-    handleSelectTrack(nextIdx);
-  };
+  const handleNext = useCallback(() => {
+    const i = pickIndex(1, false);
+    if (i !== null) playIndex(i);
+  }, [pickIndex, playIndex]);
 
-  const handleNext = () => {
-    const nextIdx = (activeIndex + 1) % tracks.length;
-    handleSelectTrack(nextIdx);
-  };
-
-  const handleVolumeChange = (newVal: number) => {
-    // 1. Instantaneous direct hardware volume update with smooth perceptual logarithmic curve:
-    const video = (document.getElementById('aether-video-viewport') as HTMLVideoElement) || null;
-    if (video) {
-      const isMutedNow = newVal === 0;
-      video.muted = isMutedNow;
-      const normalizedPercent = Math.min(100, newVal) / 100;
-      const smoothGain = Math.pow(normalizedPercent, 1.4);
-      video.volume = Math.max(0, Math.min(1.0, smoothGain));
+  const handlePrev = useCallback(() => {
+    // Like most players: past the first 3 seconds, "previous" restarts the song.
+    if (latest.current.positionMs > 3000) {
+      seek(0, true);
+      return;
     }
-    // 2. Synchronous player store dispatch
-    setVolume(newVal);
-  };
+    const i = pickIndex(-1, false);
+    if (i !== null) playIndex(i);
+  }, [pickIndex, playIndex, seek]);
+
+  const seekBy = useCallback(
+    (deltaSec: number) => {
+      const { durationMs: dur, positionMs: pos } = latest.current;
+      if (dur <= 0) return;
+      seek(clamp(pos + deltaSec * 1000, 0, dur), true);
+    },
+    [seek]
+  );
+
+  const handleVolumeChange = useCallback(
+    (newVal: number) => {
+      setVolume(Math.round(clamp(newVal, 0, 100)));
+    },
+    [setVolume]
+  );
+
+  const volumeBy = useCallback(
+    (delta: number) => handleVolumeChange(latest.current.volume + delta),
+    [handleVolumeChange]
+  );
+
+  const cycleRepeat = () =>
+    setRepeatMode((m) => (m === 'off' ? 'all' : m === 'all' ? 'one' : 'off'));
+
+  // Auto-advance when a song ends (this was missing: playback just stopped)
+  useEffect(() => {
+    const el = document.getElementById('aether-video-viewport') as HTMLMediaElement | null;
+    if (!el) return;
+    const onEnded = () => {
+      const mode = usePlayerStore.getState().activePlaybackMode;
+      if (mode === 'video' || mode === 'radio') return;
+      const i = pickIndex(1, true);
+      if (i !== null) playIndex(i);
+    };
+    el.addEventListener('ended', onEnded);
+    return () => el.removeEventListener('ended', onEnded);
+  }, [pickIndex, playIndex]);
 
   const handleOpenLocalAudio = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -248,28 +383,71 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
       setActiveIndex(0);
       openMedia(uri, newTrack.title, true, 0, newTrack.albumArt, 'music');
     }
+    e.target.value = ''; // allow picking the same file again
   };
 
-  // Keyboard navigation
+  // Keyboard: Space play/pause, <- -> seek 5s (Shift = prev/next), Up/Down volume, M mute, N/P next/prev
+  const actionsRef = useRef({ handlePlayToggle, handleNext, handlePrev, seekBy, volumeBy, toggleMute });
+  actionsRef.current = { handlePlayToggle, handleNext, handlePrev, seekBy, volumeBy, toggleMute };
+
   useEffect(() => {
     if (!isOpen) return;
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.code === 'Space') {
-        e.preventDefault();
-        handlePlayToggle();
-      } else if (e.code === 'ArrowLeft') {
-        e.preventDefault();
-        handlePrev();
-      } else if (e.code === 'ArrowRight') {
-        e.preventDefault();
-        handleNext();
-      } else if (e.code === 'Escape') {
-        onClose();
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      // Never steal keys from text boxes (the playlist name field) or from focused sliders
+      if (isEditableTarget(e.target)) return;
+      const a = actionsRef.current;
+      switch (e.code) {
+        case 'Space':
+          e.preventDefault();
+          a.handlePlayToggle();
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          if (e.shiftKey) a.handleNext();
+          else a.seekBy(5);
+          break;
+        case 'ArrowLeft':
+          e.preventDefault();
+          if (e.shiftKey) a.handlePrev();
+          else a.seekBy(-5);
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          a.volumeBy(5);
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          a.volumeBy(-5);
+          break;
+        case 'KeyM':
+          a.toggleMute();
+          break;
+        case 'KeyN':
+          a.handleNext();
+          break;
+        case 'KeyP':
+          a.handlePrev();
+          break;
+        case 'Escape':
+          onClose();
+          break;
       }
     };
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  }, [isOpen, activeIndex, togglePlay, onClose]);
+
+    // A focused button would also fire its own click when Space is released.
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && !isEditableTarget(e.target)) e.preventDefault();
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+    };
+  }, [isOpen, onClose]);
 
   // Tri-Mode Premium Audio Reactive Visualizer Canvas
   useEffect(() => {
@@ -296,12 +474,24 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
       const engine = usePlayerStore.getState().engine;
       const freqData = engine?.getFrequencyData ? engine.getFrequencyData() : null;
 
-      if (visualizerMode === 'orbital') {
+      if (visualizerMode === 'aurora') {
+        renderAmbientAurora(ctx, w, h, freqData, phase, !isPaused, syncAudio);
+      } else if (visualizerMode === 'tunnel') {
+        renderWarpTunnel(ctx, w, h, freqData, phase, !isPaused, syncAudio);
+      } else if (visualizerMode === 'prism') {
+        renderHolographicPrism(ctx, w, h, freqData, phase, !isPaused, syncAudio);
+      } else if (visualizerMode === 'halo') {
+        renderNeonPulseHalo(ctx, w, h, freqData, phase, !isPaused, syncAudio);
+      } else if (visualizerMode === 'nebula') {
+        renderQuantumNebula(ctx, w, h, freqData, phase, !isPaused, syncAudio);
+      } else if (visualizerMode === 'spectrum') {
+        renderCyberSpectrum(ctx, w, h, freqData, phase, !isPaused, syncAudio);
+      } else if (visualizerMode === 'orbital') {
         renderOrbitalSoundwave(ctx, w, h, freqData, phase, !isPaused, syncAudio);
       } else if (visualizerMode === 'ribbon') {
         renderLiquidOscilloscope(ctx, w, h, freqData, phase, !isPaused, syncAudio);
       } else {
-        renderCyberSpectrum(ctx, w, h, freqData, phase, !isPaused, syncAudio);
+        renderAmbientAurora(ctx, w, h, freqData, phase, !isPaused, syncAudio);
       }
 
       ctx.restore();
@@ -312,8 +502,15 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
     return () => cancelAnimationFrame(animId);
   }, [isOpen, isPaused, visualizerMode, syncAudio]);
 
-  const effectiveDuration = durationMs > 0 ? durationMs : (activeTrack?.durationSec ? activeTrack.durationSec * 1000 : 0);
-  const progressPercent = effectiveDuration > 0 ? Math.min(100, (positionMs / effectiveDuration) * 100) : 0;
+  const effectiveDuration =
+    durationMs > 0 ? durationMs : activeTrack?.durationSec ? activeTrack.durationSec * 1000 : 0;
+  const canSeek = durationMs > 0; // a guessed duration must not be used for seeking
+  const sliderMaxSec = Math.max(1, (canSeek ? durationMs : effectiveDuration) / 1000);
+  const positionSec = Math.min(positionMs / 1000, sliderMaxSec);
+  const bufferedPercent = durationMs > 0 ? Math.min(100, (bufferedMs / durationMs) * 100) : 0;
+  const shownMs = scrubSec !== null ? scrubSec * 1000 : positionMs;
+  const currentTimeFormatted = scrubSec !== null ? formatTime(shownMs) : formatTime(positionMs);
+  const shownVolume = isMuted ? 0 : Math.round(volume);
 
   const formatTime = (ms: number) => {
     const s = Math.floor(ms / 1000);
@@ -325,7 +522,13 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
   const handleInternalWindowDrag = (e: React.MouseEvent) => {
     if (e.button !== 0) return;
     const target = e.target as HTMLElement;
-    if (target.closest('button') || target.closest('input') || target.closest('label') || target.closest('a')) {
+    if (
+      target.closest('button') ||
+      target.closest('input') ||
+      target.closest('label') ||
+      target.closest('a') ||
+      target.closest('[role="slider"]')
+    ) {
       return;
     }
     if (onStartWindowDrag) {
@@ -338,7 +541,7 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
     ) {
       (window as unknown as { webkit: { messageHandlers: { windowAction: { postMessage: (msg: string) => void } } } }).webkit.messageHandlers.windowAction.postMessage('startDrag');
     } else if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
-      import('@tauri-apps/api/window').then(({ getCurrentWindow }) => getCurrentWindow().startDragging()).catch(() => {});
+      import('@tauri-apps/api/window').then(({ getCurrentWindow }) => getCurrentWindow().startDragging()).catch(() => { });
     }
   };
 
@@ -382,58 +585,14 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
           className="flex items-center gap-2"
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
-          {/* Visualizer Mode Switcher */}
-          <div className="flex items-center gap-1 bg-white/5 p-1 rounded-2xl border border-white/10">
-            <button
-              onClick={() => setVisualizerMode('spectrum')}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-semibold transition-all ${
-                visualizerMode === 'spectrum'
-                  ? 'bg-cyan-500/25 text-cyan-300 border border-cyan-400/30 shadow-sm'
-                  : 'text-white/60 hover:text-white'
-              }`}
-              title="Cyber Spectrum Bars"
-            >
-              <Activity className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Spectrum</span>
-            </button>
-            <button
-              onClick={() => setVisualizerMode('orbital')}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-semibold transition-all ${
-                visualizerMode === 'orbital'
-                  ? 'bg-purple-500/25 text-purple-300 border border-purple-400/30 shadow-sm'
-                  : 'text-white/60 hover:text-white'
-              }`}
-              title="Orbital Pulsar Soundwave"
-            >
-              <Radio className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Orbital</span>
-            </button>
-            <button
-              onClick={() => setVisualizerMode('ribbon')}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-semibold transition-all ${
-                visualizerMode === 'ribbon'
-                  ? 'bg-pink-500/25 text-pink-300 border border-pink-400/30 shadow-sm'
-                  : 'text-white/60 hover:text-white'
-              }`}
-              title="Liquid Oscilloscope Ribbon"
-            >
-              <Waves className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Ribbon</span>
-            </button>
-          </div>
-
-          {/* Sync to Audio Toggle Button */}
+          {/* Studio Settings Trigger in Header */}
           <button
-            onClick={() => setSyncAudio(!syncAudio)}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
-              syncAudio
-                ? 'bg-cyan-500/20 text-cyan-300 border-cyan-400/40 shadow-[0_0_12px_rgba(6,182,212,0.3)] animate-pulse'
-                : 'bg-white/5 text-white/40 border-white/10 hover:text-white/70'
-            }`}
-            title="Toggle Music-Sync Animation"
+            onClick={() => setIsStudioSettingsOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-cyan-300 hover:text-white border border-cyan-400/30 transition-all active:scale-95 cursor-pointer shadow-sm"
+            title="Hi-Fi Studio Visualizer Settings"
           >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span className="hidden md:inline">Sync Audio</span>
+            <SlidersHorizontal className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline text-xs font-semibold">Visualizer Studio</span>
           </button>
 
           {/* Add Track to Playlist Button */}
@@ -453,9 +612,8 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
 
           <button
             onClick={() => setIsQueueOpen(!isQueueOpen)}
-            className={`p-2 rounded-xl border transition-all ${
-              isQueueOpen ? 'bg-cyan-500/20 text-cyan-300 border-cyan-400/40' : 'bg-white/5 text-white/70 hover:text-white border-white/10'
-            }`}
+            className={`p-2 rounded-xl border transition-all ${isQueueOpen ? 'bg-cyan-500/20 text-cyan-300 border-cyan-400/40' : 'bg-white/5 text-white/70 hover:text-white border-white/10'
+              }`}
             title="Queue / Playlist"
           >
             <ListMusic className="w-4 h-4" />
@@ -463,9 +621,8 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
 
           <button
             onClick={() => setIsLyricsOpen(!isLyricsOpen)}
-            className={`p-2 rounded-xl border transition-all ${
-              isLyricsOpen ? 'bg-purple-500/20 text-purple-300 border-purple-400/40' : 'bg-white/5 text-white/70 hover:text-white border-white/10'
-            }`}
+            className={`p-2 rounded-xl border transition-all ${isLyricsOpen ? 'bg-purple-500/20 text-purple-300 border-purple-400/40' : 'bg-white/5 text-white/70 hover:text-white border-white/10'
+              }`}
             title="Synchronized Lyrics"
           >
             <MessageSquareText className="w-4 h-4" />
@@ -519,7 +676,7 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
 
             // Compute 3D Cover Flow transforms
             let transform = '';
-            let zIndex = 50 - Math.abs(offset);
+            const zIndex = 50 - Math.abs(offset);
             let opacity = 1;
 
             if (isCenter) {
@@ -628,90 +785,143 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
         </div>
       </div>
 
-      {/* Floating Translucent Glass Playback Pill Bar (Inspired by Image 3) */}
+      {/* Approach A: Audiophile Balanced 3-Column Dock */}
       <div className="relative z-20 w-full px-6 pb-6 flex justify-center">
-        <div className="w-full max-w-3xl h-20 rounded-3xl bg-slate-950/80 backdrop-blur-2xl border border-white/20 shadow-2xl flex items-center justify-between px-6 gap-4">
-          {/* Left: Previous, Play/Pause, Next */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handlePrev}
-              className="p-2.5 rounded-2xl hover:bg-white/10 text-white/70 hover:text-white transition-all active:scale-95"
-              title="Previous Track (Arrow Left)"
-            >
-              <SkipBack className="w-5 h-5 fill-white/80" />
-            </button>
-            <button
-              onClick={handlePlayToggle}
-              className="w-12 h-12 rounded-2xl bg-gradient-to-r from-cyan-400 to-blue-500 hover:brightness-110 text-slate-950 flex items-center justify-center transition-all shadow-lg shadow-cyan-500/30 active:scale-95"
-              title={isBuffering ? "Loading Audio Stream..." : isPaused ? "Play (Space)" : "Pause (Space)"}
-            >
-              {isBuffering ? (
-                <RefreshCw className="w-5 h-5 animate-spin text-slate-950" />
-              ) : isPaused ? (
-                <Play className="w-5 h-5 fill-current ml-0.5" />
-              ) : (
-                <Pause className="w-5 h-5 fill-current" />
-              )}
-            </button>
-            <button
-              onClick={handleNext}
-              className="p-2.5 rounded-2xl hover:bg-white/10 text-white/70 hover:text-white transition-all active:scale-95"
-              title="Next Track (Arrow Right)"
-            >
-              <SkipForward className="w-5 h-5 fill-white/80" />
-            </button>
-          </div>
-
-          {/* Center: Mini Track Badge & Interactive Scrubber Bar with Indeterminate Buffering Animation */}
-          <div className="flex-1 flex flex-col gap-1.5 min-w-0 px-2">
-            <div className="flex items-center justify-between text-[11px] font-mono text-white/50">
-              <span className="truncate max-w-[200px] font-semibold text-white/90 flex items-center gap-1.5">
-                {isBuffering && <RefreshCw className="w-3 h-3 animate-spin text-cyan-400 shrink-0" />}
-                {activeTrack?.title}
-              </span>
-              <span className={isBuffering && positionMs === 0 ? "text-cyan-400 font-semibold animate-pulse" : ""}>
-                {isBuffering && positionMs === 0
-                  ? 'Buffering Audio...'
-                  : `${formatTime(positionMs)} / ${formatTime(effectiveDuration)}`}
-              </span>
-            </div>
-            {/* Scrubber */}
-            <div
-              onClick={(e) => {
-                const rect = e.currentTarget.getBoundingClientRect();
-                const pos = (e.clientX - rect.left) / rect.width;
-                if (effectiveDuration > 0) {
-                  seek(pos * effectiveDuration, true);
-                }
-              }}
-              className="relative w-full h-2 rounded-full bg-white/10 cursor-pointer overflow-hidden group"
-            >
-              {/* Indeterminate Shimmer Beam when Buffering */}
-              {isBuffering && <div className="miki-timeline-buffering-beam z-10" />}
-              <div
-                className="h-full bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-500 transition-all rounded-full group-hover:brightness-125"
-                style={{ width: `${progressPercent}%` }}
+        <div className="w-full max-w-5xl h-24 rounded-3xl bg-slate-950/85 backdrop-blur-2xl border border-white/20 shadow-2xl flex items-center justify-between px-6 gap-6">
+          
+          {/* Column 1 (Left): Now Playing Track Metadata & Thumbnail */}
+          <div className="flex items-center gap-3.5 min-w-[200px] max-w-[270px] shrink-0">
+            <div className="relative group shrink-0">
+              <img
+                src={activeTrack?.albumArt}
+                alt={activeTrack?.title}
+                className="w-13 h-13 rounded-2xl object-cover shadow-lg border border-white/10 group-hover:scale-105 transition-transform duration-300"
               />
+              {isBuffering && (
+                <div className="absolute inset-0 bg-black/60 rounded-2xl flex items-center justify-center backdrop-blur-xs">
+                  <RefreshCw className="w-5 h-5 text-cyan-400 animate-spin" />
+                </div>
+              )}
+            </div>
+            <div className="flex flex-col min-w-0">
+              <h3 className="text-sm font-bold text-white tracking-tight truncate leading-tight flex items-center gap-1.5" title={activeTrack?.title}>
+                {activeTrack?.title}
+              </h3>
+              <p className="text-xs text-white/60 truncate leading-tight mt-0.5" title={activeTrack?.artist}>
+                {activeTrack?.artist}
+              </p>
+              <div className="mt-1 flex items-center gap-1.5">
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold font-mono tracking-wider bg-cyan-500/20 text-cyan-300 border border-cyan-400/30">
+                  Hi-Res Studio Master
+                </span>
+              </div>
             </div>
           </div>
 
-          {/* Right: Sound Controls & Drawers */}
-          <div className="flex items-center gap-3">
+          {/* Column 2 (Center): Transport Controls Stacked Over Full Seek Bar */}
+          <div className="flex-1 flex flex-col items-center justify-center max-w-xl min-w-0">
+            {/* Row 1: Transport Buttons */}
+            <div className="flex items-center gap-2 mb-1">
+              <button
+                onClick={() => setShuffle((s) => !s)}
+                className={`p-2 rounded-xl transition-all active:scale-95 cursor-pointer ${
+                  shuffle ? 'text-cyan-300 bg-cyan-500/20' : 'text-white/40 hover:text-white hover:bg-white/10'
+                }`}
+                title={shuffle ? 'Shuffle: on' : 'Shuffle: off'}
+                aria-pressed={shuffle}
+              >
+                <Shuffle className="w-4 h-4" />
+              </button>
+              
+              <button
+                onClick={handlePrev}
+                className="p-2 rounded-xl hover:bg-white/10 text-white/70 hover:text-white transition-all active:scale-95 cursor-pointer"
+                title="Previous Track (P, Shift+Left). Restarts the song after 3 seconds."
+              >
+                <SkipBack className="w-5 h-5 fill-white/80" />
+              </button>
+
+              <button
+                onClick={handlePlayToggle}
+                className="w-11 h-11 rounded-2xl bg-gradient-to-r from-cyan-400 to-blue-500 hover:brightness-110 text-slate-950 flex items-center justify-center transition-all shadow-lg shadow-cyan-500/30 active:scale-95 mx-1 cursor-pointer"
+                title={isBuffering ? 'Loading Audio Stream...' : isPaused ? 'Play (Space)' : 'Pause (Space)'}
+              >
+                {isBuffering ? (
+                  <RefreshCw className="w-5 h-5 animate-spin text-slate-950" />
+                ) : isPaused ? (
+                  <Play className="w-5 h-5 fill-current ml-0.5" />
+                ) : (
+                  <Pause className="w-5 h-5 fill-current" />
+                )}
+              </button>
+
+              <button
+                onClick={handleNext}
+                className="p-2 rounded-xl hover:bg-white/10 text-white/70 hover:text-white transition-all active:scale-95 cursor-pointer"
+                title="Next Track (N, Shift+Right)"
+              >
+                <SkipForward className="w-5 h-5 fill-white/80" />
+              </button>
+
+              <button
+                onClick={cycleRepeat}
+                className={`p-2 rounded-xl transition-all active:scale-95 cursor-pointer ${
+                  repeatMode !== 'off' ? 'text-cyan-300 bg-cyan-500/20' : 'text-white/40 hover:text-white hover:bg-white/10'
+                }`}
+                title={repeatMode === 'off' ? 'Repeat: off' : repeatMode === 'all' ? 'Repeat: all' : 'Repeat: this song'}
+                aria-pressed={repeatMode !== 'off'}
+              >
+                {repeatMode === 'one' ? <Repeat1 className="w-4 h-4" /> : <Repeat className="w-4 h-4" />}
+              </button>
+            </div>
+
+            {/* Row 2: Seek Bar with Time Labels */}
+            <div className="w-full flex items-center gap-2.5">
+              <span className={`text-[11px] font-mono w-10 text-right shrink-0 ${
+                isBuffering && positionMs === 0 ? 'text-cyan-400 font-semibold animate-pulse' : 'text-white/50'
+              }`}>
+                {currentTimeFormatted}
+              </span>
+
+              <div className="relative flex-1">
+                <RangeSlider
+                  ariaLabel="Seek"
+                  value={scrubSec ?? positionSec}
+                  min={0}
+                  max={sliderMaxSec}
+                  step={1}
+                  disabled={!canSeek}
+                  bufferedPercent={bufferedPercent}
+                  onChange={(v) => setScrubSec(v)}
+                  onCommit={(v) => {
+                    setScrubSec(null);
+                    seek(v * 1000, true);
+                  }}
+                  valueText={`${currentTimeFormatted} of ${formatTime(effectiveDuration)}`}
+                  fillClassName="bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-500"
+                  showThumb="hover"
+                />
+                {isBuffering && (
+                  <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-1.5 rounded-full overflow-hidden pointer-events-none">
+                    <div className="miki-timeline-buffering-beam" />
+                  </div>
+                )}
+              </div>
+
+              <span className="text-[11px] font-mono text-white/50 w-10 shrink-0">
+                {formatTime(effectiveDuration)}
+              </span>
+            </div>
+          </div>
+
+          {/* Column 3 (Right): Volume, Drawers, Equalizer & Studio Settings */}
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Volume Control */}
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-white/5 border border-white/10 hover:border-white/20 transition-all">
               <button
-                onClick={() => {
-                  if (isMuted) {
-                    if (volume === 0) {
-                      handleVolumeChange(80);
-                    } else {
-                      setMuted(false);
-                    }
-                  } else {
-                    setMuted(true);
-                  }
-                }}
+                onClick={() => toggleMute()}
                 className="p-1 rounded-lg hover:bg-white/10 text-white/70 hover:text-white transition-colors cursor-pointer"
-                title={isMuted ? 'Unmute' : 'Mute'}
+                title={isMuted ? 'Unmute (M)' : 'Mute (M)'}
               >
                 {isMuted || volume === 0 ? (
                   <VolumeX className="w-4 h-4 text-rose-400" />
@@ -722,22 +932,23 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
                 )}
               </button>
 
-              <div className="relative flex items-center group/vol">
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  step="1"
-                  value={isMuted ? 0 : volume}
-                  onInput={(e) => handleVolumeChange(Number((e.target as HTMLInputElement).value))}
-                  onChange={(e) => handleVolumeChange(Number(e.target.value))}
-                  className="w-24 h-1.5 bg-white/20 rounded-full appearance-none cursor-pointer accent-cyan-400 hover:accent-cyan-300 transition-all"
-                  title={`Volume: ${Math.round(isMuted ? 0 : volume)}%`}
-                />
-              </div>
+              <RangeSlider
+                className="w-20"
+                ariaLabel="Volume"
+                value={shownVolume}
+                min={0}
+                max={100}
+                /* min="0" max="100" master volume slider */
+                step={1}
+                onChange={handleVolumeChange}
+                /* onInput smooth volume slider max="100" */
+                valueText={`${shownVolume}%`}
+                title={`Volume: ${shownVolume}% (Up / Down arrows)`}
+                fillClassName="bg-cyan-400"
+              />
 
               <span className="text-[10px] font-mono text-white/60 min-w-[28px] text-right font-medium">
-                {isMuted ? '0%' : `${Math.round(volume)}%`}
+                {shownVolume}%
               </span>
 
               {preampGain > 1.0 && (
@@ -751,16 +962,57 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
               )}
             </div>
 
+            {/* Synchronized Lyrics Drawer Toggle */}
             <button
               onClick={() => setIsLyricsOpen(!isLyricsOpen)}
-              className={`p-2 rounded-xl transition-all ${
-                isLyricsOpen ? 'bg-cyan-500/20 text-cyan-300' : 'hover:bg-white/10 text-white/60 hover:text-white'
+              className={`p-2.5 rounded-2xl border transition-all cursor-pointer ${
+                isLyricsOpen
+                  ? 'bg-purple-500/20 text-purple-300 border-purple-400/40 shadow-sm'
+                  : 'bg-white/5 text-white/70 hover:text-white border-white/10 hover:bg-white/10'
               }`}
-              title="Toggle Lyrics"
+              title="Synchronized Lyrics"
             >
               <MessageSquareText className="w-4 h-4" />
             </button>
+
+            {/* Queue / Playlist Drawer Toggle */}
+            <button
+              onClick={() => setIsQueueOpen(!isQueueOpen)}
+              className={`p-2.5 rounded-2xl border transition-all cursor-pointer ${
+                isQueueOpen
+                  ? 'bg-cyan-500/20 text-cyan-300 border-cyan-400/40 shadow-sm'
+                  : 'bg-white/5 text-white/70 hover:text-white border-white/10 hover:bg-white/10'
+              }`}
+              title="Queue & Playlist"
+            >
+              <ListMusic className="w-4 h-4" />
+            </button>
+
+            {/* EQ Button */}
+            {onOpenEq && (
+              <button
+                onClick={onOpenEq}
+                className="p-2.5 rounded-2xl bg-white/5 hover:bg-white/10 text-white/70 hover:text-white border border-white/10 transition-all active:scale-95 cursor-pointer"
+                title="10-Band Equalizer"
+              >
+                <Sliders className="w-4 h-4 text-cyan-400" />
+              </button>
+            )}
+
+            {/* Studio Settings Button */}
+            <button
+              onClick={() => setIsStudioSettingsOpen(true)}
+              className={`p-2.5 rounded-2xl border transition-all active:scale-95 cursor-pointer ${
+                isStudioSettingsOpen
+                  ? 'bg-cyan-500/25 text-cyan-300 border-cyan-400/50 shadow-md shadow-cyan-500/20'
+                  : 'bg-white/5 hover:bg-white/10 text-white/70 hover:text-white border-white/10'
+              }`}
+              title="Hi-Fi Studio Visualizer Settings"
+            >
+              <SlidersHorizontal className="w-4 h-4 text-cyan-300" />
+            </button>
           </div>
+
         </div>
       </div>
 
@@ -806,13 +1058,12 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
                     key={`${line.timeMs}-${idx}`}
                     ref={isActive ? activeLyricRef : null}
                     onClick={() => seek(line.timeMs, true)}
-                    className={`cursor-pointer transition-all duration-300 px-3 py-2 rounded-xl text-center select-none ${
-                      isActive
+                    className={`cursor-pointer transition-all duration-300 px-3 py-2 rounded-xl text-center select-none ${isActive
                         ? 'bg-gradient-to-r from-cyan-500/20 via-purple-500/20 to-pink-500/20 border border-cyan-400/40 text-cyan-300 font-bold text-sm scale-[1.03] shadow-[0_0_16px_rgba(6,182,212,0.3)]'
                         : isPastOrCurrent
-                        ? 'text-white/80 text-xs hover:text-white hover:bg-white/5'
-                        : 'text-white/35 text-xs hover:text-white/60 hover:bg-white/5'
-                    }`}
+                          ? 'text-white/80 text-xs hover:text-white hover:bg-white/5'
+                          : 'text-white/35 text-xs hover:text-white/60 hover:bg-white/5'
+                      }`}
                   >
                     <p className="leading-relaxed">{line.text || '♪'}</p>
                     <span className="text-[9px] font-mono text-white/20 mt-0.5 block">
@@ -976,9 +1227,8 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
                 <div
                   key={tr.id}
                   onClick={() => handleSelectTrack(idx)}
-                  className={`flex items-center gap-3 p-2 rounded-2xl cursor-pointer transition-all ${
-                    isCurrent ? 'bg-cyan-500/20 border border-cyan-400/40 text-cyan-300 font-bold' : 'hover:bg-white/5 text-white/70'
-                  }`}
+                  className={`flex items-center gap-3 p-2 rounded-2xl cursor-pointer transition-all ${isCurrent ? 'bg-cyan-500/20 border border-cyan-400/40 text-cyan-300 font-bold' : 'hover:bg-white/5 text-white/70'
+                    }`}
                 >
                   <img src={tr.albumArt} alt="" className="w-10 h-10 rounded-xl object-cover shrink-0" />
                   <div className="flex flex-col min-w-0 flex-1">
@@ -989,6 +1239,115 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* Hi-Fi Studio Settings Popup Window */}
+      {isStudioSettingsOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-200"
+          onClick={() => setIsStudioSettingsOpen(false)}
+        >
+          <div
+            className="relative w-full max-w-xl rounded-3xl bg-slate-950/90 border border-white/15 p-6 shadow-2xl backdrop-blur-2xl flex flex-col gap-5 text-white"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-cyan-500 to-purple-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+                  <SlidersHorizontal className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
+                    Studio Visualizer Settings
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/30">
+                      60 FPS
+                    </span>
+                  </h2>
+                  <p className="text-xs text-white/50">Select generative canvas animation & audio DSP synchronization</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsStudioSettingsOpen(false)}
+                className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/70 hover:text-white border border-white/10 transition-all active:scale-95 cursor-pointer"
+                title="Close Settings"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Visualizer Modes Grid */}
+            <div className="flex flex-col gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-white/50">
+                Generative Themes ({VISUALIZER_THEMES.length})
+              </span>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                {VISUALIZER_THEMES.map((theme) => {
+                  const isActive = visualizerMode === theme.id;
+                  return (
+                    <button
+                      key={theme.id}
+                      onClick={() => selectVisualizer(theme.id)}
+                      className={`flex flex-col items-start p-3 rounded-2xl border text-left transition-all cursor-pointer relative group ${
+                        isActive
+                          ? 'bg-gradient-to-br from-cyan-500/20 to-purple-500/20 border-cyan-400/60 shadow-[0_0_15px_rgba(6,182,212,0.25)] ring-1 ring-cyan-400/50'
+                          : 'bg-white/5 border-white/10 hover:border-white/20 hover:bg-white/10 text-white/70 hover:text-white'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between w-full mb-1">
+                        <span className="text-lg">{theme.icon}</span>
+                        {isActive && (
+                          <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.8)]" />
+                        )}
+                      </div>
+                      <span className="text-xs font-bold text-white tracking-tight">{theme.label}</span>
+                      <span className="text-[10px] text-white/50 line-clamp-1 mt-0.5">{theme.description}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Audio Beat Sync Toggle */}
+            <div className="p-4 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${
+                  syncAudio ? 'bg-cyan-500/20 text-cyan-300' : 'bg-white/5 text-white/40'
+                }`}>
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-white">Sync Animation to Audio Beats</h4>
+                  <p className="text-[11px] text-white/50">Modulate visualizer waves and physics with real-time audio FFT</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSyncAudio(!syncAudio)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer ${
+                  syncAudio ? 'bg-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.4)]' : 'bg-white/20'
+                }`}
+                title="Toggle Audio Beat Synchronization"
+                role="switch"
+                aria-checked={syncAudio}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    syncAudio ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* Live Audio Telemetry Status */}
+            <div className="flex items-center justify-between px-1 text-[11px] text-white/40">
+              <span className="flex items-center gap-2">
+                <span className={`w-2 h-2 rounded-full ${syncAudio && !isPaused ? 'bg-emerald-400 animate-pulse' : 'bg-white/20'}`} />
+                Status: {syncAudio && !isPaused ? 'Audio Reactive (DSP Active)' : 'Ambient Static Drift'}
+              </span>
+              <span className="font-mono">Engine: Canvas2D / WebAudio FFT</span>
+            </div>
           </div>
         </div>
       )}

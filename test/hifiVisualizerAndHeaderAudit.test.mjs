@@ -69,3 +69,25 @@ describe('Task 1: 6 Modern Generative Audio Visualizers Audit', () => {
     });
   });
 });
+
+describe('Task 2: Studio Settings Modal & Theme Selection Audit', () => {
+  test('verifies FullWindowMusicPlayer embeds Studio Settings modal with all 6 visualizer cards', () => {
+    const code = fs.readFileSync(path.resolve(process.cwd(), 'src/components/music/FullWindowMusicPlayer.tsx'), 'utf-8');
+    assert.match(code, /isStudioSettingsOpen/);
+    assert.match(code, /VISUALIZER_THEMES\.map/);
+    assert.match(code, /Sync Animation to Audio Beats|Sync Audio Beats/i);
+    // Header must no longer contain the hardcoded 3-button mode switcher in top bar
+    assert.ok(!code.includes('title="Cyber Spectrum Bars"'));
+  });
+});
+
+describe('Task 3: Approach A 3-Column Playback Dock Audit', () => {
+  test('verifies FullWindowMusicPlayer implements Approach A 3-column playback dock', () => {
+    const code = fs.readFileSync(path.resolve(process.cwd(), 'src/components/music/FullWindowMusicPlayer.tsx'), 'utf-8');
+    assert.match(code, /Hi-Res|Studio Master/i);
+    assert.match(code, /RangeSlider/);
+    assert.match(code, /handlePrev/);
+    assert.match(code, /handleNext/);
+    assert.match(code, /handlePlayToggle/);
+  });
+});
