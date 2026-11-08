@@ -90,6 +90,16 @@ describe('Task 3: Approach A 3-Column Playback Dock Audit', () => {
     assert.match(code, /handleNext/);
     assert.match(code, /handlePlayToggle/);
   });
+
+  test('verifies Approach A dock thumbnail has strict dimensions and overflow clipping without invalid w-13 classes', () => {
+    const code = fs.readFileSync(path.resolve(process.cwd(), 'src/components/music/FullWindowMusicPlayer.tsx'), 'utf-8');
+    // Must NOT contain invalid Tailwind classes like w-13 or h-13 which cause unconstrained giant image blowout
+    assert.ok(!code.includes('w-13'), 'Must not contain non-existent Tailwind class w-13');
+    assert.ok(!code.includes('h-13'), 'Must not contain non-existent Tailwind class h-13');
+
+    // Thumbnail container must constrain width, height, and overflow
+    assert.match(code, /w-1[24]\s+h-1[24][\s\S]*?overflow-hidden/);
+  });
 });
 
 describe('Task 4: Single User Profile Shower & Header Menu Audit', () => {

@@ -772,11 +772,11 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
         </div>
 
         {/* Focused Track Metadata Display */}
-        <div className="flex flex-col items-center mt-6 text-center animate-in fade-in duration-300">
-          <h2 className="text-2xl font-black text-white tracking-tight drop-shadow-md">
+        <div className="flex flex-col items-center mt-3 sm:mt-4 text-center animate-in fade-in duration-300 max-w-xl px-4 z-10">
+          <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight drop-shadow-md truncate max-w-full">
             {activeTrack?.title || 'Unknown Track'}
           </h2>
-          <p className="text-sm font-medium text-cyan-300/80 mt-1">
+          <p className="text-xs sm:text-sm font-medium text-cyan-300/80 mt-0.5 truncate max-w-full">
             {activeTrack?.artist || 'Unknown Artist'}
           </p>
         </div>
@@ -788,11 +788,11 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
           
           {/* Column 1 (Left): Now Playing Track Metadata & Thumbnail */}
           <div className="flex items-center gap-3.5 min-w-[200px] max-w-[270px] shrink-0">
-            <div className="relative group shrink-0">
+            <div className="w-14 h-14 rounded-2xl overflow-hidden shrink-0 relative group border border-white/10 shadow-lg bg-slate-900">
               <img
                 src={activeTrack?.albumArt}
                 alt={activeTrack?.title}
-                className="w-13 h-13 rounded-2xl object-cover shadow-lg border border-white/10 group-hover:scale-105 transition-transform duration-300"
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 select-none pointer-events-none"
               />
               {isBuffering && (
                 <div className="absolute inset-0 bg-black/60 rounded-2xl flex items-center justify-center backdrop-blur-xs">
