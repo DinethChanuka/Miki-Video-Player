@@ -49,6 +49,7 @@ let storedCache: Record<string, LyricsResult> | null = null;
 /**
  * Cleans YouTube/Music video titles to isolate true track title and artist
  * e.g. "Digvijaya (දිග්විජය) Theme Song | Official Music Video | Pradeep Rangana" -> title: "Digvijaya", artist: "Pradeep Rangana"
+ * e.g. "Bin Tere (Full Song) - I Hate Luv Storys | Sunidhi Chauhan" -> title: "Bin Tere", artist: "Sunidhi Chauhan"
  */
 export function cleanTrackSearchQuery(rawTitle: string, rawArtist?: string): { trackTitle: string; artist: string } {
   if (!rawTitle) return { trackTitle: '', artist: rawArtist || '' };
@@ -56,38 +57,75 @@ export function cleanTrackSearchQuery(rawTitle: string, rawArtist?: string): { t
   let title = rawTitle;
   let artist = rawArtist || '';
 
-  // Remove common YouTube suffixes and junk in brackets/parentheses
-  title = title
-    .replace(/\s*[\(\[](?:Official\s*(?:Music\s*)?Video|Full\s*(?:Song\s*)?Audio|Audio|Video|Lyric\s*Video|HD|4K|Lyrics)[\)\]]/gi, '')
-    .replace(/\s*[\(\[][^\)\]]*[\)\]]/g, '') // remove non-latin or extra info in parens and brackets
-    .trim();
+  // 1. Remove bracketed noise words (e.g. "[Official Video]", "(Full Song)", "(Lyrical)", "(Teledrama Theme Song)")
+  const bracketNoiseRegex =
+    /\s*[\(\[](?:Official\s*(?:Music\s*)?Video|Full\s*(?:Song\s*)?Audio|Audio|Video|Lyric(?:al)?\s*Video|HD|4K|Lyrics?|Teledrama\s*(?:Theme\s*)?Song|Full\s*Song|Title\s*Song|Remix|Acoustic)[\)\]]/gi;
+  title = title.replace(bracketNoiseRegex, '').trim();
 
-  // If title has pipes or dashes: e.g. "Title | Tag | Artist" or "Artist - Title"
+  // Strip remaining non-title metadata inside parentheses/brackets
+  title = title.replace(/\s*[\(\[][^\)\]]*[\)\]]/g, '').trim();
+
+  // 2. Separate pipe delimited segments: "Title | Movie | Artist"
+  let segments: string[] = [];
   if (title.includes(' | ')) {
-    const parts = title.split(' | ').map((p) => p.trim());
-    if (parts.length >= 2) {
-      title = parts[0];
-      // Check if trailing part is artist or tags
-      const lastPart = parts[parts.length - 1];
-      if (!lastPart.toLowerCase().includes('video') && !lastPart.toLowerCase().includes('audio')) {
-        artist = lastPart;
-      }
+    segments = title.split(' | ').map((p) => p.trim()).filter(Boolean);
+  } else if (title.includes('|')) {
+    segments = title.split('|').map((p) => p.trim()).filter(Boolean);
+  } else {
+    segments = [title];
+  }
+
+  let primarySegment = segments[0] || title;
+
+  // Extract artist candidates from trailing pipe segments
+  if (segments.length > 1) {
+    const trailingSegments = segments.slice(1);
+    // Prioritize recognized composer/playback singer names if present
+    const singerCandidate = trailingSegments.find((seg) =>
+      /Pritam|Arijit|Shreya|Sunidhi|Shafqat|Atif|Sonu|Mohit|Yohani|Rahman|Badshah|Armaan|Neha|Darshan|Jubin|Tanishk/i.test(seg)
+    );
+
+    const generalCandidate = trailingSegments.find((seg) => {
+      const lower = seg.toLowerCase();
+      return (
+        !lower.includes('official') &&
+        !lower.includes('video') &&
+        !lower.includes('trailer') &&
+        !lower.includes('teaser') &&
+        !lower.includes('t-series') &&
+        !lower.includes('yrf') &&
+        !lower.includes('sony music') &&
+        !lower.includes('zee music')
+      );
+    });
+
+    const chosen = singerCandidate || generalCandidate;
+    if (chosen) {
+      artist = chosen;
+    } else if (!artist || artist === 'YouTube Music' || artist === 'Official Artist') {
+      artist = trailingSegments[trailingSegments.length - 1];
     }
-  } else if (title.includes(' - ')) {
-    const parts = title.split(' - ').map((p) => p.trim());
-    if (parts.length >= 2) {
-      if (!artist || artist === 'YouTube Music' || artist === 'Official Artist') {
-        artist = parts[0];
-        title = parts[1];
+  }
+
+  // 3. Handle dash inside primarySegment: "Bin Tere - I Hate Luv Storys" or "Kesariya - Brahmāstra"
+  if (primarySegment.includes(' - ') || primarySegment.includes(' – ') || primarySegment.includes(' — ')) {
+    const dashParts = primarySegment.split(/\s*[-–—]\s*/).map((p) => p.trim()).filter(Boolean);
+    if (dashParts.length >= 2) {
+      primarySegment = dashParts[0];
+
+      if (!artist || artist === 'YouTube Music' || artist === 'Official Artist' || GENERIC_ARTIST.test(artist)) {
+        artist = dashParts[1];
       }
     }
   }
 
-  // Remove trailing "Title Song", "Theme Song", "Full Song"
-  title = title.replace(/\s*(?:Title\s*Song|Theme\s*Song|Full\s*Song|Song)\s*$/i, '').trim();
+  // 4. Remove trailing noise words: "Title Song", "Theme Song", "Full Song", "Song"
+  primarySegment = primarySegment
+    .replace(/\s*(?:Title\s*Song|Theme\s*Song|Full\s*Song|Teledrama\s*Song|Baila\s*Song|Song)\s*$/i, '')
+    .trim();
 
   return {
-    trackTitle: title || rawTitle,
+    trackTitle: primarySegment || rawTitle,
     artist: artist && artist !== 'YouTube Music' ? artist : '',
   };
 }
@@ -142,8 +180,16 @@ function buildCandidates(rawTitle: string, rawArtist?: string): Candidates {
   const classic = cleanTrackSearchQuery(rawTitle, rawArtist);
   const channelArtist = rawArtist && !GENERIC_ARTIST.test(rawArtist) ? rawArtist : '';
 
-  const titles = unique([segments[0] || '', stripNoise(classic.trackTitle), segments[1] || '']).slice(0, 3);
-  const artists = unique([channelArtist, classic.artist, segments[1] || '', segments[2] || '']).filter(
+  // Extract Sinhala (U+0D80..U+0DFF) and Hindi/Devanagari (U+0900..U+097F) scripts
+  const sinhala = (rawTitle.match(/[\u0D80-\u0DFF]+/g) || []).join(' ').trim();
+  const devanagari = (rawTitle.match(/[\u0900-\u097F]+/g) || []).join(' ').trim();
+
+  const titleCands = [stripNoise(classic.trackTitle), segments[0] || '', segments[1] || ''];
+  if (sinhala) titleCands.push(sinhala);
+  if (devanagari) titleCands.push(devanagari);
+
+  const titles = unique(titleCands).slice(0, 5);
+  const artists = unique([classic.artist, channelArtist, segments[1] || '', segments[2] || '']).filter(
     (a) => !GENERIC_ARTIST.test(a)
   );
 

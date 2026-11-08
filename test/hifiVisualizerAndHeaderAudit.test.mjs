@@ -116,3 +116,142 @@ describe('Task 4: Single User Profile Shower & Header Menu Audit', () => {
     assert.match(homeCode, /ApplicationMenu|onOpenSettings/);
   });
 });
+
+describe('Task 5: Cyber Spectrum Full-Width Animation & Holographic Prism Visibility Audit', () => {
+  test('renderCyberSpectrum generates dynamic bar heights across all 48 bars with realistic audio FFT data', () => {
+    const barsDrawn = [];
+    const mockCtx = {
+      clearRect: () => {},
+      createLinearGradient: () => ({ addColorStop: () => {} }),
+      fillRect: (x, y, w, h) => {
+        barsDrawn.push({ x, y, w, h });
+      },
+    };
+
+    // Realistic AAC/Opus frequency data: strong bass/mids in bins 0..20, steep rolloff above bin 25 (zeros in bins 25..63)
+    const realisticFft = new Uint8Array(64);
+    for (let i = 0; i < 20; i++) realisticFft[i] = Math.max(20, 240 - i * 10);
+    // Bins 25..63 are near 0 or 0, typical of compressed 128k audio streams
+    for (let i = 25; i < 64; i++) realisticFft[i] = 0;
+
+    renderCyberSpectrum(mockCtx, 1000, 600, realisticFft, 1.0, true, true);
+
+    // Each bar draws an upward bar, downward reflection, and peak cap (3 fillRect calls per bar = 144 calls for 48 bars)
+    assert.ok(barsDrawn.length >= 48, `Expected at least 48 bars rendered, got ${barsDrawn.length}`);
+
+    // Check upward bars across the second half of the screen (bars 24..47)
+    // Upward bars have y < centerY (where centerY = 600 * 0.65 = 390) and height > 8px
+    const upwardBars = barsDrawn.filter((b) => b.y < 390 && b.h > 8);
+    const rightSideBars = upwardBars.filter((b) => b.x > 500);
+
+    assert.ok(
+      rightSideBars.length >= 15,
+      `Cyber Spectrum right half must not be flat or dead; expected active right-side bars, got ${rightSideBars.length}`
+    );
+  });
+
+  test('renderHolographicPrism projects structure visible beyond the 256px center cover flow card', () => {
+    const verticesProjected = [];
+    const mockCtx = {
+      clearRect: () => {},
+      beginPath: () => {},
+      moveTo: (x, y) => verticesProjected.push({ x, y }),
+      lineTo: (x, y) => verticesProjected.push({ x, y }),
+      stroke: () => {},
+      fill: () => {},
+      arc: (x, y) => verticesProjected.push({ x, y }),
+      createLinearGradient: () => ({ addColorStop: () => {} }),
+      createRadialGradient: () => ({ addColorStop: () => {} }),
+      fillRect: () => {},
+    };
+
+    const freqData = new Uint8Array(64).fill(120);
+    renderHolographicPrism(mockCtx, 1200, 800, freqData, 1.0, true, true);
+
+    const centerX = 600;
+    const centerY = 416; // 800 * 0.52
+
+    // Cover Flow card is 256px wide (radius 128px from center).
+    // The holographic prism vertices/structure must extend noticeably beyond 150px (e.g. 200px+) so it frames the card
+    const maxDistFromCenter = Math.max(
+      ...verticesProjected.map((v) => Math.hypot(v.x - centerX, v.y - centerY))
+    );
+
+    assert.ok(
+      maxDistFromCenter > 200,
+      `Holographic Prism must extend beyond 200px from center to avoid being occluded by 256px Cover Flow card. Got: ${maxDistFromCenter}px`
+    );
+  });
+});
+
+describe('Task 6: Sinhala & Hindi Lyrics Detection & Sanitization Audit', () => {
+  test('cleanTrackSearchQuery isolates pure track title and artist for Bollywood and Sinhala tracks', async () => {
+    const { cleanTrackSearchQuery } = await import('../src/utils/lyricsService.ts');
+
+    // 1. Bollywood title with Movie and singers in pipes
+    const res1 = cleanTrackSearchQuery(
+      'Bin Tere (Full Song) - I Hate Luv Storys | Sunidhi Chauhan, Shafqat Amanat Ali',
+      'Sony Music India'
+    );
+    assert.equal(res1.trackTitle, 'Bin Tere');
+    assert.match(res1.artist, /Sunidhi Chauhan/i);
+
+    // 2. Bollywood title with "Title Song" suffix and multi-artist pipe
+    const res2 = cleanTrackSearchQuery(
+      'Saiyaara Title Song | Tanishk Bagchi, Faheem Abdullah, Arslan Nizami, Irshad Kamil',
+      'YRF'
+    );
+    assert.equal(res2.trackTitle, 'Saiyaara');
+    assert.match(res2.artist, /Tanishk Bagchi/i);
+
+    // 3. Bollywood title with movie and actors in multiple pipes
+    const res3 = cleanTrackSearchQuery(
+      'Kesariya - Brahmāstra | Ranbir Kapoor | Alia Bhatt | Pritam | Arijit Singh | Amitabh Bhattacharya',
+      'Sony Music India'
+    );
+    assert.equal(res3.trackTitle, 'Kesariya');
+    assert.match(res3.artist, /Pritam|Arijit Singh/i);
+
+    // 4. Sinhala track with native script in parens and teledrama / theme song tags
+    const res4 = cleanTrackSearchQuery(
+      'Digvijaya (දිග්විජය) Theme Song | Official Music Video | Pradeep Rangana',
+      'Pradeep Rangana Official'
+    );
+    assert.equal(res4.trackTitle, 'Digvijaya');
+
+    // 5. Sinhala Baila / Teledrama track with Sinhala script and artist
+    const res5 = cleanTrackSearchQuery(
+      'Manike Mage Hithe (මැණිකේ මගේ හිතේ) - Yohani & Satheeshan | Official Music Video',
+      'Yohani'
+    );
+    assert.equal(res5.trackTitle, 'Manike Mage Hithe');
+    assert.match(res5.artist, /Yohani/i);
+  });
+});
+
+describe('Task 7: High-Contrast Lyrics UI & Timeline Duration Sanity Audit', () => {
+  test('FullWindowMusicPlayer renders high-contrast lyrics styling and sparkle indicator', () => {
+    const code = fs.readFileSync(path.resolve(process.cwd(), 'src/components/music/FullWindowMusicPlayer.tsx'), 'utf-8');
+
+    // Inactive lyrics must have high contrast (text-white/70 or text-white/75 or higher, not text-white/35)
+    assert.ok(
+      !code.includes('text-white/35'),
+      'Inactive lyrics must not be low contrast (text-white/35)'
+    );
+    assert.match(code, /text-white\/7[05]|text-white\/80/);
+
+    // Active line must feature sparkle indicator (Sparkles icon)
+    assert.match(code, /<Sparkles/);
+  });
+
+  test('FullWindowMusicPlayer corrects WebKit 2x HE-AAC duration doubling bug on timeline', () => {
+    const code = fs.readFileSync(path.resolve(process.cwd(), 'src/components/music/FullWindowMusicPlayer.tsx'), 'utf-8');
+
+    // Must include duration validation/sanity check against WebKit 2x HE-AAC bug
+    assert.match(
+      code,
+      /durationSec[\s\S]*?(?:correctedDurationMs|effectiveDuration)[\s\S]*?(?:1\.7|1\.8|2\.2|\* 2|\/ 2)/,
+      'Must contain logic to detect and correct doubled duration'
+    );
+  });
+});

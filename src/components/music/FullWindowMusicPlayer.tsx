@@ -25,6 +25,7 @@ import {
   Repeat1,
 } from 'lucide-react';
 import { FEATURED_MUSIC_TRACKS } from './MusicPlayerView';
+import { CURATED_YOUTUBE_TRACKS } from '../../utils/youtubeMusicService';
 import { fetchTrackLyrics, LyricsResult } from '../../utils/lyricsService';
 import { RangeSlider } from '../common/RangeSlider';
 import { warmYouTubeAudio } from '../../utils/youtubePrefetch';
@@ -234,12 +235,23 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
       songTitle = parts[0]?.trim() || currentTitle;
       songArtist = parts[1]?.trim() || 'Studio Master';
     }
+    let knownDurationSec = 210;
+    try {
+      for (const group of Object.values(CURATED_YOUTUBE_TRACKS)) {
+        const found = group.find((t) => t.streamUrl === currentUri || (t.youtubeId && currentUri.includes(t.youtubeId)));
+        if (found && found.durationSec > 0) {
+          knownDurationSec = found.durationSec;
+          break;
+        }
+      }
+    } catch { }
+
     const newTrack = {
       id: `current-${Date.now()}`,
       title: songTitle,
       artist: songArtist,
       url: currentUri,
-      durationSec: 210,
+      durationSec: knownDurationSec,
       albumArt:
         currentArtwork ||
         'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=500&auto=format&fit=crop&q=80',
@@ -249,13 +261,19 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUri, currentTitle, currentArtwork]);
 
-  // Remember the real duration once the stream reports it
+  // Remember the real duration once the stream reports it, guarding against the WebKit 2x HE-AAC bug
   useEffect(() => {
     if (!currentUri || durationMs <= 0) return;
     const sec = Math.floor(durationMs / 1000);
     setTracks((prev) => {
       const i = prev.findIndex((t) => t.url === currentUri);
-      if (i === -1 || prev[i].durationSec === sec) return prev;
+      if (i === -1) return prev;
+      const currentTrackSec = prev[i].durationSec;
+      // If duration is inflated ~2x by WebKit SBR bug (e.g. 8:19 instead of 4:08), do not overwrite with doubled duration
+      if (currentTrackSec && currentTrackSec > 0 && sec > currentTrackSec * 1.7 && sec < currentTrackSec * 2.3) {
+        return prev;
+      }
+      if (prev[i].durationSec === sec) return prev;
       const updated = [...prev];
       updated[i] = { ...updated[i], durationSec: sec };
       return updated;
@@ -499,12 +517,24 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
     return () => cancelAnimationFrame(animId);
   }, [isOpen, isPaused, visualizerMode, syncAudio]);
 
+  // Sanitize effective duration: Guard against the known WebKit 2x HE-AAC SBR duration doubling bug
+  // (where WebKit miscalculates 24 kHz timescale on audio chunks and reports e.g. 8:19 instead of 4:08)
+  let correctedDurationMs = durationMs;
+  if (activeTrack?.durationSec && activeTrack.durationSec > 0) {
+    const expectedMs = activeTrack.durationSec * 1000;
+    if (durationMs > 0 && durationMs > expectedMs * 1.7 && durationMs < expectedMs * 2.3) {
+      correctedDurationMs = expectedMs;
+    } else if (durationMs <= 0) {
+      correctedDurationMs = expectedMs;
+    }
+  }
+
   const effectiveDuration =
-    durationMs > 0 ? durationMs : activeTrack?.durationSec ? activeTrack.durationSec * 1000 : 0;
-  const canSeek = durationMs > 0; // a guessed duration must not be used for seeking
-  const sliderMaxSec = Math.max(1, (canSeek ? durationMs : effectiveDuration) / 1000);
+    correctedDurationMs > 0 ? correctedDurationMs : activeTrack?.durationSec ? activeTrack.durationSec * 1000 : 0;
+  const canSeek = effectiveDuration > 0;
+  const sliderMaxSec = Math.max(1, (canSeek ? correctedDurationMs : effectiveDuration) / 1000);
   const positionSec = Math.min(positionMs / 1000, sliderMaxSec);
-  const bufferedPercent = durationMs > 0 ? Math.min(100, (bufferedMs / durationMs) * 100) : 0;
+  const bufferedPercent = effectiveDuration > 0 ? Math.min(100, (bufferedMs / effectiveDuration) * 100) : 0;
   const formatTime = (ms: number) => {
     const s = Math.floor(ms / 1000);
     const m = Math.floor(s / 60);
@@ -1055,15 +1085,21 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
                     key={`${line.timeMs}-${idx}`}
                     ref={isActive ? activeLyricRef : null}
                     onClick={() => seek(line.timeMs, true)}
-                    className={`cursor-pointer transition-all duration-300 px-3 py-2 rounded-xl text-center select-none ${isActive
-                        ? 'bg-gradient-to-r from-cyan-500/20 via-purple-500/20 to-pink-500/20 border border-cyan-400/40 text-cyan-300 font-bold text-sm scale-[1.03] shadow-[0_0_16px_rgba(6,182,212,0.3)]'
+                    className={`cursor-pointer transition-all duration-300 px-3.5 py-2.5 rounded-2xl text-center select-none ${isActive
+                        ? 'bg-gradient-to-r from-cyan-500/25 via-fuchsia-500/25 to-pink-500/25 border border-cyan-400/50 text-white font-extrabold text-base scale-[1.04] shadow-[0_0_24px_rgba(6,182,212,0.4)] backdrop-blur-md ring-1 ring-cyan-300/30'
                         : isPastOrCurrent
-                          ? 'text-white/80 text-xs hover:text-white hover:bg-white/5'
-                          : 'text-white/35 text-xs hover:text-white/60 hover:bg-white/5'
+                          ? 'text-white/85 text-sm font-medium hover:text-white hover:bg-white/10'
+                          : 'text-white/75 text-sm font-medium hover:text-white hover:bg-white/10'
                       }`}
                   >
-                    <p className="leading-relaxed">{line.text || '♪'}</p>
-                    <span className="text-[9px] font-mono text-white/20 mt-0.5 block">
+                    <div className="flex items-center justify-center gap-1.5 leading-relaxed">
+                      {isActive && <Sparkles className="w-4 h-4 text-cyan-300 animate-pulse flex-shrink-0" />}
+                      <p className={isActive ? 'text-cyan-100 drop-shadow-[0_1px_8px_rgba(6,182,212,0.6)] font-bold' : ''}>
+                        {line.text || '♪'}
+                      </p>
+                      {isActive && <Sparkles className="w-4 h-4 text-pink-300 animate-pulse flex-shrink-0" />}
+                    </div>
+                    <span className={`text-[10px] font-mono mt-0.5 block ${isActive ? 'text-cyan-300/80' : 'text-white/50'}`}>
                       {formatTime(line.timeMs)}
                     </span>
                   </div>
@@ -1076,7 +1112,7 @@ export const FullWindowMusicPlayer: React.FC<FullWindowMusicPlayerProps> = ({
                 <p className="text-xs font-bold text-white/90 truncate">{activeTrack?.title}</p>
                 <p className="text-[11px] text-cyan-400/70 truncate">{activeTrack?.artist}</p>
               </div>
-              <div className="text-xs text-white/70 leading-relaxed whitespace-pre-line py-2">
+              <div className="text-sm font-medium text-white/80 leading-relaxed whitespace-pre-line py-2">
                 {lyricsData.plainLyrics}
               </div>
             </div>

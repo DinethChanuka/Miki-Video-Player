@@ -281,7 +281,7 @@ export function renderWarpTunnel(
 }
 
 /* ==================================================================== */
-/* 3. Kinetic Holographic Prism (Rotating 3D Polyhedron)                */
+/* 3. Kinetic Holographic Prism (Rotating 3D Polyhedron & Tesseract)   */
 /* ==================================================================== */
 const POLY_VERTICES = [
   [-1, -1, -1],
@@ -303,6 +303,22 @@ const POLY_EDGES = [
   [9, 0], [9, 1], [9, 4], [9, 5],
 ];
 
+const OUTER_FRAME_VERTICES = [
+  [-1.5, -1.5, -1.5],
+  [1.5, -1.5, -1.5],
+  [1.5, 1.5, -1.5],
+  [-1.5, 1.5, -1.5],
+  [-1.5, -1.5, 1.5],
+  [1.5, -1.5, 1.5],
+  [1.5, 1.5, 1.5],
+  [-1.5, 1.5, 1.5],
+];
+const OUTER_FRAME_EDGES = [
+  [0, 1], [1, 2], [2, 3], [3, 0],
+  [4, 5], [5, 6], [6, 7], [7, 4],
+  [0, 4], [1, 5], [2, 6], [3, 7],
+];
+
 export function renderHolographicPrism(
   ctx: CanvasRenderingContext2D,
   width: number,
@@ -317,17 +333,57 @@ export function renderHolographicPrism(
   const centerX = width / 2;
   const centerY = height * 0.52;
   const energy = syncAudio && isPlaying ? getBandEnergy(data, 10, 50) : 0.35 + Math.sin(phase) * 0.15;
-  const scale = (Math.min(width, height) * 0.22) * (1 + energy * 0.3);
+  // Expansive scale framing the central 256px cover flow card
+  const scale = (Math.min(width, height) * 0.54) * (1 + energy * 0.25);
 
-  // Background Ambient Glow
-  const aura = ctx.createRadialGradient(centerX, centerY, 10, centerX, centerY, scale * 2.5);
-  aura.addColorStop(0, `rgba(59, 130, 246, ${0.3 * energy})`);
-  aura.addColorStop(0.5, `rgba(6, 182, 212, ${0.15 * energy})`);
+  // Background Ambient Holographic Aura
+  const aura = ctx.createRadialGradient(centerX, centerY, 20, centerX, centerY, scale * 1.8);
+  aura.addColorStop(0, `rgba(59, 130, 246, ${0.35 * energy})`);
+  aura.addColorStop(0.4, `rgba(168, 85, 247, ${0.18 * energy})`);
+  aura.addColorStop(0.8, `rgba(6, 182, 212, ${0.08 * energy})`);
   aura.addColorStop(1, 'transparent');
   ctx.fillStyle = aura;
   ctx.fillRect(0, 0, width, height);
 
-  // 3D Rotation angles
+  // Concentric Orbital Astrolabe Rings framing the album art
+  const ringRadius1 = scale * 0.88;
+  const ringRadius2 = scale * 1.18;
+
+  // Ring 1 (tilted cyan astrolabe ring)
+  ctx.beginPath();
+  const tiltCos1 = Math.cos(phase * 0.45);
+  const tiltSin1 = Math.sin(phase * 0.45);
+  for (let s = 0; s <= 36; s++) {
+    const ang = (s / 36) * Math.PI * 2;
+    const px0 = Math.cos(ang) * ringRadius1;
+    const py0 = Math.sin(ang) * ringRadius1 * 0.38;
+    const rx = px0 * tiltCos1 - py0 * tiltSin1;
+    const ry = px0 * tiltSin1 + py0 * tiltCos1;
+    if (s === 0) ctx.moveTo(centerX + rx, centerY + ry);
+    else ctx.lineTo(centerX + rx, centerY + ry);
+  }
+  ctx.strokeStyle = 'rgba(6, 182, 212, 0.45)';
+  ctx.lineWidth = 1.8;
+  ctx.stroke();
+
+  // Ring 2 (counter-tilted magenta astrolabe ring)
+  ctx.beginPath();
+  const tiltCos2 = Math.cos(-phase * 0.65);
+  const tiltSin2 = Math.sin(-phase * 0.65);
+  for (let s = 0; s <= 36; s++) {
+    const ang = (s / 36) * Math.PI * 2;
+    const px0 = Math.cos(ang) * ringRadius2;
+    const py0 = Math.sin(ang) * ringRadius2 * 0.42;
+    const rx = px0 * tiltCos2 - py0 * tiltSin2;
+    const ry = px0 * tiltSin2 + py0 * tiltCos2;
+    if (s === 0) ctx.moveTo(centerX + rx, centerY + ry);
+    else ctx.lineTo(centerX + rx, centerY + ry);
+  }
+  ctx.strokeStyle = 'rgba(236, 72, 153, 0.35)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // 3D Rotation angles for core inner polyhedron
   const rotX = phase * 0.6;
   const rotY = phase * 0.9;
   const rotZ = phase * 0.4;
@@ -336,28 +392,24 @@ export function renderHolographicPrism(
   const cosY = Math.cos(rotY), sinY = Math.sin(rotY);
   const cosZ = Math.cos(rotZ), sinZ = Math.sin(rotZ);
 
+  const distance = 2.4;
   const projected: Array<[number, number, number]> = [];
 
   for (const [vx, vy, vz] of POLY_VERTICES) {
-    // Rotate Y
     let x = vx * cosY - vz * sinY;
     let z = vx * sinY + vz * cosY;
-    // Rotate X
     let y = vy * cosX - z * sinX;
     z = vy * sinX + z * cosX;
-    // Rotate Z
     const rx = x * cosZ - y * sinZ;
     const ry = x * sinZ + y * cosZ;
 
-    // Perspective projection
-    const distance = 3.5;
-    const fov = 1 / (distance + z * 0.5);
+    const fov = 1 / (distance + z * 0.4);
     const sx = centerX + rx * scale * fov;
     const sy = centerY + ry * scale * fov;
     projected.push([sx, sy, z]);
   }
 
-  // Draw Edges with Holographic Chromatic Glow
+  // Draw Core Edges with Chromatic Neon Glow
   for (const [i1, i2] of POLY_EDGES) {
     const p1 = projected[i1];
     const p2 = projected[i2];
@@ -366,10 +418,42 @@ export function renderHolographicPrism(
     const edgeGrad = ctx.createLinearGradient(p1[0], p1[1], p2[0], p2[1]);
     edgeGrad.addColorStop(0, '#06b6d4');
     edgeGrad.addColorStop(0.5, '#3b82f6');
-    edgeGrad.addColorStop(1, '#a855f7');
+    edgeGrad.addColorStop(1, '#ec4899');
 
     ctx.strokeStyle = edgeGrad;
-    ctx.lineWidth = 2.0;
+    ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    ctx.moveTo(p1[0], p1[1]);
+    ctx.lineTo(p2[0], p2[1]);
+    ctx.stroke();
+  }
+
+  // Draw Outer Framing Tesseract Cage (Counter-rotating)
+  const oRotX = -phase * 0.4;
+  const oRotY = -phase * 0.55;
+  const oCosX = Math.cos(oRotX), oSinX = Math.sin(oRotX);
+  const oCosY = Math.cos(oRotY), oSinY = Math.sin(oRotY);
+
+  const outerProjected: Array<[number, number, number]> = [];
+  for (const [vx, vy, vz] of OUTER_FRAME_VERTICES) {
+    let x = vx * oCosY - vz * oSinY;
+    let z = vx * oSinY + vz * oCosY;
+    let y = vy * oCosX - z * oSinX;
+    z = vy * oSinX + z * oCosX;
+
+    const fov = 1 / (distance + z * 0.35);
+    const sx = centerX + x * scale * fov;
+    const sy = centerY + y * scale * fov;
+    outerProjected.push([sx, sy, z]);
+  }
+
+  for (const [i1, i2] of OUTER_FRAME_EDGES) {
+    const p1 = outerProjected[i1];
+    const p2 = outerProjected[i2];
+    if (!p1 || !p2) continue;
+
+    ctx.strokeStyle = 'rgba(168, 85, 247, 0.45)';
+    ctx.lineWidth = 1.2;
     ctx.beginPath();
     ctx.moveTo(p1[0], p1[1]);
     ctx.lineTo(p2[0], p2[1]);
@@ -380,7 +464,20 @@ export function renderHolographicPrism(
   for (const [px, py] of projected) {
     ctx.fillStyle = '#ffffff';
     ctx.beginPath();
-    ctx.arc(px, py, 2.5 + energy * 2, 0, Math.PI * 2);
+    ctx.arc(px, py, 3.0 + energy * 2.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Subtle outer halo per vertex
+    ctx.fillStyle = 'rgba(6, 182, 212, 0.6)';
+    ctx.beginPath();
+    ctx.arc(px, py, 6.0 + energy * 4.0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  for (const [px, py] of outerProjected) {
+    ctx.fillStyle = 'rgba(236, 72, 153, 0.85)';
+    ctx.beginPath();
+    ctx.arc(px, py, 2.5 + energy * 1.5, 0, Math.PI * 2);
     ctx.fill();
   }
 }
@@ -552,18 +649,34 @@ export function renderCyberSpectrum(
 
     if (isPlaying) {
       if (syncAudio && data && data.length > 0) {
-        const dataIdx = Math.floor((i / barCount) * (data.length * 0.75));
-        intensity = (data[dataIdx] || 0) / 255;
+        // Perceptual logarithmic mapping across audio bins
+        const logFrac = Math.pow(i / (barCount - 1), 1.45);
+        const maxBin = Math.max(2, Math.floor(data.length * 0.72));
+        const binExact = logFrac * maxBin;
+        const binLow = Math.floor(binExact);
+        const binHigh = Math.min(data.length - 1, binLow + 1);
+        const binFraction = binExact - binLow;
+        const rawVal = (data[binLow] || 0) * (1 - binFraction) + (data[binHigh] || 0) * binFraction;
+
+        // Treble compensation curve so higher frequencies (naturally lower dB) have balanced visual weight
+        const trebleCurve = 1.0 + Math.pow(i / (barCount - 1), 1.2) * 2.8;
+
+        // Dynamic harmonic rhythm pulse: keep high-frequency bars responsive to underlying beat harmonics
+        const subHarmonicIdx = Math.floor((i % 16) * (maxBin / 32));
+        const harmonicEnergy = (data[subHarmonicIdx] || 0) * 0.32;
+
+        intensity = Math.min(1.0, Math.max(0.12, (rawVal * trebleCurve + harmonicEnergy) / 255));
       } else {
         const wave1 = Math.sin(phase * 1.2 + i * 0.18) * 0.5 + 0.5;
-        const wave2 = Math.cos(phase * 0.8 + i * 0.32) * 0.35 + 0.35;
+        const wave2 = Math.cos(phase * 0.8 + i * 0.28) * 0.35 + 0.35;
         intensity = Math.min(1.0, wave1 * 0.65 + wave2 * 0.45);
       }
     }
 
-    const bellCurve = Math.sin((i / barCount) * Math.PI);
+    // Wide acoustic envelope that never zeros out edge bars
+    const envelope = 0.82 + 0.18 * Math.sin((i / (barCount - 1)) * Math.PI);
     const maxBarHeight = height * 0.52;
-    const barHeight = Math.max(6, intensity * bellCurve * maxBarHeight);
+    const barHeight = Math.max(8, intensity * envelope * maxBarHeight);
 
     // Falling peak physics
     spectrumPeaks[i] = Math.max(barHeight, (spectrumPeaks[i] || 0) - 1.4);
