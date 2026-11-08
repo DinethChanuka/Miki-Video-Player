@@ -18,7 +18,6 @@ import { usePlayerGestures } from './hooks/usePlayerGestures';
 import { YouTubePlayer } from './components/player/YouTubePlayer';
 import { WebEmbedPlayer } from './components/player/WebEmbedPlayer';
 import { SubtitleOverlay } from './components/player/SubtitleOverlay';
-import { ApplicationMenu } from './components/hud/ApplicationMenu';
 import { GmailSignInModal } from './components/hud/GmailSignInModal';
 import { FullWindowMusicPlayer } from './components/music/FullWindowMusicPlayer';
 import { PersistentMusicControlHub } from './components/hud/PersistentMusicControlHub';
@@ -690,29 +689,6 @@ export const App: React.FC = () => {
             </div>
           )}
 
-          {/* Application Menu: Google/Gmail Sign-in, Web Streams, Quick Tools */}
-          <ApplicationMenu
-            onOpenGmailSignIn={() => setIsGmailSignInOpen(true)}
-            onOpenLibrary={(tab) => {
-              if (tab) setFileBrowserInitialTab(tab);
-              setIsFileBrowserOpen(true);
-            }}
-            onOpenWebBrowser={(url) => {
-              if (url) setWebBrowserUrl(url);
-              setIsWebBrowserOpen(true);
-            }}
-            onOpenSettings={() => setIsSettingsOpen(true)}
-            onOpenEq={() => setIsEqOpen(true)}
-            onOpenLocalFile={handleOpenLocalFileDialog}
-            onOpenSystemAccess={() => setIsSystemAccessOpen(true)}
-            onOpenGames={(gameId?: string) => {
-              if (gameId) setSelectedGameId(gameId);
-              setIsGamesOpen(true);
-            }}
-            onOpenMusic={() => setMusicPlayerOpen(true)}
-            onOpenChannels={() => setIsChannelsOpen(true)}
-          />
-
           {currentUri && (
             <div className="flex items-center gap-2">
               <img
@@ -749,27 +725,7 @@ export const App: React.FC = () => {
             <span className="text-[10px] hidden sm:inline">100%</span>
           </div>
 
-          {/* Logged User Profile (Suriya Sharma) */}
-          <div
-            className="flex items-center gap-2 pl-1 pr-2.5 py-1 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-colors cursor-pointer select-none"
-            title="Logged in as Suriya Sharma • Online"
-            onClick={() => setIsSettingsOpen(true)}
-          >
-            <div className="relative">
-              <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-cyan-500 to-purple-600 flex items-center justify-center text-[10px] font-extrabold text-white shadow-sm">
-                SS
-              </div>
-              <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 border border-[#07090e]" />
-            </div>
-            <div className="hidden md:flex flex-col text-left">
-              <span className="text-xs font-semibold text-white/95 leading-none">
-                Suriya Sharma
-              </span>
-              <span className="text-[9px] text-emerald-400 font-mono leading-none mt-0.5">
-                Online
-              </span>
-            </div>
-          </div>
+          {/* Authoritative user-profile & avatar are rendered in HomeDashboardView.tsx to eliminate duplicate user accounts */}
 
           {/* Custom Window Controls (Pure Undecorated Frame) */}
           <div className="flex items-center gap-1 ml-0.5 pl-2 border-l border-white/10">
@@ -1128,6 +1084,13 @@ export const App: React.FC = () => {
                 const input = document.getElementById("miki-main-file-input");
                 input?.click();
               }}
+              onOpenGmailSignIn={() => setIsGmailSignInOpen(true)}
+              onOpenLibrary={(tab) => {
+                if (tab) setFileBrowserInitialTab(tab);
+                setIsFileBrowserOpen(true);
+              }}
+              onOpenSystemAccess={() => setIsSystemAccessOpen(true)}
+              onOpenChannels={() => setIsChannelsOpen(true)}
             />
             {/* Hidden file input for native file select dialog */}
             <input

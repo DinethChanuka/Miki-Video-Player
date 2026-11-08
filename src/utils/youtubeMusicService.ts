@@ -4,6 +4,8 @@
  * artist/channel attribution, and high-resolution album artwork.
  */
 
+import { warmYouTubeAudioBatch } from './youtubePrefetch.ts';
+
 export interface YouTubeMusicTrack {
   id: string;
   youtubeId: string;
@@ -240,8 +242,55 @@ function searchViaNativeBridge(cleanQuery: string): Promise<YouTubeMusicTrack[] 
   });
 }
 
+/** Fetches a JSON array of tracks from a local search endpoint. Never throws. */
+async function fetchTracksFrom(url: string, timeoutMs: number): Promise<YouTubeMusicTrack[] | null> {
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return Array.isArray(data) && data.length > 0 ? (data as YouTubeMusicTrack[]) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Resolves with the first source that returns tracks; null only when every source failed. */
+function firstWithResults(
+  sources: Array<Promise<YouTubeMusicTrack[] | null>>
+): Promise<YouTubeMusicTrack[] | null> {
+  return new Promise((resolve) => {
+    let pending = sources.length;
+    if (pending === 0) {
+      resolve(null);
+      return;
+    }
+    const settleEmpty = () => {
+      pending -= 1;
+      if (pending === 0) resolve(null);
+    };
+    for (const source of sources) {
+      source
+        .then((tracks) => {
+          if (tracks && tracks.length > 0) resolve(tracks);
+          else settleEmpty();
+        })
+        .catch(settleEmpty);
+    }
+  });
+}
+
+function rememberAndWarm(cacheKey: string, tracks: YouTubeMusicTrack[]): YouTubeMusicTrack[] {
+  YT_SEARCH_CACHE.set(cacheKey, tracks);
+  // Resolve the first results on the server now, so pressing play starts at once.
+  warmYouTubeAudioBatch(tracks.map((t) => t.youtubeId), 3);
+  return tracks;
+}
+
 /**
  * Searches live YouTube Music tracks with authentic duration, video IDs, and high-res art.
+ *
+ * All local sources are asked at the same time and the first one with results wins,
+ * instead of waiting for each one to time out in turn.
  */
 export async function searchYouTubeMusicLive(query: string): Promise<YouTubeMusicTrack[]> {
   const clean = query.trim();
@@ -252,48 +301,43 @@ export async function searchYouTubeMusicLive(query: string): Promise<YouTubeMusi
     return YT_SEARCH_CACHE.get(cacheKey)!;
   }
 
-  // 1. Check curated offline catalog matches first for instant response
+  // 1. Curated catalog matches first for an instant response
   const normalized = clean.toLowerCase().replace(/[^a-z0-9]/g, '');
   for (const [key, tracks] of Object.entries(CURATED_YOUTUBE_TRACKS)) {
     if (normalized.includes(key) || key.includes(normalized)) {
-      YT_SEARCH_CACHE.set(cacheKey, tracks);
-      return tracks;
+      return rememberAndWarm(cacheKey, tracks);
     }
   }
 
-  // 2. Query native desktop LocalAppServer endpoint (zero CORS restrictions, ultra fast)
-  try {
-    const localRes = await fetch(`http://127.0.0.1:39281/api/search-youtube?q=${encodeURIComponent(clean)}`, {
-      signal: AbortSignal.timeout(6000),
-    });
-    if (localRes.ok) {
-      const localData = await localRes.json();
-      if (Array.isArray(localData) && localData.length > 0) {
-        YT_SEARCH_CACHE.set(cacheKey, localData);
-        return localData;
-      }
-    }
-  } catch {
-    // Fall back to native bridge IPC
+  // 2. Same-origin dev server, native LocalAppServer and the macOS bridge, all at once
+  const encoded = encodeURIComponent(clean);
+  const sources: Array<Promise<YouTubeMusicTrack[] | null>> = [];
+  const origin =
+    typeof window !== 'undefined' && window.location?.origin?.startsWith('http') ? window.location.origin : '';
+  if (origin) {
+    sources.push(fetchTracksFrom(`${origin}/api/search-youtube?q=${encoded}`, 6000));
+  }
+  if (origin !== 'http://127.0.0.1:39281') {
+    sources.push(fetchTracksFrom(`http://127.0.0.1:39281/api/search-youtube?q=${encoded}`, 6000));
+  }
+  sources.push(searchViaNativeBridge(clean));
+
+  const fromLocal = await firstWithResults(sources);
+  if (fromLocal) {
+    return rememberAndWarm(cacheKey, fromLocal);
   }
 
-  // 3. Try native macOS desktop URLSession IPC (zero CORS restrictions)
-  const nativeResults = await searchViaNativeBridge(clean);
-  if (nativeResults && nativeResults.length > 0) {
-    YT_SEARCH_CACHE.set(cacheKey, nativeResults);
-    return nativeResults;
-  }
-
-  // 3. Fallback to direct web fetch (works in environments where CORS is disabled or proxied)
+  // 3. Direct web fetch (works in environments where CORS is disabled or proxied)
   try {
     const res = await fetch('https://www.youtube.com/youtubei/v1/search', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(6000),
       body: JSON.stringify({
         context: {
           client: {
             clientName: 'WEB',
-            clientVersion: '2.20240101.01.00',
+            clientVersion: '2.20250801.00.00',
             hl: 'en',
           },
         },
@@ -303,17 +347,21 @@ export async function searchYouTubeMusicLive(query: string): Promise<YouTubeMusi
 
     if (res.ok) {
       const data = await res.json();
-      const contents =
-        data?.contents?.twoColumnSearchResultsRenderer?.primaryContents
-          ?.sectionListRenderer?.contents?.[0]?.itemSectionRenderer?.contents || [];
+      const sections: any[] =
+        data?.contents?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer?.contents || [];
 
       const tracks: YouTubeMusicTrack[] = [];
-      for (const item of contents) {
-        const v = item.videoRenderer;
-        if (v && v.videoId) {
+      const seen = new Set<string>();
+      for (const section of sections) {
+        for (const item of section?.itemSectionRenderer?.contents || []) {
+          const v = item?.videoRenderer;
+          if (!v || !v.videoId || seen.has(v.videoId)) continue;
+          const durationStr = v.lengthText?.simpleText;
+          if (!durationStr) continue; // skip live streams
+          seen.add(v.videoId);
+
           const rawTitle = v.title?.runs?.[0]?.text || `${clean} Song`;
           const rawArtist = v.ownerText?.runs?.[0]?.text || 'Official Artist';
-          const durationStr = v.lengthText?.simpleText || '3:45';
           const durationSec = parseDurationText(durationStr);
 
           // Clean title of unnecessary clutter
@@ -340,36 +388,20 @@ export async function searchYouTubeMusicLive(query: string): Promise<YouTubeMusi
 
           if (tracks.length >= 10) break;
         }
+        if (tracks.length >= 10) break;
       }
 
       if (tracks.length > 0) {
-        YT_SEARCH_CACHE.set(cacheKey, tracks);
-        return tracks;
+        return rememberAndWarm(cacheKey, tracks);
       }
     }
   } catch {
     // Network / CORS fallback
   }
 
-  // 4. Fallback track synthesis with guaranteed verified full-track audio
-  const fallbackVideoId = 'H2f7MZaw3Yo';
-  const fallbackMatch: YouTubeMusicTrack[] = [
-    {
-      id: `yt-gen-${encodeURIComponent(clean)}`,
-      youtubeId: fallbackVideoId,
-      title: `${clean} (Full Audio Track)`,
-      artist: 'Official Music',
-      duration: '4:26',
-      durationSec: 266,
-      coverUrl: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&auto=format&fit=crop&q=80',
-      streamUrl: `https://www.youtube.com/watch?v=${fallbackVideoId}`,
-      platform: 'youtube',
-      genre: 'YouTube Music',
-      badge: 'YouTube Music Full Track',
-    },
-  ];
-
-  YT_SEARCH_CACHE.set(cacheKey, fallbackMatch);
-  return fallbackMatch;
+  // 4. Nothing found. The old code returned a made-up track that always played the same
+  //    unrelated song under the searched title. Returning an empty list lets the caller
+  //    fall back to the built-in catalog instead. Empty results are not cached, so the
+  //    next attempt retries the network.
+  return [];
 }
-

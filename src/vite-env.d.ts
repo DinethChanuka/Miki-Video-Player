@@ -41,6 +41,7 @@ declare module 'lucide-react' {
   export const Search: LucideIcon;
   export const Camera: LucideIcon;
   export const Repeat: LucideIcon;
+  export const Repeat1: LucideIcon;
   export const Tv: LucideIcon;
   export const Tv2: LucideIcon;
   export const Clapperboard: LucideIcon;
