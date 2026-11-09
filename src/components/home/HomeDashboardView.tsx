@@ -17,7 +17,6 @@ import {
   MusicTrack,
   MusicPlatform,
 } from '../../utils/musicDiscoveryService';
-import { getRecommendedTracks } from '../../utils/musicRecommendationEngine';
 import { ApplicationMenu } from '../hud/ApplicationMenu';
 import {
   Film,
@@ -792,7 +791,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
   const [cinesubzList, setCinesubzList] = useState<CineSubzMovie[]>(CINESUBZ_MOVIES);
   const [cinesubzTvList, setCinesubzTvList] = useState<CineSubzTvShow[]>(CINESUBZ_TV_SHOWS);
   const [selectedMusicCategory, setSelectedMusicCategory] = useState<string>('all');
-  const [selectedMusicPlatform, setSelectedMusicPlatform] = useState<MusicPlatform | 'all'>('youtube');
+  const [selectedMusicPlatform] = useState<MusicPlatform | 'all'>('youtube');
   const [musicDiscoveryList, setMusicDiscoveryList] = useState<MusicTrack[]>(() =>
     [...MUSIC_DISCOVERY_CATALOG].sort(() => Math.random() - 0.5)
   );
@@ -866,6 +865,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
   const [groovvySubTab, setGroovvySubTab] = useState<'music' | 'podcast' | 'live'>('music');
   const [groovvySearch, setGroovvySearch] = useState('');
   const [isHeroLiked, setIsHeroLiked] = useState(false);
+  const [showAllMusicResults, setShowAllMusicResults] = useState(false);
 
   const formatGroovvyTime = (sec: number) => {
     if (isNaN(sec) || sec < 0) return '0:00';
@@ -880,10 +880,6 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
     const randomCat = categories[Math.floor(Math.random() * categories.length)];
     setSelectedMusicCategory(randomCat);
   };
-
-  const recommendedTracks = useMemo(() => {
-    return getRecommendedTracks(musicDiscoveryList, recentMedia, currentUri, 6);
-  }, [musicDiscoveryList, recentMedia, currentUri]);
 
   const activeAlbum = COVER_FLOW_ALBUMS[activeAlbumIdx] || COVER_FLOW_ALBUMS[0];
 
@@ -1179,6 +1175,14 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
     return filteredMusicTracks.slice(start, start + MUSIC_PAGE_SIZE);
   }, [filteredMusicTracks, musicCurrentPage]);
 
+  const isMusicSearchOrFilterActive = useMemo(() => {
+    return (
+      searchQuery.trim().length > 0 ||
+      groovvySearch.trim().length > 0 ||
+      selectedMusicCategory !== 'all'
+    );
+  }, [searchQuery, groovvySearch, selectedMusicCategory]);
+
   // Filtered Radio Garden & Worldwide Live Stations
   const filteredRadioStations = useMemo<RadioGardenStation[]>(() => {
     const gardenStations = searchRadioGardenStations(searchQuery, radioFilterGenre);
@@ -1222,6 +1226,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
     const track = COVER_FLOW_ALBUMS[idx];
     if (track) {
       openMedia(track.url, `${track.title} - ${track.artist}`, true, 0, track.albumArt, 'music');
+      setMusicPlayerOpen(false);
     }
   };
 
@@ -2310,7 +2315,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
             </div>
           ) : effectiveSection === 'music' ? (
             <div className="flex flex-col gap-8 items-center w-full max-w-6xl pt-2 pb-12 animate-in fade-in duration-300">
-              {/* Groovvy 3D Perspective Music Studio */}
+              {/* Groovvy 3D Perspective Music Studio with COVER_FLOW_ALBUMS */}
               {/* Groovvy Sub-Navigation Bar */}
               <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-4 pb-2 border-b border-white/5">
                 <div className="flex items-center gap-6">
@@ -2366,8 +2371,10 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
               >
                 {/* Left Content */}
                 <div className="flex flex-col items-start z-10 max-w-xl">
-                  <span className="text-[11px] font-bold uppercase tracking-widest text-white/50 mb-2">
-                    Trending New Hits
+                  <span className="text-[11px] font-bold uppercase tracking-widest text-white/50 mb-2 flex items-center gap-2">
+                    <span>Groovvy 3D Sound Lounge</span>
+                    <span className="text-white/30">•</span>
+                    <span>Trending New Hits</span>
                   </span>
                   <h1 className="text-3xl sm:text-5xl font-black text-white tracking-tight leading-none mb-3 drop-shadow-md">
                     In My Feelings
@@ -2389,6 +2396,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                           'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=600&q=80',
                           'music'
                         );
+                        setMusicPlayerOpen(false);
                       }}
                       className="px-6 py-2.5 rounded-full bg-[#4361ee] hover:bg-[#3b52d4] active:scale-95 text-white font-bold text-xs tracking-wider uppercase transition-all shadow-xl shadow-blue-600/30 cursor-pointer flex items-center gap-2"
                     >
@@ -2430,7 +2438,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                   </h3>
                   <button
                     onClick={() => {
-                      if (onOpenMusic) onOpenMusic();
+                      setShowAllMusicResults(true);
                     }}
                     className="text-xs font-semibold text-white/40 hover:text-white transition-colors cursor-pointer"
                   >
@@ -2445,11 +2453,13 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                       key={artist.id}
                       onClick={() => {
                         setSearchQuery(artist.name);
+                        setGroovvySearch(artist.name);
                         const matched = musicDiscoveryList.find((m) =>
                           m.artist.toLowerCase().includes(artist.name.toLowerCase())
                         );
                         if (matched) {
                           openMedia(matched.streamUrl || matched.pageUrl, `${matched.title} - ${matched.artist}`, true, 0, matched.coverUrl, 'music');
+                          setMusicPlayerOpen(false);
                         }
                       }}
                       className="group flex flex-col items-center p-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 min-w-[130px] sm:min-w-[140px] cursor-pointer hover:-translate-y-1 transition-all shadow-lg select-none"
@@ -2477,110 +2487,340 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full items-start">
                 {/* Left Column (col-span-7) */}
                 <div className="lg:col-span-7 flex flex-col gap-6 w-full">
-                  {/* Genres Section */}
-                  <div className="w-full flex flex-col gap-3">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-base font-extrabold text-white tracking-wide">
-                        Genres
-                      </h3>
-                      <button
-                        onClick={() => setSelectedMusicCategory('all')}
-                        className="text-xs font-semibold text-white/40 hover:text-white transition-colors cursor-pointer"
-                      >
-                        See all
-                      </button>
-                    </div>
-
-                    {/* 2 x 3 Colored Genre Cards */}
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                      {GROOVVY_GENRES.map((genre) => (
-                        <div
-                          key={genre.id}
-                          onClick={() => {
-                            setSelectedMusicCategory(
-                              genre.id === 'dance-beat' ? 'phonk' :
-                              genre.id === 'electro-pop' ? 'lo-fi' :
-                              genre.id === 'alt-indie' ? 'english' :
-                              genre.id === 'hip-hop' ? 'hindi' :
-                              genre.id === 'classical' ? 'romantic' : 'all'
-                            );
-                          }}
-                          className={`${genre.bgClass} ${genre.borderClass} border rounded-2xl p-4 flex items-center justify-center text-center cursor-pointer hover:scale-[1.03] transition-all shadow-md group`}
-                        >
-                          <span className={`text-xs font-bold tracking-wide ${genre.textClass}`}>
-                            {genre.name}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Top Charts Section */}
-                  <div className="w-full flex flex-col gap-3">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-base font-extrabold text-white tracking-wide">
-                        Top Charts
-                      </h3>
-                      <button
-                        onClick={() => {
-                          if (onOpenMusic) onOpenMusic();
-                        }}
-                        className="text-xs font-semibold text-white/40 hover:text-white transition-colors cursor-pointer"
-                      >
-                        See all
-                      </button>
-                    </div>
-
-                    {/* Ranked Tracks List */}
-                    <div className="flex flex-col gap-2">
-                      {GROOVVY_TOP_CHARTS.map((track) => (
-                        <div
-                          key={track.id}
-                          onClick={() => {
-                            openMedia(track.url, `${track.title} - ${track.artist}`, true, 0, track.cover, 'music');
-                          }}
-                          className="flex items-center justify-between p-2.5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/15 transition-all cursor-pointer group"
-                        >
-                          <div className="flex items-center gap-3.5 min-w-0">
-                            <span className="text-xs font-black text-white/40 group-hover:text-[#4361ee] transition-colors w-6 text-center">
-                              {track.rank}
-                            </span>
-                            <div className="w-10 h-10 rounded-xl overflow-hidden bg-black/60 shrink-0 border border-white/10 shadow-sm">
-                              <img
-                                src={track.cover}
-                                alt={track.title}
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
-                            <div className="flex flex-col min-w-0">
-                              <span className="text-xs font-bold text-white group-hover:text-blue-300 transition-colors truncate">
-                                {track.title}
-                              </span>
-                              <span className="text-[11px] text-white/50 truncate">
-                                {track.artist}
-                              </span>
-                            </div>
+                  {isMusicSearchOrFilterActive || showAllMusicResults ? (
+                    /* Sound Lounge Discovery & Search Results Table */
+                    <div className="w-full flex flex-col gap-3">
+                      <div className="flex items-center justify-between pb-1 border-b border-white/5">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-cyan-600 via-purple-600 to-pink-500 flex items-center justify-center text-white shadow-md">
+                            <Sparkles className="w-3.5 h-3.5" />
                           </div>
+                          <div>
+                            <h3 className="text-sm font-bold text-white tracking-wide uppercase flex items-center gap-2">
+                              <span>Sound Lounge Results</span>
+                              <span className="text-[10px] font-normal normal-case px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                                {filteredMusicTracks.length} Songs
+                              </span>
+                            </h3>
+                          </div>
+                        </div>
 
-                          <div className="flex items-center gap-3 shrink-0">
-                            <div className="flex items-center gap-1 text-xs font-mono text-white/40">
-                              <Headphones className="w-3 h-3 text-white/30" />
-                              <span>{track.duration}</span>
-                            </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={handleShuffleDiscovery}
+                            title="Shuffle Discovery"
+                            className="px-2.5 py-1 rounded-xl bg-white/10 hover:bg-white/15 text-white/80 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                          >
+                            <Shuffle className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">Shuffle Discovery</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              setIsRefreshingMusic(true);
+                              fetchLiveMusicDiscovery()
+                                .then((tracks) => {
+                                  if (tracks && tracks.length > 0) setMusicDiscoveryList(tracks);
+                                })
+                                .finally(() => setTimeout(() => setIsRefreshingMusic(false), 600));
+                            }}
+                            className="px-2.5 py-1 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                            title="Live Catalog Sync"
+                          >
+                            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingMusic ? 'animate-spin' : ''}`} />
+                            <span className="hidden sm:inline">Sync</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              setSearchQuery('');
+                              setGroovvySearch('');
+                              setSelectedMusicCategory('all');
+                              setShowAllMusicResults(false);
+                            }}
+                            className="px-2.5 py-1 rounded-xl bg-white/5 hover:bg-white/10 text-white/60 hover:text-white text-xs transition-colors cursor-pointer"
+                          >
+                            Reset
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Track List */}
+                      {filteredMusicTracks.length === 0 ? (
+                        <div className="p-8 rounded-2xl bg-white/5 border border-white/5 text-center flex flex-col items-center gap-2 my-2">
+                          <Music className="w-8 h-8 text-white/30" />
+                          <p className="text-xs text-white/60">No songs found matching your search</p>
+                          <button
+                            onClick={() => {
+                              setSearchQuery('');
+                              setGroovvySearch('');
+                              setSelectedMusicCategory('all');
+                              setShowAllMusicResults(false);
+                            }}
+                            className="text-xs text-[#4361ee] hover:underline cursor-pointer"
+                          >
+                            Reset Search
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col gap-2 max-h-[520px] overflow-y-auto pr-1 scrollbar-thin">
+                          {paginatedMusicTracks.map((track, idx) => {
+                            const trackIndex = (musicCurrentPage - 1) * MUSIC_PAGE_SIZE + idx + 1;
+                            const isCurrentTrack =
+                              currentTitle === `${track.title} - ${track.artist}` ||
+                              currentTitle === track.title;
+                            return (
+                              <div
+                                key={track.id || `${track.title}-${idx}`}
+                                onClick={() => {
+                                  if (isCurrentTrack) {
+                                    togglePlay();
+                                  } else {
+                                    openMedia(
+                                      track.streamUrl || track.pageUrl,
+                                      `${track.title} - ${track.artist}`,
+                                      true,
+                                      0,
+                                      track.coverUrl,
+                                      'music'
+                                    );
+                                    setMusicPlayerOpen(false);
+                                  }
+                                }}
+                                className={`flex items-center justify-between p-2.5 rounded-2xl border transition-all cursor-pointer group ${
+                                  isCurrentTrack
+                                    ? 'bg-blue-500/15 border-blue-500/30 shadow-lg shadow-blue-500/10'
+                                    : 'bg-white/5 hover:bg-white/10 border-white/5 hover:border-white/15'
+                                }`}
+                              >
+                                <div className="flex items-center gap-3.5 min-w-0">
+                                  <span
+                                    className={`text-xs font-black w-6 text-center shrink-0 ${
+                                      isCurrentTrack
+                                        ? 'text-[#4361ee]'
+                                        : 'text-white/40 group-hover:text-[#4361ee]'
+                                    }`}
+                                  >
+                                    {trackIndex < 10 ? `0${trackIndex}` : trackIndex}
+                                  </span>
+                                  <div className="w-10 h-10 rounded-xl overflow-hidden bg-black/60 shrink-0 border border-white/10 shadow-sm relative">
+                                    <img
+                                      src={track.coverUrl}
+                                      alt={track.title}
+                                      className="w-full h-full object-cover"
+                                      loading="lazy"
+                                    />
+                                    {isCurrentTrack && !isPaused && (
+                                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                                        <div className="w-2 h-2 rounded-full bg-[#4361ee] animate-ping" />
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="flex flex-col min-w-0">
+                                    <span
+                                      className={`text-xs font-bold truncate ${
+                                        isCurrentTrack
+                                          ? 'text-blue-300'
+                                          : 'text-white group-hover:text-blue-300'
+                                      }`}
+                                    >
+                                      {track.title}
+                                    </span>
+                                    <span className="text-[11px] text-white/50 truncate">
+                                      {track.artist}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-3 shrink-0">
+                                  <div className="flex items-center gap-1 text-xs font-mono text-white/40">
+                                    <Headphones className="w-3 h-3 text-white/30" />
+                                    <span>{track.duration || '3:45'}</span>
+                                  </div>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (isCurrentTrack) {
+                                        togglePlay();
+                                      } else {
+                                        openMedia(
+                                          track.streamUrl || track.pageUrl,
+                                          `${track.title} - ${track.artist}`,
+                                          true,
+                                          0,
+                                          track.coverUrl,
+                                          'music'
+                                        );
+                                        setMusicPlayerOpen(false);
+                                      }
+                                    }}
+                                    className={`p-2 rounded-xl text-white transition-colors shadow-sm cursor-pointer ${
+                                      isCurrentTrack
+                                        ? 'bg-[#4361ee]'
+                                        : 'bg-white/10 group-hover:bg-[#4361ee]'
+                                    }`}
+                                  >
+                                    {isCurrentTrack && !isPaused ? (
+                                      <Pause className="w-3.5 h-3.5 fill-current" />
+                                    ) : (
+                                      <Play className="w-3.5 h-3.5 fill-current" />
+                                    )}
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* Chunked Streaming Pagination Controls */}
+                      {filteredMusicTracks.length > MUSIC_PAGE_SIZE && (
+                        <div className="flex items-center justify-between pt-2 border-t border-white/5 mt-1">
+                          <span className="text-[11px] font-mono text-white/40">
+                            Showing {(musicCurrentPage - 1) * MUSIC_PAGE_SIZE + 1} -{' '}
+                            {Math.min(filteredMusicTracks.length, musicCurrentPage * MUSIC_PAGE_SIZE)} of{' '}
+                            {filteredMusicTracks.length} Songs (Chunked Streaming)
+                          </span>
+                          <div className="flex items-center gap-1.5">
                             <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openMedia(track.url, `${track.title} - ${track.artist}`, true, 0, track.cover, 'music');
-                              }}
-                              className="p-2 rounded-xl bg-white/10 group-hover:bg-[#4361ee] text-white transition-colors shadow-sm"
+                              onClick={() => setMusicCurrentPage((p) => Math.max(1, p - 1))}
+                              disabled={musicCurrentPage <= 1}
+                              className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-xs text-white/70 disabled:opacity-30 disabled:pointer-events-none transition-all flex items-center gap-1 cursor-pointer"
                             >
-                              <Play className="w-3.5 h-3.5 fill-current" />
+                              <ChevronLeft className="w-3.5 h-3.5" />
+                              <span>Previous</span>
+                            </button>
+                            <span className="text-xs font-mono text-white/50 px-1">
+                              Chunk {musicCurrentPage} of {musicTotalPages}
+                            </span>
+                            <button
+                              onClick={() => setMusicCurrentPage((p) => Math.min(musicTotalPages, p + 1))}
+                              disabled={musicCurrentPage >= musicTotalPages}
+                              className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-xs text-white/70 disabled:opacity-30 disabled:pointer-events-none transition-all flex items-center gap-1 cursor-pointer"
+                            >
+                              <span>Next</span>
+                              <ChevronRight className="w-3.5 h-3.5" />
                             </button>
                           </div>
                         </div>
-                      ))}
+                      )}
                     </div>
-                  </div>
+                  ) : (
+                    <>
+                      {/* Genres Section */}
+                      <div className="w-full flex flex-col gap-3">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-base font-extrabold text-white tracking-wide">
+                            Genres
+                          </h3>
+                          <button
+                            onClick={() => setShowAllMusicResults(true)}
+                            className="text-xs font-semibold text-white/40 hover:text-white transition-colors cursor-pointer"
+                          >
+                            See all
+                          </button>
+                        </div>
+
+                        {/* 2 x 3 Colored Genre Cards */}
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                          {GROOVVY_GENRES.map((genre) => (
+                            <div
+                              key={genre.id}
+                              onClick={() => {
+                                setSelectedMusicCategory(
+                                  genre.id === 'dance-beat' ? 'phonk' :
+                                  genre.id === 'electro-pop' ? 'lo-fi' :
+                                  genre.id === 'alt-indie' ? 'english' :
+                                  genre.id === 'hip-hop' ? 'hindi' :
+                                  genre.id === 'classical' ? 'romantic' : 'all'
+                                );
+                              }}
+                              className={`${genre.bgClass} ${genre.borderClass} border rounded-2xl p-4 flex items-center justify-center text-center cursor-pointer hover:scale-[1.03] transition-all shadow-md group`}
+                            >
+                              <span className={`text-xs font-bold tracking-wide ${genre.textClass}`}>
+                                {genre.name}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Top Charts Section */}
+                      <div className="w-full flex flex-col gap-3">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-base font-extrabold text-white tracking-wide">
+                            Top Charts
+                          </h3>
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={handleShuffleDiscovery}
+                              title="Shuffle Discovery"
+                              className="text-xs font-semibold text-white/40 hover:text-white transition-colors cursor-pointer flex items-center gap-1"
+                            >
+                              <Shuffle className="w-3 h-3" />
+                              <span>Shuffle</span>
+                            </button>
+                            <button
+                              onClick={() => setShowAllMusicResults(true)}
+                              className="text-xs font-semibold text-white/40 hover:text-white transition-colors cursor-pointer"
+                            >
+                              See all
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Ranked Tracks List */}
+                        <div className="flex flex-col gap-2">
+                          {GROOVVY_TOP_CHARTS.map((track) => (
+                            <div
+                              key={track.id}
+                              onClick={() => {
+                                openMedia(track.url, `${track.title} - ${track.artist}`, true, 0, track.cover, 'music');
+                                setMusicPlayerOpen(false);
+                              }}
+                              className="flex items-center justify-between p-2.5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/15 transition-all cursor-pointer group"
+                            >
+                              <div className="flex items-center gap-3.5 min-w-0">
+                                <span className="text-xs font-black text-white/40 group-hover:text-[#4361ee] transition-colors w-6 text-center">
+                                  {track.rank}
+                                </span>
+                                <div className="w-10 h-10 rounded-xl overflow-hidden bg-black/60 shrink-0 border border-white/10 shadow-sm">
+                                  <img
+                                    src={track.cover}
+                                    alt={track.title}
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
+                                <div className="flex flex-col min-w-0">
+                                  <span className="text-xs font-bold text-white group-hover:text-blue-300 transition-colors truncate">
+                                    {track.title}
+                                  </span>
+                                  <span className="text-[11px] text-white/50 truncate">
+                                    {track.artist}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-3 shrink-0">
+                                <div className="flex items-center gap-1 text-xs font-mono text-white/40">
+                                  <Headphones className="w-3 h-3 text-white/30" />
+                                  <span>{track.duration}</span>
+                                </div>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openMedia(track.url, `${track.title} - ${track.artist}`, true, 0, track.cover, 'music');
+                                    setMusicPlayerOpen(false);
+                                  }}
+                                  className="p-2 rounded-xl bg-white/10 group-hover:bg-[#4361ee] text-white transition-colors shadow-sm"
+                                >
+                                  <Play className="w-3.5 h-3.5 fill-current" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 {/* Right Column (col-span-5): Dedicated Player Card (Image 2) */}
@@ -2684,15 +2924,16 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                       <button
                         onClick={handleShuffleDiscovery}
                         className="p-1.5 hover:text-white/80 transition-colors cursor-pointer"
-                        title="Shuffle"
+                        title="Shuffle Discovery"
                       >
                         <Shuffle className="w-4 h-4" />
                       </button>
 
                       <button
-                        onClick={() =>
-                          handlePlayAlbum((activeAlbumIdx - 1 + COVER_FLOW_ALBUMS.length) % COVER_FLOW_ALBUMS.length)
-                        }
+                        onClick={() => {
+                          handlePlayAlbum((activeAlbumIdx - 1 + COVER_FLOW_ALBUMS.length) % COVER_FLOW_ALBUMS.length);
+                          setMusicPlayerOpen(false);
+                        }}
                         className="p-1.5 hover:text-white/80 transition-colors cursor-pointer"
                         title="Previous"
                       >
@@ -2712,8 +2953,10 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                               previouslyPlayed.thumbnailUri,
                               'music'
                             );
+                            setMusicPlayerOpen(false);
                           } else {
                             handlePlayAlbum(activeAlbumIdx);
+                            setMusicPlayerOpen(false);
                           }
                         }}
                         className="p-3 rounded-full bg-white text-[#4361ee] shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer"
@@ -2729,9 +2972,10 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                       </button>
 
                       <button
-                        onClick={() =>
-                          handlePlayAlbum((activeAlbumIdx + 1) % COVER_FLOW_ALBUMS.length)
-                        }
+                        onClick={() => {
+                          handlePlayAlbum((activeAlbumIdx + 1) % COVER_FLOW_ALBUMS.length);
+                          setMusicPlayerOpen(false);
+                        }}
                         className="p-1.5 hover:text-white/80 transition-colors cursor-pointer"
                         title="Next"
                       >
@@ -2761,372 +3005,6 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                     </button>
                   </div>
                 </div>
-              </div>
-
-              {/* Sound Lounge Discovery & Live Search */}
-              <div className="w-full max-w-5xl flex flex-col gap-5 mt-2">
-                {/* In-Section Live Music Search Bar */}
-                <div className="relative w-full">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Live search songs, artists & soundscapes..."
-                    className="w-full pl-11 pr-24 py-3 rounded-2xl bg-white/5 border border-white/10 text-xs text-white placeholder-white/40 focus:outline-none focus:border-cyan-500/60 focus:bg-white/10 transition-all font-medium"
-                  />
-                  {searchQuery && (
-                    <button
-                      onClick={() => setSearchQuery('')}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-lg bg-white/10 text-[10px] text-white/70 hover:text-white hover:bg-white/20 transition-all cursor-pointer"
-                    >
-                      Clear
-                    </button>
-                  )}
-                </div>
-
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-cyan-600 via-purple-600 to-pink-500 flex items-center justify-center text-white shadow-lg shadow-cyan-500/20">
-                      <Sparkles className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-bold text-white tracking-wide uppercase flex items-center gap-2">
-                        Sound Lounge
-                        <span className="text-[10px] font-normal normal-case px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
-                          {filteredMusicTracks.length} Songs
-                        </span>
-                      </h3>
-                      <p className="text-[11px] text-white/50">
-                        Lossless Studio Soundscapes & Spatial Discovery
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Category Filter Buttons & Shuffle */}
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <button
-                      onClick={handleShuffleDiscovery}
-                      className="px-3 py-1 rounded-xl text-xs font-semibold bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 transition-all cursor-pointer flex items-center gap-1.5 shadow-sm active:scale-95"
-                      title="Shuffle & Discover Random Tracks"
-                    >
-                      <Shuffle className="w-3.5 h-3.5 text-purple-400" />
-                      <span>Shuffle Discovery</span>
-                    </button>
-
-                    {[
-                      { id: 'all', label: 'All Songs', color: 'bg-rose-500' },
-                      { id: 'romantic', label: 'Romantic', color: 'bg-pink-400' },
-                      { id: 'hindi', label: 'Hindi', color: 'bg-amber-400' },
-                      { id: 'english', label: 'English', color: 'bg-cyan-400' },
-                      { id: 'sinhala', label: 'Sinhala', color: 'bg-emerald-400' },
-                      { id: 'phonk', label: 'Phonk', color: 'bg-purple-500' },
-                      { id: 'lo-fi', label: 'Lo-Fi', color: 'bg-indigo-400' },
-                    ].map((p) => {
-                      const isActive = selectedMusicCategory === p.id;
-                      return (
-                        <button
-                          key={p.id}
-                          onClick={() => setSelectedMusicCategory(p.id)}
-                          className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
-                            isActive
-                              ? 'bg-gradient-to-r from-cyan-600 to-purple-600 text-white font-bold shadow-md shadow-cyan-500/20'
-                              : 'bg-white/5 text-white/70 hover:bg-white/10 hover:text-white border border-white/10'
-                          }`}
-                        >
-                          <span className={`w-2 h-2 rounded-full ${p.color}`} />
-                          <span>{p.label}</span>
-                        </button>
-                      );
-                    })}
-
-                    {/* Spotify-style Live Catalog Sync */}
-                    <button
-                      onClick={() => {
-                        setIsRefreshingMusic(true);
-                        fetchLiveMusicDiscovery()
-                          .then((tracks) => {
-                            if (tracks && tracks.length > 0) setMusicDiscoveryList(tracks);
-                          })
-                          .finally(() => setTimeout(() => setIsRefreshingMusic(false), 600));
-                      }}
-                      className="px-3 py-1 rounded-xl text-xs font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 transition-all cursor-pointer flex items-center gap-1.5"
-                      title="Sync & load latest fresh releases like Spotify"
-                    >
-                      <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingMusic ? 'animate-spin' : ''}`} />
-                      <span>Live Sync</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Algorithmic Recommendations: Suggested For You */}
-                {!searchQuery && recommendedTracks.length > 0 && (
-                  <div className="flex flex-col gap-3 p-4 rounded-3xl bg-gradient-to-r from-purple-950/20 via-slate-900/40 to-cyan-950/20 border border-white/10 backdrop-blur-md">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Sparkles className="w-4 h-4 text-cyan-400" />
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-white/90">
-                          Suggested For You
-                        </h4>
-                      </div>
-                      <span className="text-[10px] text-white/40 font-mono">Personalized Stream Engine</span>
-                    </div>
-
-                    <div className="flex items-center gap-3 overflow-x-auto pb-1 scrollbar-none">
-                      {recommendedTracks.map((rTrack) => (
-                        <div
-                          key={`rec-${rTrack.id}`}
-                          onClick={() => {
-                            if (rTrack.streamUrl) {
-                              openMedia(rTrack.streamUrl, `${rTrack.title} - ${rTrack.artist}`, true, 0, rTrack.coverUrl, 'music');
-                              setMusicPlayerOpen(true);
-                              if (onOpenMusic) onOpenMusic();
-                            }
-                          }}
-                          className="flex items-center gap-3 p-2 rounded-2xl bg-white/5 hover:bg-white/15 border border-white/10 cursor-pointer min-w-[220px] max-w-[240px] shrink-0 transition-all hover:scale-[1.02] group"
-                        >
-                          <img
-                            src={rTrack.coverUrl}
-                            alt=""
-                            className="w-12 h-12 rounded-xl object-cover shrink-0"
-                            onError={(e) => {
-                              (e.currentTarget as HTMLImageElement).src =
-                                'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&auto=format&fit=crop&q=80';
-                            }}
-                          />
-                          <div className="flex flex-col min-w-0 flex-1">
-                            <span className="text-xs font-bold text-white truncate group-hover:text-cyan-400 transition-colors">
-                              {rTrack.title}
-                            </span>
-                            <span className="text-[10px] text-white/50 truncate">{rTrack.artist}</span>
-                          </div>
-                          <Play className="w-4 h-4 text-cyan-400 fill-current opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Music Cards Grid */}
-                {filteredMusicTracks.length === 0 ? (
-                  <div className="p-8 rounded-2xl bg-white/5 border border-white/10 text-center flex flex-col items-center gap-2">
-                    <Music className="w-8 h-8 text-white/30" />
-                    <p className="text-xs text-white/60">No tracks found matching "{searchQuery}"</p>
-                    <button
-                      onClick={() => {
-                        setSearchQuery('');
-                        setSelectedMusicPlatform('all');
-                      }}
-                      className="text-xs text-rose-400 hover:underline cursor-pointer mt-1"
-                    >
-                      Clear search filters
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-6 w-full">
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                      {paginatedMusicTracks.map((track) => {
-                        return (
-                          <div
-                            key={track.id}
-                            onClick={() => {
-                              if (track.streamUrl) {
-                                openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl, 'music');
-                                setMusicPlayerOpen(true);
-                                if (onOpenMusic) onOpenMusic();
-                              }
-                            }}
-                            className="group relative flex flex-col rounded-2xl bg-white/5 border border-white/10 overflow-hidden hover:border-cyan-500/50 hover:bg-white/10 transition-all shadow-xl hover:shadow-2xl cursor-pointer"
-                          >
-                            {/* Cover Image Container with Preview Zoom */}
-                            <div className="relative aspect-square w-full overflow-hidden bg-black/60">
-                              <img
-                                src={track.coverUrl}
-                                alt={track.title}
-                                loading="lazy"
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                                onError={(e) => {
-                                  (e.currentTarget as HTMLImageElement).src =
-                                    'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&auto=format&fit=crop&q=80';
-                                }}
-                              />
-                              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-80 group-hover:opacity-60 transition-opacity" />
-
-                              {/* Audio Quality / Genre Badge */}
-                              <div
-                                className="absolute top-2 left-2 flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold text-white shadow-md backdrop-blur-md border border-white/20"
-                                style={{
-                                  background:
-                                    track.category === 'romantic'
-                                      ? 'linear-gradient(135deg, #ec4899, #f43f5e)'
-                                      : track.category === 'phonk'
-                                      ? 'linear-gradient(135deg, #8b5cf6, #6366f1)'
-                                      : track.category === 'hindi'
-                                      ? 'linear-gradient(135deg, #f59e0b, #d97706)'
-                                      : track.category === 'sinhala'
-                                      ? 'linear-gradient(135deg, #10b981, #059669)'
-                                      : 'linear-gradient(135deg, #06b6d4, #2563eb)',
-                                }}
-                              >
-                                <span>{track.category ? track.category.toUpperCase() : 'HI-FI STUDIO'}</span>
-                              </div>
-
-                              {/* Add to Playlist button */}
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedTrackForPlaylist({
-                                    id: track.id,
-                                    title: track.title,
-                                    artist: track.artist,
-                                    url: track.streamUrl,
-                                    coverUrl: track.coverUrl,
-                                  });
-                                  setIsPlaylistModalOpen(true);
-                                }}
-                                className="absolute bottom-2 right-2 p-1.5 rounded-xl bg-black/60 hover:bg-cyan-500 text-white/80 hover:text-white backdrop-blur-md border border-white/20 opacity-0 group-hover:opacity-100 transition-all cursor-pointer shadow-lg"
-                                title="Add to Playlist"
-                              >
-                                <ListPlus className="w-3.5 h-3.5" />
-                              </button>
-
-                              {/* Duration / Plays Badge */}
-                              {(track.duration || track.plays) && (
-                                <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded-md text-[9px] font-mono text-white/90 bg-black/70 backdrop-blur-md border border-white/10">
-                                  {track.duration || track.plays}
-                                </div>
-                              )}
-
-                              {/* Center Play Button Overlay */}
-                              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 backdrop-blur-[2px]">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (track.streamUrl) {
-                                      openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl, 'music');
-                                      setMusicPlayerOpen(true);
-                                      if (onOpenMusic) onOpenMusic();
-                                    }
-                                  }}
-                                  className="w-11 h-11 rounded-full bg-white text-black hover:scale-110 flex items-center justify-center shadow-xl transition-all cursor-pointer"
-                                  title="Play in Miki Player"
-                                >
-                                  <Play className="w-5 h-5 fill-current ml-0.5 text-black" />
-                                </button>
-                              </div>
-                            </div>
-
-                            {/* Track Details & Action Footer */}
-                            <div className="p-3 flex flex-col flex-1 justify-between gap-2">
-                              <div>
-                                <h4
-                                  className="text-xs font-bold text-white truncate group-hover:text-emerald-400 transition-colors"
-                                  title={track.title}
-                                >
-                                  {track.title}
-                                </h4>
-                                <p className="text-[11px] text-white/60 truncate" title={track.artist}>
-                                  {track.artist}
-                                </p>
-                                <div className="mt-1 flex items-center gap-1">
-                                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/10 text-white/70 font-medium truncate">
-                                    {track.genre}
-                                  </span>
-                                </div>
-                              </div>
-
-                              {/* In-App Direct Play Action */}
-                              <div className="pt-2 border-t border-white/5 flex items-center justify-between gap-1">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (track.streamUrl) {
-                                      openMedia(track.streamUrl, `${track.title} - ${track.artist}`, true, 0, track.coverUrl, 'music');
-                                      setMusicPlayerOpen(true);
-                                      if (onOpenMusic) onOpenMusic();
-                                    }
-                                  }}
-                                  className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-emerald-600/80 hover:bg-emerald-500 hover:scale-[1.02] text-white text-[10px] font-bold shadow-md transition-all cursor-pointer"
-                                  title="Play Directly in Miki Player"
-                                >
-                                  <Play className="w-3.5 h-3.5 fill-current" />
-                                  <span>Play Song In-App</span>
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* Chunk-by-Chunk Progressive Music Loading & Pagination Controls */}
-                    {filteredMusicTracks.length > MUSIC_PAGE_SIZE && (
-                      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-6 border-t border-white/10 w-full">
-                        <div className="flex items-center gap-2">
-                          <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400 font-mono text-[10px] font-bold border border-emerald-500/30">
-                            Chunk {musicCurrentPage} of {musicTotalPages}
-                          </span>
-                          <span className="text-xs text-white/50 font-mono">
-                            Showing {(musicCurrentPage - 1) * MUSIC_PAGE_SIZE + 1} -{' '}
-                            {Math.min(filteredMusicTracks.length, musicCurrentPage * MUSIC_PAGE_SIZE)} of{' '}
-                            {filteredMusicTracks.length} Songs (Chunked Streaming)
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            onClick={() => setMusicCurrentPage((p) => Math.max(1, p - 1))}
-                            disabled={musicCurrentPage === 1}
-                            className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-white border border-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center gap-1"
-                          >
-                            <ChevronLeft className="w-3.5 h-3.5" />
-                            <span>Previous Chunk</span>
-                          </button>
-
-                          {Array.from({ length: musicTotalPages }, (_, i) => i + 1).map((chunkNum) => {
-                            if (
-                              chunkNum === 1 ||
-                              chunkNum === musicTotalPages ||
-                              (chunkNum >= musicCurrentPage - 2 && chunkNum <= musicCurrentPage + 2)
-                            ) {
-                              const isActive = musicCurrentPage === chunkNum;
-                              return (
-                                <button
-                                  key={chunkNum}
-                                  onClick={() => setMusicCurrentPage(chunkNum)}
-                                  className={`w-8 h-8 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                                    isActive
-                                      ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/40'
-                                      : 'bg-white/5 text-white/70 hover:bg-white/10 hover:text-white border border-white/10'
-                                  }`}
-                                >
-                                  {chunkNum}
-                                </button>
-                              );
-                            }
-                            if (chunkNum === musicCurrentPage - 3 || chunkNum === musicCurrentPage + 3) {
-                              return (
-                                <span key={chunkNum} className="text-xs text-white/40 px-1">
-                                  ...
-                                </span>
-                              );
-                            }
-                            return null;
-                          })}
-
-                          <button
-                            onClick={() => setMusicCurrentPage((p) => Math.min(musicTotalPages, p + 1))}
-                            disabled={musicCurrentPage === musicTotalPages}
-                            className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-white border border-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center gap-1"
-                          >
-                            <span>Next Chunk</span>
-                            <ChevronRight className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
             </div>
           ) : effectiveSection === 'radio' ? (
