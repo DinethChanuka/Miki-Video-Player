@@ -116,3 +116,21 @@ export const ALBUM_POSTERS = {
   darkhaast: '/posters/albums/darkhaast.jpg',
   tujhkoJoPaaya: '/posters/albums/tujhko.jpg',
 };
+
+export const ARTIST_AVATARS = {
+  camilaCabello: '/artists/camila_cabello.jpg',
+  camilaCabelloHero: '/artists/camila_cabello_hero.jpg',
+  travisScott: '/artists/travis_scott.jpg',
+  billieEilish: '/artists/billie_eilish.jpg',
+  kanyeWest: '/artists/kanye_west.jpg',
+  nickiMinaj: '/artists/nicki_minaj.jpg',
+  theWeeknd: '/artists/the_weeknd.jpg',
+  duaLipa: '/artists/dua_lipa.jpg',
+  johnLegend: '/artists/john_legend.jpg',
+  adele: '/artists/adele.jpg',
+  aliciaKeys: '/artists/alicia_keys.jpg',
+  brunoMars: '/artists/bruno_mars.jpg',
+  samSmith: '/artists/sam_smith.jpg',
+  michaelBuble: '/artists/michael_buble.jpg',
+  stevieWonder: '/artists/stevie_wonder.jpg',
+};

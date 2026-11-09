@@ -3,6 +3,7 @@ import { usePlayerStore } from '../../store/playerStore';
 import {
   MusicTrack,
 } from '../../core/MusicAudioEngine';
+import { ARTIST_AVATARS } from '../../utils/mediaPosters';
 import {
   Play,
   Pause,
@@ -74,12 +75,12 @@ export const SPOTIFY_ALBUMS: SpotifyAlbum[] = [
 ];
 
 export const FANS_LIKE_TOO: RelatedArtist[] = [
-  { id: 'alicia-keys', name: 'Alicia Keys', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80' },
-  { id: 'sam-smith', name: 'Sam Smith', avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80' },
-  { id: 'adele', name: 'Adele', avatarUrl: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=300&q=80' },
-  { id: 'bruno-mars', name: 'Bruno Mars', avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80' },
-  { id: 'michael-buble', name: 'Michael Bublé', avatarUrl: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&w=300&q=80' },
-  { id: 'stevie-wonder', name: 'Stevie Wonder', avatarUrl: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?auto=format&fit=crop&w=300&q=80' },
+  { id: 'alicia-keys', name: 'Alicia Keys', avatarUrl: ARTIST_AVATARS.aliciaKeys },
+  { id: 'sam-smith', name: 'Sam Smith', avatarUrl: ARTIST_AVATARS.samSmith },
+  { id: 'adele', name: 'Adele', avatarUrl: ARTIST_AVATARS.adele },
+  { id: 'bruno-mars', name: 'Bruno Mars', avatarUrl: ARTIST_AVATARS.brunoMars },
+  { id: 'michael-buble', name: 'Michael Bublé', avatarUrl: ARTIST_AVATARS.michaelBuble },
+  { id: 'stevie-wonder', name: 'Stevie Wonder', avatarUrl: ARTIST_AVATARS.stevieWonder },
 ];
 
 export const FEATURED_MUSIC_TRACKS: (MusicTrack & { plays?: string })[] = [
@@ -394,9 +395,13 @@ export const MusicPlayerView: React.FC = () => {
           <div className="relative w-full sm:w-80 h-56 sm:h-64 shrink-0 flex items-center justify-end">
             <div className="absolute inset-0 bg-gradient-to-r from-neutral-900 via-transparent to-transparent z-10 pointer-events-none" />
             <img
-              src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=700&q=80"
+              src={ARTIST_AVATARS.johnLegend}
               alt="John Legend Spotlight"
               className="w-full h-full object-cover object-top filter grayscale contrast-125"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).src =
+                  'https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cf/John_Legend_2019_by_Glenn_Francis_%28cropped%29.jpg/960px-John_Legend_2019_by_Glenn_Francis_%28cropped%29.jpg';
+              }}
             />
           </div>
         </div>
@@ -631,6 +636,15 @@ export const MusicPlayerView: React.FC = () => {
                         src={artist.avatarUrl}
                         alt={artist.name}
                         className="w-full h-full object-cover filter contrast-105"
+                        onError={(e) => {
+                          const img = e.currentTarget as HTMLImageElement;
+                          if (artist.id === 'alicia-keys') img.src = 'https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cd/Alicia_Keys_2019_by_Glenn_Francis_%28cropped%29.jpg/960px-Alicia_Keys_2019_by_Glenn_Francis_%28cropped%29.jpg';
+                          else if (artist.id === 'sam-smith') img.src = 'https://thumb.wikimedia.org/wikipedia/commons/thumb/9/91/Sam_Smith_2019_by_Glenn_Francis_%28cropped%29.jpg/960px-Sam_Smith_2019_by_Glenn_Francis_%28cropped%29.jpg';
+                          else if (artist.id === 'adele') img.src = 'https://thumb.wikimedia.org/wikipedia/commons/thumb/5/52/Adele_for_Vogue_in_2021.jpg/960px-Adele_for_Vogue_in_2021.jpg';
+                          else if (artist.id === 'bruno-mars') img.src = 'https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e3/Bruno_Mars_2011.jpg/960px-Bruno_Mars_2011.jpg';
+                          else if (artist.id === 'michael-buble') img.src = 'https://thumb.wikimedia.org/wikipedia/commons/thumb/1/17/Michael_Bubl%C3%A9_%2853695559289%29_%28cropped%29.jpg/960px-Michael_Bubl%C3%A9_%2853695559289%29_%28cropped%29.jpg';
+                          else if (artist.id === 'stevie-wonder') img.src = 'https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b2/SWonderBSTHyde060719-72_%28cropped%29.jpg/960px-SWonderBSTHyde060719-72_%28cropped%29.jpg';
+                        }}
                       />
                     </div>
                     <span className="text-[11px] font-semibold text-white/70 group-hover:text-white transition-colors truncate max-w-[80px] text-center">

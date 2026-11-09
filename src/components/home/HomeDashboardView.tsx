@@ -5,7 +5,7 @@ import { GAMES_CATALOG, GameItem } from '../../utils/gamesCatalog';
 import { CINEMA_LINKS, CinemaSiteItem } from '../../utils/cinemaLinks';
 import { INTERNET_MUSIC_STREAMS } from '../../utils/musicStreams';
 import { RADIO_GARDEN_STATIONS, RadioGardenStation, searchRadioGardenStations } from '../../utils/radioGardenCatalog';
-import { MOVIE_POSTERS, ALBUM_POSTERS } from '../../utils/mediaPosters';
+import { MOVIE_POSTERS, ALBUM_POSTERS, ARTIST_AVATARS } from '../../utils/mediaPosters';
 import { HERO_ARTWORKS } from '../../utils/heroArtworks';
 import { CINESUBZ_MOVIES, fetchLatestCineSubzMovies, searchCineSubzLive, CineSubzMovie } from '../../utils/cinesubzService';
 import { CINESUBZ_TV_SHOWS, fetchLatestCineSubzTvShows, CineSubzTvShow } from '../../utils/cinesubzTvService';
@@ -118,7 +118,7 @@ export const GROOVVY_TOP_ARTISTS: GroovvyArtist[] = [
     id: 'travis-scott',
     name: 'Travis Scott',
     plays: '44M Plays',
-    imageUrl: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?auto=format&fit=crop&w=400&q=80',
+    imageUrl: ARTIST_AVATARS.travisScott,
     gradient: 'from-blue-900/80 via-indigo-950/60 to-slate-900',
     accentColor: 'text-blue-400',
   },
@@ -126,7 +126,7 @@ export const GROOVVY_TOP_ARTISTS: GroovvyArtist[] = [
     id: 'billie-eilish',
     name: 'Billie Eilish',
     plays: '203M Plays',
-    imageUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
+    imageUrl: ARTIST_AVATARS.billieEilish,
     gradient: 'from-amber-900/80 via-yellow-950/60 to-slate-900',
     accentColor: 'text-amber-400',
   },
@@ -134,7 +134,7 @@ export const GROOVVY_TOP_ARTISTS: GroovvyArtist[] = [
     id: 'camila-cabello',
     name: 'Camila Cabello',
     plays: '63M Plays',
-    imageUrl: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&q=80',
+    imageUrl: ARTIST_AVATARS.camilaCabello,
     gradient: 'from-teal-900/80 via-emerald-950/60 to-slate-900',
     accentColor: 'text-teal-400',
   },
@@ -142,7 +142,7 @@ export const GROOVVY_TOP_ARTISTS: GroovvyArtist[] = [
     id: 'kanye-west',
     name: 'Kanye West',
     plays: '15M Plays',
-    imageUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80',
+    imageUrl: ARTIST_AVATARS.kanyeWest,
     gradient: 'from-orange-900/80 via-rose-950/60 to-slate-900',
     accentColor: 'text-orange-400',
   },
@@ -150,7 +150,7 @@ export const GROOVVY_TOP_ARTISTS: GroovvyArtist[] = [
     id: 'nicki-minaj',
     name: 'Nicki Minaj',
     plays: '100M Plays',
-    imageUrl: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=400&q=80',
+    imageUrl: ARTIST_AVATARS.nickiMinaj,
     gradient: 'from-pink-900/80 via-rose-950/60 to-slate-900',
     accentColor: 'text-pink-400',
   },
@@ -158,7 +158,7 @@ export const GROOVVY_TOP_ARTISTS: GroovvyArtist[] = [
     id: 'the-weeknd',
     name: 'Starboy',
     plays: '100M Plays',
-    imageUrl: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&w=400&q=80',
+    imageUrl: ARTIST_AVATARS.theWeeknd,
     gradient: 'from-red-900/80 via-purple-950/60 to-slate-900',
     accentColor: 'text-red-400',
   },
@@ -174,7 +174,7 @@ export const GROOVVY_TOP_ARTISTS: GroovvyArtist[] = [
     id: 'dua-lipa',
     name: 'Dua Lipa',
     plays: '110M Plays',
-    imageUrl: 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?auto=format&fit=crop&w=400&q=80',
+    imageUrl: ARTIST_AVATARS.duaLipa,
     gradient: 'from-violet-900/80 via-purple-950/60 to-slate-900',
     accentColor: 'text-violet-400',
   },
@@ -218,7 +218,7 @@ export const GROOVVY_TOP_CHARTS: GroovvyChartTrack[] = [
     duration: '3:45',
     durationSec: 225,
     plays: '128M Plays',
-    cover: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&q=80',
+    cover: ARTIST_AVATARS.camilaCabello,
     url: 'https://www.youtube.com/watch?v=HCjNJDNgk8Y',
   },
   {
@@ -229,7 +229,7 @@ export const GROOVVY_TOP_CHARTS: GroovvyChartTrack[] = [
     duration: '3:45',
     durationSec: 225,
     plays: '95M Plays',
-    cover: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80',
+    cover: ARTIST_AVATARS.kanyeWest,
     url: 'https://www.youtube.com/watch?v=34d7uI3l1W0',
   },
   {
@@ -273,7 +273,7 @@ export const GROOVVY_TOP_CHARTS: GroovvyChartTrack[] = [
     duration: '3:10',
     durationSec: 190,
     plays: '140M Plays',
-    cover: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?auto=format&fit=crop&w=400&q=80',
+    cover: ARTIST_AVATARS.travisScott,
     url: 'https://www.youtube.com/watch?v=3bZ41p70uNk',
   },
 ];
@@ -2393,7 +2393,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                           'In My Feelings - Camila Cabello',
                           true,
                           0,
-                          'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=600&q=80',
+                          ARTIST_AVATARS.camilaCabelloHero,
                           'music'
                         );
                         setMusicPlayerOpen(false);
@@ -2422,9 +2422,13 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                 <div className="relative w-full sm:w-80 h-56 sm:h-72 shrink-0 flex items-center justify-center sm:justify-end">
                   <div className="absolute inset-0 bg-gradient-to-r from-[#0d111d] via-transparent to-transparent z-10 hidden sm:block pointer-events-none" />
                   <img
-                    src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=700&q=80"
+                    src={ARTIST_AVATARS.camilaCabelloHero}
                     alt="Camila Cabello Hero"
                     className="w-full h-full object-cover object-top rounded-2xl sm:rounded-none opacity-90 filter contrast-105"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).src =
+                        'https://thumb.wikimedia.org/wikipedia/commons/thumb/f/fe/Camila_Cabello_Sundance_2024_Cropped_%28cropped%29.jpg/960px-Camila_Cabello_Sundance_2024_Cropped_%28cropped%29.jpg';
+                    }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-[#0d111d] via-transparent to-transparent sm:hidden pointer-events-none" />
                 </div>
@@ -2469,6 +2473,16 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                           src={artist.imageUrl}
                           alt={artist.name}
                           className="w-full h-full object-cover"
+                          onError={(e) => {
+                            const img = e.currentTarget as HTMLImageElement;
+                            if (artist.id === 'travis-scott') img.src = 'https://thumb.wikimedia.org/wikipedia/commons/thumb/1/14/TravisScott-byPhilipRomano_%28cropped%29.jpg/960px-TravisScott-byPhilipRomano_%28cropped%29.jpg';
+                            else if (artist.id === 'billie-eilish') img.src = 'https://thumb.wikimedia.org/wikipedia/commons/thumb/9/91/BillieEilishO2160622_%2817_of_45%29_%2852153177539%29_%28cropped_2%29.jpg/960px-BillieEilishO2160622_%2817_of_45%29_%2852153177539%29_%28cropped_2%29.jpg';
+                            else if (artist.id === 'camila-cabello') img.src = 'https://thumb.wikimedia.org/wikipedia/commons/thumb/f/fe/Camila_Cabello_Sundance_2024_Cropped_%28cropped%29.jpg/960px-Camila_Cabello_Sundance_2024_Cropped_%28cropped%29.jpg';
+                            else if (artist.id === 'kanye-west') img.src = 'https://thumb.wikimedia.org/wikipedia/commons/thumb/5/58/Kanye_West_at_the_2009_Tribeca_Film_Festival_%28crop_2%29.jpg/960px-Kanye_West_at_the_2009_Tribeca_Film_Festival_%28crop_2%29.jpg';
+                            else if (artist.id === 'nicki-minaj') img.src = 'https://thumb.wikimedia.org/wikipedia/commons/thumb/1/14/Nicki_Minaj_at_the_2022_MTV_VMAs_02_%28cropped%29.jpg/960px-Nicki_Minaj_at_the_2022_MTV_VMAs_02_%28cropped%29.jpg';
+                            else if (artist.id === 'the-weeknd') img.src = 'https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a0/The_Weeknd_Cannes_2023_%28cropped%29.jpg/960px-The_Weeknd_Cannes_2023_%28cropped%29.jpg';
+                            else if (artist.id === 'dua-lipa') img.src = 'https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1c/DuaLipaO2020522_%2840_of_99%29_%2852052474369%29_%28cropped%29.jpg/960px-DuaLipaO2020522_%2840_of_99%29_%2852052474369%29_%28cropped%29.jpg';
+                          }}
                         />
                         <div className="absolute inset-0 bg-black/20 group-hover:bg-black/0 transition-colors" />
                       </div>
@@ -2863,7 +2877,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                         currentArtwork ||
                         previouslyPlayed?.thumbnailUri ||
                         activeAlbum.albumArt ||
-                        'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?auto=format&fit=crop&w=400&q=80'
+                        ARTIST_AVATARS.travisScott
                       }
                       alt={currentTitle || 'Butterfly Effect'}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
