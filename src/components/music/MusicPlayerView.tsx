@@ -427,12 +427,13 @@ export const MusicPlayerView: React.FC = () => {
               {/* Tracks Rows */}
               <div className="flex flex-col gap-1.5">
                 {filteredTracks.map((track, idx) => {
-                  const isCurrent = currentTrackIndex === idx;
+                  const realIdx = tracks.findIndex((t) => t.id === track.id);
+                  const isCurrent = currentTrack?.id === track.id;
                   const isLiked = likedSongIds[track.id] || false;
                   return (
                     <div
                       key={track.id}
-                      onClick={() => handlePlayTrack(idx)}
+                      onClick={() => handlePlayTrack(realIdx !== -1 ? realIdx : idx)}
                       className={`grid grid-cols-12 gap-3 items-center px-4 py-3 rounded-2xl border transition-all cursor-pointer group ${
                         isCurrent
                           ? 'bg-white/10 border-white/20 text-white shadow-md'
@@ -567,39 +568,43 @@ export const MusicPlayerView: React.FC = () => {
 
               <div className="flex flex-col gap-2">
                 {[
-                  { rank: '#1', title: 'All of Me - John Legend', duration: '3:42', idx: 2 },
-                  { rank: '#2', title: 'Wild (feat Gary Clark Jr)', duration: '3:16', idx: 4 },
-                  { rank: '#3', title: 'Minefields (feat Faouzia)', duration: '3:37', idx: 5 },
-                ].map((item) => (
-                  <div
-                    key={item.rank}
-                    onClick={() => handlePlayTrack(item.idx)}
-                    className="flex items-center justify-between p-2.5 rounded-2xl bg-black/30 hover:bg-white/10 border border-white/5 transition-all cursor-pointer group"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span className="text-xs font-mono font-bold text-white/40 group-hover:text-cyan-400 transition-colors w-5">
-                        {item.rank}
-                      </span>
-                      <div className="w-8 h-8 rounded-lg overflow-hidden bg-black/60 shrink-0">
-                        <img
-                          src={tracks[item.idx]?.albumArt || tracks[0].albumArt}
-                          alt={item.title}
-                          className="w-full h-full object-cover"
-                        />
+                  { rank: '#1', title: 'All of Me - John Legend', duration: '3:42', id: 'track-all-of-me' },
+                  { rank: '#2', title: 'Wild (feat Gary Clark Jr)', duration: '3:16', id: 'track-wild' },
+                  { rank: '#3', title: 'Minefields (feat Faouzia)', duration: '3:37', id: 'track-minefields' },
+                ].map((item) => {
+                  const resolvedIdx = tracks.findIndex((t) => t.id === item.id);
+                  const activeTrack = resolvedIdx !== -1 ? tracks[resolvedIdx] : tracks[0];
+                  return (
+                    <div
+                      key={item.rank}
+                      onClick={() => handlePlayTrack(resolvedIdx !== -1 ? resolvedIdx : 0)}
+                      className="flex items-center justify-between p-2.5 rounded-2xl bg-black/30 hover:bg-white/10 border border-white/5 transition-all cursor-pointer group"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="text-xs font-mono font-bold text-white/40 group-hover:text-cyan-400 transition-colors w-5">
+                          {item.rank}
+                        </span>
+                        <div className="w-8 h-8 rounded-lg overflow-hidden bg-black/60 shrink-0">
+                          <img
+                            src={activeTrack?.albumArt || tracks[0].albumArt}
+                            alt={item.title}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <span className="text-xs font-bold text-white truncate group-hover:text-cyan-300 transition-colors">
+                          {item.title}
+                        </span>
                       </div>
-                      <span className="text-xs font-bold text-white truncate group-hover:text-cyan-300 transition-colors">
-                        {item.title}
-                      </span>
-                    </div>
 
-                    <div className="flex items-center gap-2.5 shrink-0">
-                      <span className="text-[11px] font-mono text-white/40">
-                        {item.duration}
-                      </span>
-                      <Play className="w-3 h-3 fill-white text-white/60 group-hover:text-white group-hover:fill-cyan-400 transition-colors" />
+                      <div className="flex items-center gap-2.5 shrink-0">
+                        <span className="text-[11px] font-mono text-white/40">
+                          {item.duration}
+                        </span>
+                        <Play className="w-3 h-3 fill-white text-white/60 group-hover:text-white group-hover:fill-cyan-400 transition-colors" />
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 

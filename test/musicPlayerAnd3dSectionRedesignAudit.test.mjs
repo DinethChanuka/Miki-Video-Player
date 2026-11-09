@@ -67,3 +67,4 @@ describe('Task 1 & 3: Spotify-Style Playlist Player Audit (Image 1)', () => {
     assert.match(musicPlayerCode, /togglePlay|isPaused/);
   });
 });
+

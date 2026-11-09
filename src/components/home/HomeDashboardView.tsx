@@ -2658,7 +2658,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                   {/* Scrubber Progress Bar */}
                   <div className="flex flex-col gap-1 w-full pt-1">
                     <div className="flex items-center justify-between text-[11px] font-mono text-white/40">
-                      <span>{formatGroovvyTime(positionMs / 1000 || 165)}</span>
+                      <span>{formatGroovvyTime(currentUri ? positionMs / 1000 : 165)}</span>
                       <span>
                         {durationMs > 0
                           ? formatGroovvyTime(Math.max(0, (durationMs - positionMs) / 1000))
