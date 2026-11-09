@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { usePlayerStore } from '../../store/playerStore';
 import { CURATED_CHANNELS, LiveChannel } from '../../utils/channelCatalog';
 import { GAMES_CATALOG, GameItem } from '../../utils/gamesCatalog';
@@ -17,6 +17,12 @@ import {
   MusicTrack,
   MusicPlatform,
 } from '../../utils/musicDiscoveryService';
+import { AllArtistsModal } from '../music/AllArtistsModal';
+import {
+  ArtistProfile,
+  fetchArtistSongsLive,
+  searchArtists,
+} from '../../utils/artistCatalogService';
 import { ApplicationMenu } from '../hud/ApplicationMenu';
 import {
   Film,
@@ -797,6 +803,10 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
   );
   const [isTopPlayerHidden, setIsTopPlayerHidden] = useState<boolean>(false);
   const [isPlaylistModalOpen, setIsPlaylistModalOpen] = useState<boolean>(false);
+  const [isAllArtistsModalOpen, setIsAllArtistsModalOpen] = useState<boolean>(false);
+  const [selectedArtistProfile, setSelectedArtistProfile] = useState<ArtistProfile | null>(null);
+  const [isLoadingArtistSongs, setIsLoadingArtistSongs] = useState<boolean>(false);
+  const [loadingArtistName, setLoadingArtistName] = useState<string>('');
   const [selectedTrackForPlaylist, setSelectedTrackForPlaylist] = useState<any>(null);
   const [newPlaylistName, setNewPlaylistName] = useState<string>('');
   const [liveSearchedTracks, setLiveSearchedTracks] = useState<MusicTrack[]>([]);
@@ -866,6 +876,49 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
   const [groovvySearch, setGroovvySearch] = useState('');
   const [isHeroLiked, setIsHeroLiked] = useState(false);
   const [showAllMusicResults, setShowAllMusicResults] = useState(false);
+
+  const handleSelectArtist = useCallback(
+    async (artist: ArtistProfile | string) => {
+      const isProfile = typeof artist === 'object' && artist !== null;
+      const artistName = isProfile ? artist.name : artist.trim();
+      if (!artistName) return;
+
+      if (isProfile) {
+        setSelectedArtistProfile(artist);
+      } else {
+        const matched = searchArtists(artistName)[0] || null;
+        setSelectedArtistProfile(matched);
+      }
+
+      setLoadingArtistName(artistName);
+      setIsLoadingArtistSongs(true);
+      setSearchQuery(artistName);
+      setGroovvySearch(artistName);
+      setShowAllMusicResults(true);
+
+      try {
+        const liveTracks = await fetchArtistSongsLive(artist);
+        if (liveTracks && liveTracks.length > 0) {
+          setLiveSearchedTracks(liveTracks);
+          const first = liveTracks[0];
+          openMedia(
+            first.streamUrl || first.pageUrl,
+            `${first.title} - ${first.artist}`,
+            true,
+            0,
+            first.coverUrl,
+            'music'
+          );
+          setMusicPlayerOpen(false);
+        }
+      } catch (err) {
+        console.error('Failed to load live artist songs:', err);
+      } finally {
+        setIsLoadingArtistSongs(false);
+      }
+    },
+    [openMedia, setMusicPlayerOpen]
+  );
 
   const formatGroovvyTime = (sec: number) => {
     if (isNaN(sec) || sec < 0) return '0:00';
@@ -992,7 +1045,12 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
       return;
     }
     const timer = setTimeout(() => {
-      fetchOnlineMusicSearch(q, selectedMusicPlatform)
+      const matchedArtist = searchArtists(q)[0];
+      const searchPromise = matchedArtist
+        ? fetchArtistSongsLive(matchedArtist)
+        : fetchOnlineMusicSearch(q, selectedMusicPlatform);
+
+      searchPromise
         .then((tracks) => {
           if (!isCancelled && tracks && tracks.length > 0) {
             setLiveSearchedTracks(tracks);
@@ -2442,7 +2500,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                   </h3>
                   <button
                     onClick={() => {
-                      setShowAllMusicResults(true);
+                      setIsAllArtistsModalOpen(true);
                     }}
                     className="text-xs font-semibold text-white/40 hover:text-white transition-colors cursor-pointer"
                   >
@@ -2456,15 +2514,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                     <div
                       key={artist.id}
                       onClick={() => {
-                        setSearchQuery(artist.name);
-                        setGroovvySearch(artist.name);
-                        const matched = musicDiscoveryList.find((m) =>
-                          m.artist.toLowerCase().includes(artist.name.toLowerCase())
-                        );
-                        if (matched) {
-                          openMedia(matched.streamUrl || matched.pageUrl, `${matched.title} - ${matched.artist}`, true, 0, matched.coverUrl, 'music');
-                          setMusicPlayerOpen(false);
-                        }
+                        handleSelectArtist(artist.name);
                       }}
                       className="group flex flex-col items-center p-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 min-w-[130px] sm:min-w-[140px] cursor-pointer hover:-translate-y-1 transition-all shadow-lg select-none"
                     >
@@ -2545,6 +2595,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                           </button>
                           <button
                             onClick={() => {
+                              setSelectedArtistProfile(null);
                               setSearchQuery('');
                               setGroovvySearch('');
                               setSelectedMusicCategory('all');
@@ -2556,6 +2607,88 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                           </button>
                         </div>
                       </div>
+
+                      {/* Live Artist Loading State */}
+                      {isLoadingArtistSongs && (
+                        <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-gradient-to-r from-blue-900/30 via-indigo-900/20 to-purple-900/10 border border-blue-500/30 text-white animate-pulse">
+                          <RefreshCw className="w-4 h-4 text-cyan-400 animate-spin shrink-0" />
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-xs font-bold text-cyan-300 truncate">
+                              Loading all live songs from internet for {loadingArtistName}...
+                            </span>
+                            <span className="text-[11px] text-white/50 truncate">
+                              Streaming live YouTube Music tracks with lossless audio
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Artist Spotlight Banner */}
+                      {selectedArtistProfile && (
+                        <div className="p-3.5 rounded-2xl bg-gradient-to-r from-blue-900/40 via-purple-900/20 to-black/40 border border-white/10 flex items-center justify-between gap-3 shadow-lg">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0 border border-white/10 shadow-md">
+                              <img
+                                src={selectedArtistProfile.imageUrl}
+                                alt={selectedArtistProfile.name}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  if (selectedArtistProfile.fallbackImageUrl) {
+                                    (e.currentTarget as HTMLImageElement).src = selectedArtistProfile.fallbackImageUrl;
+                                  }
+                                }}
+                              />
+                            </div>
+                            <div className="flex flex-col min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs sm:text-sm font-extrabold text-white truncate">
+                                  {selectedArtistProfile.name}
+                                </span>
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white/10 text-white/80 border border-white/10">
+                                  {selectedArtistProfile.language === 'english' && '🇺🇸 English'}
+                                  {selectedArtistProfile.language === 'hindi' && '🇮🇳 Hindi'}
+                                  {selectedArtistProfile.language === 'sinhala' && '🇱🇰 Sinhala'}
+                                </span>
+                              </div>
+                              {selectedArtistProfile.nativeName && (
+                                <span className="text-[11px] font-semibold text-white/60">
+                                  {selectedArtistProfile.nativeName}
+                                </span>
+                              )}
+                              <span className="text-[10px] text-cyan-300 font-mono">
+                                {selectedArtistProfile.genre} • {selectedArtistProfile.plays}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            <button
+                              onClick={() => {
+                                if (filteredMusicTracks.length > 0) {
+                                  const first = filteredMusicTracks[0];
+                                  openMedia(first.streamUrl || first.pageUrl, `${first.title} - ${first.artist}`, true, 0, first.coverUrl, 'music');
+                                  setMusicPlayerOpen(false);
+                                }
+                              }}
+                              className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-blue-600/30 transition-all cursor-pointer"
+                            >
+                              <Play className="w-3 h-3 fill-white" />
+                              <span>Play All</span>
+                            </button>
+                            <button
+                              onClick={() => {
+                                setSelectedArtistProfile(null);
+                                setSearchQuery('');
+                                setGroovvySearch('');
+                              }}
+                              className="p-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-colors cursor-pointer"
+                              title="Clear artist filter"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Track List */}
                       {filteredMusicTracks.length === 0 ? (
@@ -4631,6 +4764,13 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Multilingual All Artists Explorer Modal */}
+      <AllArtistsModal
+        isOpen={isAllArtistsModalOpen}
+        onClose={() => setIsAllArtistsModalOpen(false)}
+        onSelectArtist={handleSelectArtist}
+      />
     </div>
   );
 };
