@@ -40,6 +40,9 @@ import {
   ListMusic,
   ListPlus,
   Shuffle,
+  Repeat,
+  Headphones,
+  ChevronDown,
   Heart,
   Download,
   Bell,
@@ -100,6 +103,181 @@ interface HomeDashboardViewProps {
   onOpenSystemAccess?: () => void;
   onOpenChannels?: () => void;
 }
+
+// Groovvy-inspired 3D Music Data (Image 2)
+export interface GroovvyArtist {
+  id: string;
+  name: string;
+  plays: string;
+  imageUrl: string;
+  gradient: string;
+  accentColor: string;
+}
+
+export const GROOVVY_TOP_ARTISTS: GroovvyArtist[] = [
+  {
+    id: 'travis-scott',
+    name: 'Travis Scott',
+    plays: '44M Plays',
+    imageUrl: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?auto=format&fit=crop&w=400&q=80',
+    gradient: 'from-blue-900/80 via-indigo-950/60 to-slate-900',
+    accentColor: 'text-blue-400',
+  },
+  {
+    id: 'billie-eilish',
+    name: 'Billie Eilish',
+    plays: '203M Plays',
+    imageUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
+    gradient: 'from-amber-900/80 via-yellow-950/60 to-slate-900',
+    accentColor: 'text-amber-400',
+  },
+  {
+    id: 'camila-cabello',
+    name: 'Camila Cabello',
+    plays: '63M Plays',
+    imageUrl: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&q=80',
+    gradient: 'from-teal-900/80 via-emerald-950/60 to-slate-900',
+    accentColor: 'text-teal-400',
+  },
+  {
+    id: 'kanye-west',
+    name: 'Kanye West',
+    plays: '15M Plays',
+    imageUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80',
+    gradient: 'from-orange-900/80 via-rose-950/60 to-slate-900',
+    accentColor: 'text-orange-400',
+  },
+  {
+    id: 'nicki-minaj',
+    name: 'Nicki Minaj',
+    plays: '100M Plays',
+    imageUrl: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=400&q=80',
+    gradient: 'from-pink-900/80 via-rose-950/60 to-slate-900',
+    accentColor: 'text-pink-400',
+  },
+  {
+    id: 'the-weeknd',
+    name: 'Starboy',
+    plays: '100M Plays',
+    imageUrl: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&w=400&q=80',
+    gradient: 'from-red-900/80 via-purple-950/60 to-slate-900',
+    accentColor: 'text-red-400',
+  },
+  {
+    id: 'arijit-singh',
+    name: 'Arijit Singh',
+    plays: '88M Plays',
+    imageUrl: ALBUM_POSTERS.dooriyan || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=400&q=80',
+    gradient: 'from-cyan-900/80 via-blue-950/60 to-slate-900',
+    accentColor: 'text-cyan-400',
+  },
+  {
+    id: 'dua-lipa',
+    name: 'Dua Lipa',
+    plays: '110M Plays',
+    imageUrl: 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?auto=format&fit=crop&w=400&q=80',
+    gradient: 'from-violet-900/80 via-purple-950/60 to-slate-900',
+    accentColor: 'text-violet-400',
+  },
+];
+
+export interface GroovvyGenre {
+  id: string;
+  name: string;
+  bgClass: string;
+  textClass: string;
+  borderClass: string;
+}
+
+export const GROOVVY_GENRES: GroovvyGenre[] = [
+  { id: 'dance-beat', name: 'Dance Beat', bgClass: 'bg-[#1e3a5f]', textClass: 'text-blue-100', borderClass: 'border-blue-400/20' },
+  { id: 'electro-pop', name: 'Electro Pop', bgClass: 'bg-[#6b583e]', textClass: 'text-amber-100', borderClass: 'border-amber-400/20' },
+  { id: 'alt-indie', name: 'Alternative Indie', bgClass: 'bg-[#7a3b2e]', textClass: 'text-orange-100', borderClass: 'border-orange-400/20' },
+  { id: 'hip-hop', name: 'Hip Hop', bgClass: 'bg-[#1b4332]', textClass: 'text-emerald-100', borderClass: 'border-emerald-400/20' },
+  { id: 'classical', name: 'Classical Period', bgClass: 'bg-[#5c3d4e]', textClass: 'text-rose-100', borderClass: 'border-rose-400/20' },
+  { id: 'hip-hop-rap', name: 'Hip Hop Rap', bgClass: 'bg-[#2b3a67]', textClass: 'text-indigo-100', borderClass: 'border-indigo-400/20' },
+];
+
+export interface GroovvyChartTrack {
+  id: string;
+  rank: string;
+  title: string;
+  artist: string;
+  duration: string;
+  durationSec: number;
+  plays: string;
+  cover: string;
+  url: string;
+}
+
+export const GROOVVY_TOP_CHARTS: GroovvyChartTrack[] = [
+  {
+    id: 'chart-01',
+    rank: '#01',
+    title: 'Havana',
+    artist: 'Camila Cabello',
+    duration: '3:45',
+    durationSec: 225,
+    plays: '128M Plays',
+    cover: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&q=80',
+    url: 'https://www.youtube.com/watch?v=HCjNJDNgk8Y',
+  },
+  {
+    id: 'chart-02',
+    rank: '#02',
+    title: 'Jesus Is King',
+    artist: 'Kanye West',
+    duration: '3:45',
+    durationSec: 225,
+    plays: '95M Plays',
+    cover: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80',
+    url: 'https://www.youtube.com/watch?v=34d7uI3l1W0',
+  },
+  {
+    id: 'chart-03',
+    rank: '#03',
+    title: 'Closer',
+    artist: 'The Chainsmokers',
+    duration: '3:45',
+    durationSec: 225,
+    plays: '210M Plays',
+    cover: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=400&q=80',
+    url: 'https://www.youtube.com/watch?v=0zGcUoRlhmw',
+  },
+  {
+    id: 'chart-04',
+    rank: '#04',
+    title: 'Lean On',
+    artist: 'Major Lazer ft DJ Snake',
+    duration: '3:45',
+    durationSec: 225,
+    plays: '180M Plays',
+    cover: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=400&q=80',
+    url: 'https://www.youtube.com/watch?v=YqeW9_5kURI',
+  },
+  {
+    id: 'chart-05',
+    rank: '#05',
+    title: 'Saiyaara',
+    artist: 'Faheem Abdullah, Tanishk Bagchi',
+    duration: '4:12',
+    durationSec: 252,
+    plays: '85M Plays',
+    cover: ALBUM_POSTERS.binTere || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=400&q=80',
+    url: 'https://www.youtube.com/watch?v=K5N0yW0J_q0',
+  },
+  {
+    id: 'chart-06',
+    rank: '#06',
+    title: 'Butterfly Effect',
+    artist: 'Travis Scott',
+    duration: '3:10',
+    durationSec: 190,
+    plays: '140M Plays',
+    cover: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?auto=format&fit=crop&w=400&q=80',
+    url: 'https://www.youtube.com/watch?v=3bZ41p70uNk',
+  },
+];
 
 // Cover Flow Albums inspired directly by user-uploaded Image 1
 export interface CoverFlowTrack {
@@ -679,6 +857,22 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
   const customPlaylists = usePlayerStore((s) => s.customPlaylists);
   const createPlaylist = usePlayerStore((s) => s.createPlaylist);
   const addTrackToPlaylist = usePlayerStore((s) => s.addTrackToPlaylist);
+  const positionMs = usePlayerStore((s) => s.positionMs);
+  const durationMs = usePlayerStore((s) => s.durationMs);
+  const seek = usePlayerStore((s) => s.seek);
+  const currentTitle = usePlayerStore((s) => s.currentTitle);
+  const currentArtwork = usePlayerStore((s) => s.currentArtwork);
+
+  const [groovvySubTab, setGroovvySubTab] = useState<'music' | 'podcast' | 'live'>('music');
+  const [groovvySearch, setGroovvySearch] = useState('');
+  const [isHeroLiked, setIsHeroLiked] = useState(false);
+
+  const formatGroovvyTime = (sec: number) => {
+    if (isNaN(sec) || sec < 0) return '0:00';
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
 
   const handleShuffleDiscovery = () => {
     setMusicDiscoveryList((prev) => [...prev].sort(() => Math.random() - 0.5));
@@ -2115,224 +2309,459 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
               )}
             </div>
           ) : effectiveSection === 'music' ? (
-            <div className="flex flex-col gap-6 items-center w-full pt-2 pb-12">
-              {/* Collapsible 3D Perspective Carousel & Top Player Container */}
-              <div
-                className={`transition-all duration-500 ease-in-out overflow-hidden flex flex-col items-center w-full ${
-                  isTopPlayerHidden
-                    ? 'max-h-0 opacity-0 -translate-y-8 pointer-events-none mb-0 scale-95'
-                    : 'max-h-[600px] opacity-100 translate-y-0 mb-4 scale-100'
-                }`}
-              >
-                {/* 3D Perspective Carousel Container */}
-                <div
-                  className="relative w-full max-w-4xl h-72 sm:h-80 flex items-center justify-center pt-4 pb-2"
-                  style={{ perspective: '1200px' }}
-                >
-                {COVER_FLOW_ALBUMS.map((album, idx) => {
-                  const offset = idx - activeAlbumIdx;
-                  const isCenter = offset === 0;
-
-                  let transform = '';
-                  let zIndex = 10;
-                  let opacity = 0.5;
-
-                  if (isCenter) {
-                    transform = 'translateX(0px) translateZ(100px) rotateY(0deg) scale(1.15)';
-                    zIndex = 40;
-                    opacity = 1;
-                  } else if (offset < 0) {
-                    transform = `translateX(${offset * 120}px) translateZ(${offset * -50}px) rotateY(45deg) scale(0.85)`;
-                    zIndex = 30 + offset;
-                    opacity = Math.max(0.3, 0.9 + offset * 0.2);
-                  } else {
-                    transform = `translateX(${offset * 120}px) translateZ(${offset * -50}px) rotateY(-45deg) scale(0.85)`;
-                    zIndex = 30 - offset;
-                    opacity = Math.max(0.3, 0.9 - offset * 0.2);
-                  }
-
-                  const displayCover =
-                    isCenter && previouslyPlayed?.thumbnailUri
-                      ? previouslyPlayed.thumbnailUri
-                      : album.albumArt;
-                  const displayTitle =
-                    isCenter && previouslyPlayed?.title
-                      ? previouslyPlayed.title
-                      : album.title;
-                  const displayArtist =
-                    isCenter && previouslyPlayed
-                      ? 'Resume Playback • Recent Media'
-                      : album.artist;
-
-                  return (
-                    <div
-                      key={album.id}
-                      onClick={() => {
-                        if (isCenter && previouslyPlayed) {
-                          openMedia(
-                            previouslyPlayed.uri,
-                            previouslyPlayed.title,
-                            true,
-                            previouslyPlayed.lastPositionMs,
-                            previouslyPlayed.thumbnailUri,
-                            'music'
-                          );
-                        } else {
-                          handlePlayAlbum(idx);
-                        }
-                      }}
-                      className="absolute w-52 h-52 rounded-2xl overflow-hidden cursor-pointer transition-all duration-500 ease-out shadow-2xl border border-white/20 select-none group"
-                      style={{
-                        transform,
-                        zIndex,
-                        opacity,
-                        transformStyle: 'preserve-3d',
-                      }}
+            <div className="flex flex-col gap-8 items-center w-full max-w-6xl pt-2 pb-12 animate-in fade-in duration-300">
+              {/* Groovvy 3D Perspective Music Studio */}
+              {/* Groovvy Sub-Navigation Bar */}
+              <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-4 pb-2 border-b border-white/5">
+                <div className="flex items-center gap-6">
+                  {(['music', 'podcast', 'live'] as const).map((tab) => (
+                    <button
+                      key={tab}
+                      onClick={() => setGroovvySubTab(tab)}
+                      className={`text-xs font-black uppercase tracking-widest transition-all cursor-pointer relative pb-1 ${
+                        groovvySubTab === tab
+                          ? 'text-white'
+                          : 'text-white/40 hover:text-white/70'
+                      }`}
                     >
-                      <img
-                        src={displayCover}
-                        alt={displayTitle}
-                        referrerPolicy="no-referrer"
-                        className="w-full h-full object-cover"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex items-end p-3">
-                        <div>
-                          <h4 className="text-xs font-bold text-white truncate">{displayTitle}</h4>
-                          <p className="text-[10px] text-white/60 truncate">{displayArtist}</p>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                      {tab}
+                      {groovvySubTab === tab && (
+                        <div className="absolute -bottom-1 left-0 right-0 h-0.5 bg-[#4361ee] rounded-full shadow-lg shadow-blue-500/50" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Groovvy Top Search Bar */}
+                <div className="relative w-full sm:w-72">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/40" />
+                  <input
+                    type="text"
+                    value={groovvySearch}
+                    onChange={(e) => {
+                      setGroovvySearch(e.target.value);
+                      setSearchQuery(e.target.value);
+                    }}
+                    placeholder="Type here to search"
+                    className="w-full pl-9 pr-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder-white/40 focus:outline-none focus:border-blue-500/60 focus:bg-white/10 transition-all font-medium"
+                  />
+                  {groovvySearch && (
+                    <button
+                      onClick={() => {
+                        setGroovvySearch('');
+                        setSearchQuery('');
+                      }}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-white/50 hover:text-white"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
               </div>
 
-              {/* Active Album Title & Artist Display */}
-              <div className="text-center flex flex-col items-center gap-1 animate-in fade-in duration-300">
-                {previouslyPlayed ? (
-                  <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-[10px] font-bold text-emerald-300 mb-1">
-                    <Clock className="w-3 h-3 text-emerald-400" />
-                    <span>PREVIOUSLY PLAYED TRACK</span>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-500/20 border border-red-500/30 text-[10px] font-bold text-red-300 mb-1">
-                    <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
-                    <span>YOUTUBE MUSIC EXCLUSIVE</span>
-                  </div>
-                )}
-                <h2 className="text-xl font-bold text-white tracking-wide">
-                  {previouslyPlayed ? previouslyPlayed.title : activeAlbum.title}
-                </h2>
-                <p className="text-xs text-white/60 font-medium">
-                  {previouslyPlayed
-                    ? 'Resume Playback • Recent Media'
-                    : `${activeAlbum.artist} — ${activeAlbum.album}`}
-                </p>
-              </div>
+              {/* 1. Trending New Hits Hero Banner (Image 2) */}
+              <div
+                className="relative w-full rounded-3xl bg-gradient-to-r from-[#0d111d] via-[#121727] to-[#1c233c] border border-white/10 p-6 sm:p-10 overflow-hidden shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-6 min-h-[260px] h-72 sm:h-80"
+                style={{ perspective: '1200px' }}
+              >
+                {/* Left Content */}
+                <div className="flex flex-col items-start z-10 max-w-xl">
+                  <span className="text-[11px] font-bold uppercase tracking-widest text-white/50 mb-2">
+                    Trending New Hits
+                  </span>
+                  <h1 className="text-3xl sm:text-5xl font-black text-white tracking-tight leading-none mb-3 drop-shadow-md">
+                    In My Feelings
+                  </h1>
+                  <p className="text-sm font-semibold text-white/70 mb-6 flex items-center gap-2">
+                    <span>Camila Cabello</span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-white/30" />
+                    <span className="text-white/50 font-normal">63Million Plays</span>
+                  </p>
 
-              {/* FLOATING TRANSLUCENT GLASS PILL PLAYBACK BAR (IMAGE 1) */}
-              <div className="w-full max-w-2xl px-6 py-3 rounded-full bg-slate-950/80 backdrop-blur-2xl border border-white/15 shadow-2xl flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() =>
-                      handlePlayAlbum((activeAlbumIdx - 1 + COVER_FLOW_ALBUMS.length) % COVER_FLOW_ALBUMS.length)
-                    }
-                    className="p-2 text-white/70 hover:text-white transition-colors cursor-pointer"
-                  >
-                    <SkipBack className="w-4 h-4 fill-current" />
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      if (currentUri && activePlaybackMode === 'music') {
-                        togglePlay();
-                      } else if (previouslyPlayed) {
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => {
                         openMedia(
-                          previouslyPlayed.uri,
-                          previouslyPlayed.title,
+                          'https://www.youtube.com/watch?v=HCjNJDNgk8Y',
+                          'In My Feelings - Camila Cabello',
                           true,
-                          previouslyPlayed.lastPositionMs,
-                          previouslyPlayed.thumbnailUri,
+                          0,
+                          'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=600&q=80',
                           'music'
                         );
-                      } else {
-                        handlePlayAlbum(activeAlbumIdx);
-                      }
-                    }}
-                    className="p-2.5 rounded-full bg-white text-slate-950 hover:scale-105 transition-all cursor-pointer shadow-lg"
-                    title={isBuffering ? "Loading Audio Stream..." : !isPaused && activePlaybackMode === 'music' ? "Pause (Space)" : "Play (Space)"}
-                  >
-                    {isBuffering ? (
-                      <RefreshCw className="w-4 h-4 animate-spin text-slate-950" />
-                    ) : !isPaused && activePlaybackMode === 'music' ? (
-                      <Pause className="w-4 h-4 fill-current" />
-                    ) : (
-                      <Play className="w-4 h-4 fill-current ml-0.5" />
-                    )}
-                  </button>
+                      }}
+                      className="px-6 py-2.5 rounded-full bg-[#4361ee] hover:bg-[#3b52d4] active:scale-95 text-white font-bold text-xs tracking-wider uppercase transition-all shadow-xl shadow-blue-600/30 cursor-pointer flex items-center gap-2"
+                    >
+                      <Play className="w-3.5 h-3.5 fill-white" />
+                      <span>Listen Now</span>
+                    </button>
 
-                  <button
-                    onClick={() =>
-                      handlePlayAlbum((activeAlbumIdx + 1) % COVER_FLOW_ALBUMS.length)
-                    }
-                    className="p-2 text-white/70 hover:text-white transition-colors cursor-pointer"
-                  >
-                    <SkipForward className="w-4 h-4 fill-current" />
-                  </button>
-                </div>
-
-                <div
-                  onClick={() => {
-                    if (onOpenMusic) onOpenMusic();
-                  }}
-                  className="flex-1 flex items-center gap-3 px-3 py-1.5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 min-w-0 cursor-pointer transition-colors"
-                  title="Open Full-Window Music Player"
-                >
-                  <div className="w-8 h-8 rounded-lg overflow-hidden bg-black/60 shrink-0">
-                    <img
-                      src={previouslyPlayed?.thumbnailUri || activeAlbum.albumArt}
-                      alt={previouslyPlayed ? previouslyPlayed.title : activeAlbum.title}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <div className="flex flex-col min-w-0 flex-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-white truncate">
-                        {previouslyPlayed ? previouslyPlayed.title : activeAlbum.title}
-                      </span>
-                      <span className="text-[10px] text-white/40 font-mono">
-                        {previouslyPlayed ? 'Recent' : '3:38'}
-                      </span>
-                    </div>
-                    <div className="w-full h-1 bg-white/20 rounded-full overflow-hidden mt-1">
-                      <div className="w-2/5 h-full bg-gradient-to-r from-orange-500 to-rose-400 rounded-full" />
-                    </div>
+                    <button
+                      onClick={() => setIsHeroLiked((prev) => !prev)}
+                      className={`p-2.5 rounded-full border transition-all cursor-pointer ${
+                        isHeroLiked
+                          ? 'bg-rose-500/20 border-rose-500/40 text-rose-400'
+                          : 'bg-white/5 hover:bg-white/10 border-white/10 text-white/70 hover:text-white'
+                      }`}
+                      title="Like song"
+                    >
+                      <Heart className={`w-4 h-4 ${isHeroLiked ? 'fill-rose-400' : ''}`} />
+                    </button>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 text-white/60">
-                  <button className="p-1.5 hover:text-white transition-colors cursor-pointer">
-                    <MessageSquareText className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={onOpenMusic}
-                    title="Open Full Music Player"
-                    className="p-1.5 hover:text-white transition-colors cursor-pointer"
-                  >
-                    <ListMusic className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={toggleMute}
-                    className="p-1.5 hover:text-white transition-colors cursor-pointer"
-                  >
-                    {isMuted || volume === 0 ? (
-                      <VolumeX className="w-4 h-4 text-rose-400" />
-                    ) : (
-                      <Volume2 className="w-4 h-4" />
-                    )}
-                  </button>
+                {/* Right Hero Image fading into card */}
+                <div className="relative w-full sm:w-80 h-56 sm:h-72 shrink-0 flex items-center justify-center sm:justify-end">
+                  <div className="absolute inset-0 bg-gradient-to-r from-[#0d111d] via-transparent to-transparent z-10 hidden sm:block pointer-events-none" />
+                  <img
+                    src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=700&q=80"
+                    alt="Camila Cabello Hero"
+                    className="w-full h-full object-cover object-top rounded-2xl sm:rounded-none opacity-90 filter contrast-105"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#0d111d] via-transparent to-transparent sm:hidden pointer-events-none" />
                 </div>
               </div>
-            </div>
+
+              {/* 2. Top Artists Ribbon (Image 2 - "also show ribbon of artist") */}
+              <div className="w-full flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-base font-extrabold text-white tracking-wide">
+                    Top Artists
+                  </h3>
+                  <button
+                    onClick={() => {
+                      if (onOpenMusic) onOpenMusic();
+                    }}
+                    className="text-xs font-semibold text-white/40 hover:text-white transition-colors cursor-pointer"
+                  >
+                    See all
+                  </button>
+                </div>
+
+                {/* Horizontal Scrolling Ribbon Shelf */}
+                <div className="flex items-center gap-4 overflow-x-auto pb-2 pt-1 scrollbar-none w-full">
+                  {GROOVVY_TOP_ARTISTS.map((artist) => (
+                    <div
+                      key={artist.id}
+                      onClick={() => {
+                        setSearchQuery(artist.name);
+                        const matched = musicDiscoveryList.find((m) =>
+                          m.artist.toLowerCase().includes(artist.name.toLowerCase())
+                        );
+                        if (matched) {
+                          openMedia(matched.streamUrl || matched.pageUrl, `${matched.title} - ${matched.artist}`, true, 0, matched.coverUrl, 'music');
+                        }
+                      }}
+                      className="group flex flex-col items-center p-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 min-w-[130px] sm:min-w-[140px] cursor-pointer hover:-translate-y-1 transition-all shadow-lg select-none"
+                    >
+                      <div className="relative w-20 h-20 sm:w-22 sm:h-22 rounded-2xl overflow-hidden mb-2.5 shadow-md border border-white/10 group-hover:scale-105 transition-transform">
+                        <img
+                          src={artist.imageUrl}
+                          alt={artist.name}
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-black/20 group-hover:bg-black/0 transition-colors" />
+                      </div>
+                      <span className="text-xs font-bold text-white group-hover:text-blue-400 transition-colors truncate max-w-[120px] text-center">
+                        {artist.name}
+                      </span>
+                      <span className="text-[11px] font-semibold text-white/40 group-hover:text-white/70 transition-colors mt-0.5">
+                        {artist.plays}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 3. Lower Section: 2 Columns (Genres & Top Charts on Left, Player Card on Right) */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full items-start">
+                {/* Left Column (col-span-7) */}
+                <div className="lg:col-span-7 flex flex-col gap-6 w-full">
+                  {/* Genres Section */}
+                  <div className="w-full flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-base font-extrabold text-white tracking-wide">
+                        Genres
+                      </h3>
+                      <button
+                        onClick={() => setSelectedMusicCategory('all')}
+                        className="text-xs font-semibold text-white/40 hover:text-white transition-colors cursor-pointer"
+                      >
+                        See all
+                      </button>
+                    </div>
+
+                    {/* 2 x 3 Colored Genre Cards */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {GROOVVY_GENRES.map((genre) => (
+                        <div
+                          key={genre.id}
+                          onClick={() => {
+                            setSelectedMusicCategory(
+                              genre.id === 'dance-beat' ? 'phonk' :
+                              genre.id === 'electro-pop' ? 'lo-fi' :
+                              genre.id === 'alt-indie' ? 'english' :
+                              genre.id === 'hip-hop' ? 'hindi' :
+                              genre.id === 'classical' ? 'romantic' : 'all'
+                            );
+                          }}
+                          className={`${genre.bgClass} ${genre.borderClass} border rounded-2xl p-4 flex items-center justify-center text-center cursor-pointer hover:scale-[1.03] transition-all shadow-md group`}
+                        >
+                          <span className={`text-xs font-bold tracking-wide ${genre.textClass}`}>
+                            {genre.name}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Top Charts Section */}
+                  <div className="w-full flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-base font-extrabold text-white tracking-wide">
+                        Top Charts
+                      </h3>
+                      <button
+                        onClick={() => {
+                          if (onOpenMusic) onOpenMusic();
+                        }}
+                        className="text-xs font-semibold text-white/40 hover:text-white transition-colors cursor-pointer"
+                      >
+                        See all
+                      </button>
+                    </div>
+
+                    {/* Ranked Tracks List */}
+                    <div className="flex flex-col gap-2">
+                      {GROOVVY_TOP_CHARTS.map((track) => (
+                        <div
+                          key={track.id}
+                          onClick={() => {
+                            openMedia(track.url, `${track.title} - ${track.artist}`, true, 0, track.cover, 'music');
+                          }}
+                          className="flex items-center justify-between p-2.5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/15 transition-all cursor-pointer group"
+                        >
+                          <div className="flex items-center gap-3.5 min-w-0">
+                            <span className="text-xs font-black text-white/40 group-hover:text-[#4361ee] transition-colors w-6 text-center">
+                              {track.rank}
+                            </span>
+                            <div className="w-10 h-10 rounded-xl overflow-hidden bg-black/60 shrink-0 border border-white/10 shadow-sm">
+                              <img
+                                src={track.cover}
+                                alt={track.title}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                            <div className="flex flex-col min-w-0">
+                              <span className="text-xs font-bold text-white group-hover:text-blue-300 transition-colors truncate">
+                                {track.title}
+                              </span>
+                              <span className="text-[11px] text-white/50 truncate">
+                                {track.artist}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3 shrink-0">
+                            <div className="flex items-center gap-1 text-xs font-mono text-white/40">
+                              <Headphones className="w-3 h-3 text-white/30" />
+                              <span>{track.duration}</span>
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openMedia(track.url, `${track.title} - ${track.artist}`, true, 0, track.cover, 'music');
+                              }}
+                              className="p-2 rounded-xl bg-white/10 group-hover:bg-[#4361ee] text-white transition-colors shadow-sm"
+                            >
+                              <Play className="w-3.5 h-3.5 fill-current" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Column (col-span-5): Dedicated Player Card (Image 2) */}
+                <div className="lg:col-span-5 flex flex-col rounded-3xl bg-[#0f1422] border border-white/10 p-5 shadow-2xl backdrop-blur-xl gap-4 w-full">
+                  <div className="flex items-center justify-between w-full">
+                    <h3 className="text-sm font-black text-white uppercase tracking-wider">Player</h3>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={toggleMute}
+                        title={isMuted || volume === 0 ? "Unmute" : "Mute"}
+                        className="p-1.5 rounded-lg text-white/40 hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
+                      >
+                        {isMuted || volume === 0 ? (
+                          <VolumeX className="w-4 h-4 text-rose-400" />
+                        ) : (
+                          <Volume2 className="w-4 h-4" />
+                        )}
+                      </button>
+                      <button
+                        onClick={onOpenMusic}
+                        title="Chat & Lyrics"
+                        className="p-1.5 rounded-lg text-white/40 hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
+                      >
+                        <MessageSquareText className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={onOpenMusic}
+                        title="Open Full Player"
+                        className="p-1.5 rounded-lg text-white/40 hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
+                      >
+                        <ListMusic className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Album Artwork */}
+                  <div className="relative w-44 h-44 sm:w-52 sm:h-52 mx-auto rounded-2xl overflow-hidden shadow-2xl border border-white/15 my-1 group">
+                    <img
+                      src={
+                        currentArtwork ||
+                        previouslyPlayed?.thumbnailUri ||
+                        activeAlbum.albumArt ||
+                        'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?auto=format&fit=crop&w=400&q=80'
+                      }
+                      alt={currentTitle || 'Butterfly Effect'}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                    <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <button
+                        onClick={togglePlay}
+                        className="p-3.5 rounded-full bg-white text-[#4361ee] shadow-2xl hover:scale-110 active:scale-95 transition-all"
+                      >
+                        {!isPaused && currentUri ? (
+                          <Pause className="w-5 h-5 fill-current" />
+                        ) : (
+                          <Play className="w-5 h-5 fill-current ml-0.5" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Track Info */}
+                  <div className="flex flex-col items-center text-center gap-0.5">
+                    <h4 className="text-base font-extrabold text-white truncate max-w-xs">
+                      {currentTitle || 'Butterfly Effect'}
+                    </h4>
+                    <p className="text-xs font-semibold text-white/60 truncate max-w-xs">
+                      {previouslyPlayed ? 'Resume Playback' : activeAlbum.artist || 'Travis Scott'}
+                    </p>
+                    <span className="text-[10px] text-white/40 font-mono mt-0.5">
+                      Best of 2020
+                    </span>
+                  </div>
+
+                  {/* Scrubber Progress Bar */}
+                  <div className="flex flex-col gap-1 w-full pt-1">
+                    <div className="flex items-center justify-between text-[11px] font-mono text-white/40">
+                      <span>{formatGroovvyTime(positionMs / 1000 || 165)}</span>
+                      <span>
+                        {durationMs > 0
+                          ? formatGroovvyTime(Math.max(0, (durationMs - positionMs) / 1000))
+                          : '1:02'}
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={durationMs > 0 ? durationMs / 1000 : 227}
+                      value={positionMs / 1000}
+                      onChange={(e) => {
+                        const targetMs = parseFloat(e.target.value) * 1000;
+                        seek(targetMs);
+                      }}
+                      className="w-full h-1.5 bg-white/10 rounded-full appearance-none cursor-pointer accent-[#4361ee]"
+                    />
+                  </div>
+
+                  {/* Royal Blue Playback Controls Deck (Image 2) */}
+                  <div className="rounded-2xl bg-[#4361ee] p-4 flex flex-col gap-3 shadow-xl w-full">
+                    <div className="flex items-center justify-between text-white">
+                      <button
+                        onClick={handleShuffleDiscovery}
+                        className="p-1.5 hover:text-white/80 transition-colors cursor-pointer"
+                        title="Shuffle"
+                      >
+                        <Shuffle className="w-4 h-4" />
+                      </button>
+
+                      <button
+                        onClick={() =>
+                          handlePlayAlbum((activeAlbumIdx - 1 + COVER_FLOW_ALBUMS.length) % COVER_FLOW_ALBUMS.length)
+                        }
+                        className="p-1.5 hover:text-white/80 transition-colors cursor-pointer"
+                        title="Previous"
+                      >
+                        <SkipBack className="w-5 h-5 fill-current" />
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          if (currentUri && activePlaybackMode === 'music') {
+                            togglePlay();
+                          } else if (previouslyPlayed) {
+                            openMedia(
+                              previouslyPlayed.uri,
+                              previouslyPlayed.title,
+                              true,
+                              previouslyPlayed.lastPositionMs,
+                              previouslyPlayed.thumbnailUri,
+                              'music'
+                            );
+                          } else {
+                            handlePlayAlbum(activeAlbumIdx);
+                          }
+                        }}
+                        className="p-3 rounded-full bg-white text-[#4361ee] shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                        title={!isPaused && activePlaybackMode === 'music' ? 'Pause' : 'Play'}
+                      >
+                        {isBuffering ? (
+                          <RefreshCw className="w-5 h-5 animate-spin" />
+                        ) : !isPaused && activePlaybackMode === 'music' ? (
+                          <Pause className="w-5 h-5 fill-current" />
+                        ) : (
+                          <Play className="w-5 h-5 fill-current ml-0.5" />
+                        )}
+                      </button>
+
+                      <button
+                        onClick={() =>
+                          handlePlayAlbum((activeAlbumIdx + 1) % COVER_FLOW_ALBUMS.length)
+                        }
+                        className="p-1.5 hover:text-white/80 transition-colors cursor-pointer"
+                        title="Next"
+                      >
+                        <SkipForward className="w-5 h-5 fill-current" />
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          if (positionMs > 0) seek(0);
+                        }}
+                        className="p-1.5 hover:text-white/80 transition-colors cursor-pointer"
+                        title="Repeat"
+                      >
+                        <Repeat className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {/* Expandable ^ LYRICS Button */}
+                    <button
+                      onClick={() => {
+                        if (onOpenMusic) onOpenMusic();
+                      }}
+                      className="w-full pt-1 pb-0.5 flex items-center justify-center gap-1.5 text-[11px] font-black uppercase tracking-widest text-white/90 hover:text-white transition-colors cursor-pointer border-t border-white/20"
+                    >
+                      <ChevronDown className="w-3.5 h-3.5 rotate-180" />
+                      <span>LYRICS</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
 
               {/* Sound Lounge Discovery & Live Search */}
               <div className="w-full max-w-5xl flex flex-col gap-5 mt-2">
