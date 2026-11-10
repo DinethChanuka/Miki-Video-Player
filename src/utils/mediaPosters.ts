@@ -133,4 +133,7 @@ export const ARTIST_AVATARS = {
   samSmith: '/artists/sam_smith.jpg',
   michaelBuble: '/artists/michael_buble.jpg',
   stevieWonder: '/artists/stevie_wonder.jpg',
+  arijitSingh: '/artists/arijit_singh.jpg',
+  theWeekndHero: '/artists/the_weeknd_hero.jpg',
+  billieEilishHero: '/artists/billie_eilish_hero.jpg',
 };

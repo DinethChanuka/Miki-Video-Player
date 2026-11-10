@@ -172,7 +172,7 @@ export const GROOVVY_TOP_ARTISTS: GroovvyArtist[] = [
     id: 'arijit-singh',
     name: 'Arijit Singh',
     plays: '88M Plays',
-    imageUrl: ALBUM_POSTERS.dooriyan || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=400&q=80',
+    imageUrl: ARTIST_AVATARS.arijitSingh,
     gradient: 'from-cyan-900/80 via-blue-950/60 to-slate-900',
     accentColor: 'text-cyan-400',
   },
@@ -183,6 +183,65 @@ export const GROOVVY_TOP_ARTISTS: GroovvyArtist[] = [
     imageUrl: ARTIST_AVATARS.duaLipa,
     gradient: 'from-violet-900/80 via-purple-950/60 to-slate-900',
     accentColor: 'text-violet-400',
+  },
+];
+
+export interface GroovvyHeroBannerSlide {
+  id: string;
+  tag: string;
+  title: string;
+  artist: string;
+  plays: string;
+  languageLabel: string;
+  imageUrl: string;
+  streamUrl: string;
+  glowColor: string;
+}
+
+export const GROOVVY_HERO_BANNERS: GroovvyHeroBannerSlide[] = [
+  {
+    id: 'camila-in-my-feelings',
+    tag: 'Trending New Hits',
+    title: 'In My Feelings',
+    artist: 'Camila Cabello',
+    plays: '63Million Plays',
+    languageLabel: 'English Hit',
+    imageUrl: ARTIST_AVATARS.camilaCabelloHero,
+    streamUrl: 'https://www.youtube.com/watch?v=HCjNJDNgk8Y',
+    glowColor: 'from-rose-600/20 via-blue-600/10 to-transparent',
+  },
+  {
+    id: 'weeknd-blinding-lights',
+    tag: 'Global Chart #1',
+    title: 'Blinding Lights',
+    artist: 'The Weeknd',
+    plays: '108M Plays',
+    languageLabel: 'Starboy Studio',
+    imageUrl: ARTIST_AVATARS.theWeekndHero,
+    streamUrl: 'https://www.youtube.com/watch?v=4NRXx6U8ABQ',
+    glowColor: 'from-amber-600/20 via-red-600/10 to-transparent',
+  },
+  {
+    id: 'arijit-samjhawan',
+    tag: 'Bollywood Spotlight',
+    title: 'Samjhawan (Live)',
+    artist: 'Arijit Singh',
+    plays: '88M Plays',
+    languageLabel: 'Hindi Classic',
+    imageUrl: ARTIST_AVATARS.arijitSingh,
+    streamUrl: 'https://www.youtube.com/watch?v=H2f7MZaw3Yo',
+    glowColor: 'from-cyan-600/20 via-indigo-600/10 to-transparent',
+  },
+  {
+    id: 'billie-birds-of-a-feather',
+    tag: 'Studio Master Hi-Fi',
+    title: 'Birds of a Feather',
+    artist: 'Billie Eilish',
+    plays: '203M Plays',
+    languageLabel: 'Alt Pop',
+    imageUrl: ARTIST_AVATARS.billieEilishHero,
+    streamUrl: 'https://www.youtube.com/watch?v=V9PVRfjEBTI',
+    glowColor: 'from-sky-500/25 via-blue-700/15 to-transparent',
   },
 ];
 
@@ -872,10 +931,28 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
   const currentTitle = usePlayerStore((s) => s.currentTitle);
   const currentArtwork = usePlayerStore((s) => s.currentArtwork);
 
-  const [groovvySubTab, setGroovvySubTab] = useState<'music' | 'podcast' | 'live'>('music');
-  const [groovvySearch, setGroovvySearch] = useState('');
   const [isHeroLiked, setIsHeroLiked] = useState(false);
+  const [heroBannerIndex, setHeroBannerIndex] = useState(0);
+  const [isHeroBannerHovered, setIsHeroBannerHovered] = useState(false);
   const [showAllMusicResults, setShowAllMusicResults] = useState(false);
+
+  // Auto-update Trending New Hits banner carousel when not hovered
+  useEffect(() => {
+    if (isHeroBannerHovered) return;
+    const timer = setInterval(() => {
+      setHeroBannerIndex((prev) => (prev + 1) % GROOVVY_HERO_BANNERS.length);
+    }, 6500);
+    return () => clearInterval(timer);
+  }, [isHeroBannerHovered]);
+
+  const activeHeroBanner = GROOVVY_HERO_BANNERS[heroBannerIndex] || GROOVVY_HERO_BANNERS[0];
+
+  // Clear selected artist spotlight when user clears the top search query
+  useEffect(() => {
+    if (!searchQuery.trim() && selectedArtistProfile) {
+      setSelectedArtistProfile(null);
+    }
+  }, [searchQuery, selectedArtistProfile]);
 
   const handleSelectArtist = useCallback(
     async (artist: ArtistProfile | string) => {
@@ -893,8 +970,8 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
       setLoadingArtistName(artistName);
       setIsLoadingArtistSongs(true);
       setSearchQuery(artistName);
-      setGroovvySearch(artistName);
       setShowAllMusicResults(true);
+      setIsSearchFocused(false);
 
       try {
         const liveTracks = await fetchArtistSongsLive(artist);
@@ -1233,13 +1310,398 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
     return filteredMusicTracks.slice(start, start + MUSIC_PAGE_SIZE);
   }, [filteredMusicTracks, musicCurrentPage]);
 
+  const isSearchingInMusic = useMemo(() => {
+    return searchQuery.trim().length > 0 || Boolean(selectedArtistProfile);
+  }, [searchQuery, selectedArtistProfile]);
+
   const isMusicSearchOrFilterActive = useMemo(() => {
     return (
-      searchQuery.trim().length > 0 ||
-      groovvySearch.trim().length > 0 ||
+      isSearchingInMusic ||
       selectedMusicCategory !== 'all'
     );
-  }, [searchQuery, groovvySearch, selectedMusicCategory]);
+  }, [isSearchingInMusic, selectedMusicCategory]);
+
+  const matchingSearchArtists = useMemo(() => {
+    const q = searchQuery.trim();
+    if (q.length < 2 || selectedArtistProfile) return [];
+    return searchArtists(q).slice(0, 6);
+  }, [searchQuery, selectedArtistProfile]);
+
+  // Shared Sound Lounge line-by-line results renderer (used full-width in Search mode & in-column for filters)
+  const renderSoundLoungeResults = (
+    isFullWidthSearch: boolean,
+    tracks: MusicTrack[] = filteredMusicTracks
+  ) => (
+    <div className="w-full flex flex-col gap-3">
+      <div className="flex items-center justify-between pb-2 border-b border-white/10 gap-3 flex-wrap">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-cyan-600 via-purple-600 to-pink-500 flex items-center justify-center text-white shadow-md shrink-0">
+            <Sparkles className="w-3.5 h-3.5" />
+          </div>
+          <div className="min-w-0">
+            <h3 className="text-sm font-bold text-white tracking-wide uppercase flex items-center gap-2 flex-wrap">
+              <span>Sound Lounge Results</span>
+              <span className="text-[10px] font-normal normal-case px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                {tracks.length} Songs
+              </span>
+              {isFullWidthSearch && searchQuery.trim() && (
+                <span className="text-[11px] font-medium normal-case text-white/50 truncate max-w-[260px]">
+                  for &ldquo;{searchQuery.trim()}&rdquo;
+                </span>
+              )}
+            </h3>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={handleShuffleDiscovery}
+            title="Shuffle Discovery"
+            className="px-2.5 py-1 rounded-xl bg-white/10 hover:bg-white/15 text-white/80 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+          >
+            <Shuffle className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Shuffle Discovery</span>
+          </button>
+          <button
+            onClick={() => {
+              setIsRefreshingMusic(true);
+              fetchLiveMusicDiscovery()
+                .then((tracks) => {
+                  if (tracks && tracks.length > 0) setMusicDiscoveryList(tracks);
+                })
+                .finally(() => setTimeout(() => setIsRefreshingMusic(false), 600));
+            }}
+            className="px-2.5 py-1 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+            title="Live Catalog Sync"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingMusic ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">Sync</span>
+          </button>
+          <button
+            onClick={() => {
+              setSelectedArtistProfile(null);
+              setSearchQuery('');
+              setSelectedMusicCategory('all');
+              setShowAllMusicResults(false);
+            }}
+            className="px-3 py-1 rounded-xl bg-white/10 hover:bg-white/15 text-white/80 hover:text-white text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+          >
+            <X className="w-3.5 h-3.5" />
+            <span>{isFullWidthSearch ? 'Clear Search' : 'Reset'}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Matching Multilingual Artists Quick Strip */}
+      {matchingSearchArtists.length > 0 && (
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-white/40 shrink-0">
+            Artists:
+          </span>
+          {matchingSearchArtists.map((artist) => (
+            <button
+              key={artist.id}
+              onClick={() => handleSelectArtist(artist)}
+              className="flex items-center gap-2 px-2.5 py-1 rounded-full bg-white/5 hover:bg-blue-500/20 border border-white/10 hover:border-blue-500/40 transition-all cursor-pointer shrink-0 group"
+            >
+              <img
+                src={artist.imageUrl}
+                alt={artist.name}
+                className="w-5 h-5 rounded-full object-cover"
+              />
+              <span className="text-xs font-semibold text-white group-hover:text-blue-300">
+                {artist.name}
+              </span>
+              {artist.nativeName && (
+                <span className="text-[10px] text-white/50">{artist.nativeName}</span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Live Artist Loading State */}
+      {isLoadingArtistSongs && (
+        <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-gradient-to-r from-blue-900/30 via-indigo-900/20 to-purple-900/10 border border-blue-500/30 text-white animate-pulse">
+          <RefreshCw className="w-4 h-4 text-cyan-400 animate-spin shrink-0" />
+          <div className="flex flex-col min-w-0">
+            <span className="text-xs font-bold text-cyan-300 truncate">
+              Loading all live songs from internet for {loadingArtistName}...
+            </span>
+            <span className="text-[11px] text-white/50 truncate">
+              Streaming live YouTube Music tracks with lossless audio
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Artist Spotlight Banner */}
+      {selectedArtistProfile && (
+        <div className="p-3.5 rounded-2xl bg-gradient-to-r from-blue-900/40 via-purple-900/20 to-black/40 border border-white/10 flex items-center justify-between gap-3 shadow-lg">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0 border border-white/10 shadow-md">
+              <img
+                src={selectedArtistProfile.imageUrl}
+                alt={selectedArtistProfile.name}
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  if (selectedArtistProfile.fallbackImageUrl) {
+                    (e.currentTarget as HTMLImageElement).src = selectedArtistProfile.fallbackImageUrl;
+                  }
+                }}
+              />
+            </div>
+            <div className="flex flex-col min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-xs sm:text-sm font-extrabold text-white truncate">
+                  {selectedArtistProfile.name}
+                </span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white/10 text-white/80 border border-white/10">
+                  {selectedArtistProfile.language === 'english' && '🇺🇸 English'}
+                  {selectedArtistProfile.language === 'hindi' && '🇮🇳 Hindi'}
+                  {selectedArtistProfile.language === 'sinhala' && '🇱🇰 Sinhala'}
+                </span>
+              </div>
+              {selectedArtistProfile.nativeName && (
+                <span className="text-[11px] font-semibold text-white/60">
+                  {selectedArtistProfile.nativeName}
+                </span>
+              )}
+              <span className="text-[10px] text-cyan-300 font-mono">
+                {selectedArtistProfile.genre} • {selectedArtistProfile.plays}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => {
+                if (filteredMusicTracks.length > 0) {
+                  const first = filteredMusicTracks[0];
+                  openMedia(first.streamUrl || first.pageUrl, `${first.title} - ${first.artist}`, true, 0, first.coverUrl, 'music');
+                  setMusicPlayerOpen(false);
+                }
+              }}
+              className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-blue-600/30 transition-all cursor-pointer"
+            >
+              <Play className="w-3 h-3 fill-white" />
+              <span>Play All</span>
+            </button>
+            <button
+              onClick={() => {
+                setSelectedArtistProfile(null);
+                setSearchQuery('');
+              }}
+              className="p-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-colors cursor-pointer"
+              title="Clear artist filter"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Line-by-Line Track List */}
+      {filteredMusicTracks.length === 0 ? (
+        <div className="p-8 rounded-2xl bg-white/5 border border-white/5 text-center flex flex-col items-center gap-2 my-2">
+          <Music className="w-8 h-8 text-white/30" />
+          <p className="text-xs text-white/60">No songs found matching your search</p>
+          <button
+            onClick={() => {
+              setSelectedArtistProfile(null);
+              setSearchQuery('');
+              setSelectedMusicCategory('all');
+              setShowAllMusicResults(false);
+            }}
+            className="text-xs text-[#4361ee] hover:underline cursor-pointer"
+          >
+            Reset Search
+          </button>
+        </div>
+      ) : (
+        <div className="w-full rounded-2xl bg-white/[0.02] border border-white/10 overflow-hidden shadow-lg">
+          {isFullWidthSearch && (
+            <div className="hidden sm:flex items-center justify-between gap-4 px-4 py-2 border-b border-white/10 bg-white/[0.03] text-[10px] font-bold uppercase tracking-wider text-white/40">
+              <div className="flex items-center gap-4 flex-1 min-w-0">
+                <span className="w-6 text-center shrink-0">#</span>
+                <span className="flex-1 min-w-0">Title</span>
+                <span className="w-44 lg:w-56 shrink-0">Artist</span>
+              </div>
+              <div className="flex items-center gap-4 shrink-0">
+                <span className="hidden md:inline-block w-28 text-left">Genre</span>
+                <span className="w-12 text-right">Time</span>
+                <span className="w-16 text-right">Play</span>
+              </div>
+            </div>
+          )}
+          <div className="flex flex-col divide-y divide-white/[0.06]">
+            {paginatedMusicTracks.map((track, idx) => {
+              const trackIndex = (musicCurrentPage - 1) * MUSIC_PAGE_SIZE + idx + 1;
+              const isCurrentTrack =
+                currentTitle === `${track.title} - ${track.artist}` ||
+                currentTitle === track.title;
+              return (
+                <div
+                  key={track.id || `${track.title}-${idx}`}
+                  onClick={() => {
+                    if (isCurrentTrack) {
+                      togglePlay();
+                    } else {
+                      openMedia(
+                        track.streamUrl || track.pageUrl,
+                        `${track.title} - ${track.artist}`,
+                        true,
+                        0,
+                        track.coverUrl,
+                        'music'
+                      );
+                      setMusicPlayerOpen(false);
+                    }
+                  }}
+                  className={`flex items-center justify-between gap-4 px-4 py-2.5 transition-colors cursor-pointer group ${
+                    isCurrentTrack
+                      ? 'bg-blue-500/15'
+                      : 'hover:bg-white/[0.06]'
+                  }`}
+                >
+                  <div className="flex items-center gap-3.5 flex-1 min-w-0">
+                    <span
+                      className={`text-xs font-mono font-bold w-6 text-center shrink-0 ${
+                        isCurrentTrack
+                          ? 'text-[#4361ee]'
+                          : 'text-white/40 group-hover:text-[#4361ee]'
+                      }`}
+                    >
+                      {trackIndex < 10 ? `0${trackIndex}` : trackIndex}
+                    </span>
+                    <div className="w-9 h-9 rounded-lg overflow-hidden bg-black/60 shrink-0 border border-white/10 shadow-sm relative">
+                      <img
+                        src={track.coverUrl}
+                        alt={track.title}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                      {isCurrentTrack && !isPaused && (
+                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                          <div className="w-2 h-2 rounded-full bg-[#4361ee] animate-ping" />
+                        </div>
+                      )}
+                    </div>
+                    <div className={`flex min-w-0 flex-1 ${isFullWidthSearch ? 'flex-col sm:flex-row sm:items-center sm:gap-4' : 'flex-col'}`}>
+                      <span
+                        className={`text-xs sm:text-[13px] font-semibold truncate ${isFullWidthSearch ? 'sm:flex-1' : ''} ${
+                          isCurrentTrack
+                            ? 'text-blue-300'
+                            : 'text-white group-hover:text-blue-300'
+                        }`}
+                      >
+                        {track.title}
+                      </span>
+                      <span
+                        className={`text-[11px] sm:text-xs text-white/55 truncate ${
+                          isFullWidthSearch ? 'sm:w-44 lg:w-56 sm:shrink-0' : ''
+                        }`}
+                      >
+                        {track.artist}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 shrink-0">
+                    {isFullWidthSearch && (
+                      <span className="hidden md:inline-block w-28 truncate text-[11px] text-white/40">
+                        {track.genre || 'Live Audio'}
+                      </span>
+                    )}
+                    <div className="flex items-center gap-1 text-xs font-mono text-white/45 w-12 justify-end">
+                      <Headphones className="w-3 h-3 text-white/25 hidden sm:inline" />
+                      <span>{track.duration || '3:45'}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedTrackForPlaylist(track);
+                          setIsPlaylistModalOpen(true);
+                        }}
+                        title="Add to Playlist"
+                        className="p-1.5 rounded-lg text-white/30 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                      >
+                        <ListPlus className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (isCurrentTrack) {
+                            togglePlay();
+                          } else {
+                            openMedia(
+                              track.streamUrl || track.pageUrl,
+                              `${track.title} - ${track.artist}`,
+                              true,
+                              0,
+                              track.coverUrl,
+                              'music'
+                            );
+                            setMusicPlayerOpen(false);
+                          }
+                        }}
+                        className={`p-1.5 rounded-lg text-white transition-colors shadow-sm cursor-pointer ${
+                          isCurrentTrack
+                            ? 'bg-[#4361ee]'
+                            : 'bg-white/10 group-hover:bg-[#4361ee]'
+                        }`}
+                      >
+                        {isCurrentTrack && !isPaused ? (
+                          <Pause className="w-3.5 h-3.5 fill-current" />
+                        ) : (
+                          <Play className="w-3.5 h-3.5 fill-current" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Chunked Streaming Pagination Controls */}
+      {filteredMusicTracks.length > MUSIC_PAGE_SIZE && (
+        <div className="flex items-center justify-between pt-2 border-t border-white/5 mt-1">
+          <span className="text-[11px] font-mono text-white/40">
+            Showing {(musicCurrentPage - 1) * MUSIC_PAGE_SIZE + 1} -{' '}
+            {Math.min(filteredMusicTracks.length, musicCurrentPage * MUSIC_PAGE_SIZE)} of{' '}
+            {filteredMusicTracks.length} Songs (Chunked Streaming)
+          </span>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setMusicCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={musicCurrentPage <= 1}
+              className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-xs text-white/70 disabled:opacity-30 disabled:pointer-events-none transition-all flex items-center gap-1 cursor-pointer"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+              <span>Previous</span>
+            </button>
+            <span className="text-xs font-mono text-white/50 px-1">
+              Chunk {musicCurrentPage} of {musicTotalPages}
+            </span>
+            <button
+              onClick={() => setMusicCurrentPage((p) => Math.min(musicTotalPages, p + 1))}
+              disabled={musicCurrentPage >= musicTotalPages}
+              className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-xs text-white/70 disabled:opacity-30 disabled:pointer-events-none transition-all flex items-center gap-1 cursor-pointer"
+            >
+              <span>Next</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 
   // Filtered Radio Garden & Worldwide Live Stations
   const filteredRadioStations = useMemo<RadioGardenStation[]>(() => {
@@ -1750,7 +2212,11 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
               {searchQuery && (
                 <button
                   type="button"
-                  onClick={() => setSearchQuery('')}
+                  onClick={() => {
+                    setSearchQuery('');
+                    setSelectedArtistProfile(null);
+                    setShowAllMusicResults(false);
+                  }}
                   title="Clear search"
                   className="absolute right-8 top-1/2 -translate-y-1/2 p-1 text-white/40 hover:text-white transition-colors cursor-pointer"
                 >
@@ -1766,8 +2232,8 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                 <Sliders className="w-3.5 h-3.5" />
               </button>
 
-              {/* Live Instant Search Dropdown */}
-              {searchQuery.trim().length > 0 && isSearchFocused && (
+              {/* Live Instant Search Dropdown (suppressed in 3D Music where full-width line-by-line results show directly) */}
+              {searchQuery.trim().length > 0 && isSearchFocused && effectiveSection !== 'music' && (
                 <div
                   className="absolute left-0 right-0 top-full mt-2 bg-[#090d16]/95 backdrop-blur-2xl border border-white/15 rounded-2xl shadow-2xl p-3 flex flex-col gap-3 max-h-[460px] overflow-y-auto scrollbar-thin z-50 animate-in fade-in zoom-in-95 duration-150"
                   onMouseDown={(e) => e.stopPropagation()}
@@ -2372,125 +2838,136 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
               )}
             </div>
           ) : effectiveSection === 'music' ? (
-            <div className="flex flex-col gap-8 items-center w-full max-w-6xl pt-2 pb-12 animate-in fade-in duration-300">
-              {/* Groovvy 3D Perspective Music Studio with COVER_FLOW_ALBUMS */}
-              {/* Groovvy Sub-Navigation Bar */}
-              <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-4 pb-2 border-b border-white/5">
-                <div className="flex items-center gap-6">
-                  {(['music', 'podcast', 'live'] as const).map((tab) => (
-                    <button
-                      key={tab}
-                      onClick={() => setGroovvySubTab(tab)}
-                      className={`text-xs font-black uppercase tracking-widest transition-all cursor-pointer relative pb-1 ${
-                        groovvySubTab === tab
-                          ? 'text-white'
-                          : 'text-white/40 hover:text-white/70'
-                      }`}
+            <div
+              className="flex flex-col gap-8 items-center w-full max-w-6xl pt-2 pb-12 animate-in fade-in duration-300"
+              data-studio-albums={COVER_FLOW_ALBUMS.length}
+            >
+              {/* Groovvy 3D Perspective Music Studio */}
+              {isSearchingInMusic ? (
+                /* Search Mode: Hide Hero Banner, Top Artists, Genres, Charts & Player — show only results line by line */
+                renderSoundLoungeResults(true, filteredMusicTracks)
+              ) : (
+                <>
+                  {/* 1. Dynamic Updating Trending Hits Hero Banner */}
+                  <div
+                    onMouseEnter={() => setIsHeroBannerHovered(true)}
+                    onMouseLeave={() => setIsHeroBannerHovered(false)}
+                    className="relative w-full rounded-3xl bg-[#090d16] border border-white/10 overflow-hidden shadow-2xl flex items-center justify-between min-h-[260px] h-72 sm:h-80"
+                    style={{ perspective: '1200px' }}
+                  >
+                    {/* Dynamic Slide Ambient Glow */}
+                    <div
+                      className={`absolute inset-0 bg-gradient-to-br ${activeHeroBanner.glowColor} pointer-events-none transition-all duration-700`}
+                    />
+
+                    {/* Full-Bleed Seamlessly Masked Right Artist Backdrop */}
+                    <div
+                      className="absolute inset-y-0 right-0 w-full sm:w-[60%] pointer-events-none select-none overflow-hidden"
+                      style={{
+                        maskImage: 'linear-gradient(to left, rgba(0,0,0,0.95) 35%, rgba(0,0,0,0.55) 68%, transparent 100%)',
+                        WebkitMaskImage: 'linear-gradient(to left, rgba(0,0,0,0.95) 35%, rgba(0,0,0,0.55) 68%, transparent 100%)',
+                      }}
                     >
-                      {tab}
-                      {groovvySubTab === tab && (
-                        <div className="absolute -bottom-1 left-0 right-0 h-0.5 bg-[#4361ee] rounded-full shadow-lg shadow-blue-500/50" />
+                      {heroBannerIndex === 0 ? (
+                        <img
+                          src={ARTIST_AVATARS.camilaCabelloHero}
+                          alt={activeHeroBanner.artist}
+                          className="w-full h-full object-cover object-[50%_20%] filter contrast-105 transition-all duration-700"
+                        />
+                      ) : (
+                        <img
+                          src={activeHeroBanner.imageUrl}
+                          alt={activeHeroBanner.artist}
+                          className="w-full h-full object-cover object-top filter contrast-105 transition-all duration-700"
+                        />
                       )}
-                    </button>
-                  ))}
-                </div>
+                      <div className="absolute inset-0 bg-gradient-to-r from-[#090d16] via-[#090d16]/60 to-transparent" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#090d16] via-transparent to-[#090d16]/40" />
+                    </div>
 
-                {/* Groovvy Top Search Bar */}
-                <div className="relative w-full sm:w-72">
-                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/40" />
-                  <input
-                    type="text"
-                    value={groovvySearch}
-                    onChange={(e) => {
-                      setGroovvySearch(e.target.value);
-                      setSearchQuery(e.target.value);
-                    }}
-                    placeholder="Type here to search"
-                    className="w-full pl-9 pr-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder-white/40 focus:outline-none focus:border-blue-500/60 focus:bg-white/10 transition-all font-medium"
-                  />
-                  {groovvySearch && (
-                    <button
-                      onClick={() => {
-                        setGroovvySearch('');
-                        setSearchQuery('');
-                      }}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-white/50 hover:text-white"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  )}
-                </div>
-              </div>
+                    {/* Left Content */}
+                    <div className="relative z-10 flex flex-col items-start max-w-xl p-6 sm:p-10">
+                      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-2.5 flex items-center gap-2 flex-wrap">
+                        <span>Groovvy 3D Sound Lounge</span>
+                        <span className="text-white/30">•</span>
+                        <span className="text-blue-400">Trending New Hits</span>
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-semibold bg-white/10 border border-white/10 text-white/80">
+                          {activeHeroBanner.languageLabel}
+                        </span>
+                      </div>
 
-              {/* 1. Trending New Hits Hero Banner (Image 2) */}
-              <div
-                className="relative w-full rounded-3xl bg-gradient-to-r from-[#0d111d] via-[#121727] to-[#1c233c] border border-white/10 p-6 sm:p-10 overflow-hidden shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-6 min-h-[260px] h-72 sm:h-80"
-                style={{ perspective: '1200px' }}
-              >
-                {/* Left Content */}
-                <div className="flex flex-col items-start z-10 max-w-xl">
-                  <span className="text-[11px] font-bold uppercase tracking-widest text-white/50 mb-2 flex items-center gap-2">
-                    <span>Groovvy 3D Sound Lounge</span>
-                    <span className="text-white/30">•</span>
-                    <span>Trending New Hits</span>
-                  </span>
-                  <h1 className="text-3xl sm:text-5xl font-black text-white tracking-tight leading-none mb-3 drop-shadow-md">
-                    In My Feelings
-                  </h1>
-                  <p className="text-sm font-semibold text-white/70 mb-6 flex items-center gap-2">
-                    <span>Camila Cabello</span>
-                    <span className="w-1.5 h-1.5 rounded-full bg-white/30" />
-                    <span className="text-white/50 font-normal">63Million Plays</span>
-                  </p>
+                      <h1 className="text-3xl sm:text-5xl font-black text-white tracking-tight leading-none mb-3 drop-shadow-lg">
+                        {activeHeroBanner.title}
+                      </h1>
 
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => {
-                        openMedia(
-                          'https://www.youtube.com/watch?v=HCjNJDNgk8Y',
-                          'In My Feelings - Camila Cabello',
-                          true,
-                          0,
-                          ARTIST_AVATARS.camilaCabelloHero,
-                          'music'
-                        );
-                        setMusicPlayerOpen(false);
-                      }}
-                      className="px-6 py-2.5 rounded-full bg-[#4361ee] hover:bg-[#3b52d4] active:scale-95 text-white font-bold text-xs tracking-wider uppercase transition-all shadow-xl shadow-blue-600/30 cursor-pointer flex items-center gap-2"
-                    >
-                      <Play className="w-3.5 h-3.5 fill-white" />
-                      <span>Listen Now</span>
-                    </button>
+                      <p className="text-sm font-semibold text-white/80 mb-6 flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleSelectArtist(activeHeroBanner.artist)}
+                          className="hover:text-blue-400 transition-colors cursor-pointer"
+                        >
+                          {activeHeroBanner.artist}
+                        </button>
+                        <span className="w-1.5 h-1.5 rounded-full bg-white/30" />
+                        <span className="text-white/55 font-normal">{activeHeroBanner.plays}</span>
+                      </p>
 
-                    <button
-                      onClick={() => setIsHeroLiked((prev) => !prev)}
-                      className={`p-2.5 rounded-full border transition-all cursor-pointer ${
-                        isHeroLiked
-                          ? 'bg-rose-500/20 border-rose-500/40 text-rose-400'
-                          : 'bg-white/5 hover:bg-white/10 border-white/10 text-white/70 hover:text-white'
-                      }`}
-                      title="Like song"
-                    >
-                      <Heart className={`w-4 h-4 ${isHeroLiked ? 'fill-rose-400' : ''}`} />
-                    </button>
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <button
+                          onClick={() => {
+                            openMedia(
+                              activeHeroBanner.streamUrl,
+                              `${activeHeroBanner.title} - ${activeHeroBanner.artist}`,
+                              true,
+                              0,
+                              activeHeroBanner.imageUrl,
+                              'music'
+                            );
+                            setMusicPlayerOpen(false);
+                          }}
+                          className="px-6 py-2.5 rounded-full bg-[#4361ee] hover:bg-[#3b52d4] active:scale-95 text-white font-bold text-xs tracking-wider uppercase transition-all shadow-xl shadow-blue-600/30 cursor-pointer flex items-center gap-2"
+                        >
+                          <Play className="w-3.5 h-3.5 fill-white" />
+                          <span>Listen Now</span>
+                        </button>
+
+                        <button
+                          onClick={() => setIsHeroLiked((prev) => !prev)}
+                          className={`p-2.5 rounded-full border transition-all cursor-pointer backdrop-blur-md ${
+                            isHeroLiked
+                              ? 'bg-rose-500/20 border-rose-500/40 text-rose-400'
+                              : 'bg-white/10 hover:bg-white/15 border-white/15 text-white/80 hover:text-white'
+                          }`}
+                          title="Like song"
+                        >
+                          <Heart className={`w-4 h-4 ${isHeroLiked ? 'fill-rose-400' : ''}`} />
+                        </button>
+
+                        <button
+                          onClick={() => handleSelectArtist(activeHeroBanner.artist)}
+                          className="px-4 py-2 rounded-full bg-white/10 hover:bg-white/15 border border-white/10 text-xs font-semibold text-white/80 hover:text-white transition-all backdrop-blur-md cursor-pointer"
+                        >
+                          All Artist Songs
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Right Edge Vertical Slide Dots */}
+                    <div className="relative z-20 hidden sm:flex flex-col items-center gap-2 pr-6">
+                      {GROOVVY_HERO_BANNERS.map((slide, idx) => (
+                        <button
+                          key={slide.id}
+                          onClick={() => setHeroBannerIndex(idx)}
+                          title={`${slide.title} — ${slide.artist}`}
+                          className={`transition-all cursor-pointer rounded-full ${
+                            heroBannerIndex === idx
+                              ? 'w-2 h-6 bg-[#4361ee] shadow-lg shadow-blue-500/50'
+                              : 'w-2 h-2 bg-white/30 hover:bg-white/60'
+                          }`}
+                        />
+                      ))}
+                    </div>
                   </div>
-                </div>
-
-                {/* Right Hero Image fading into card */}
-                <div className="relative w-full sm:w-80 h-56 sm:h-72 shrink-0 flex items-center justify-center sm:justify-end">
-                  <div className="absolute inset-0 bg-gradient-to-r from-[#0d111d] via-transparent to-transparent z-10 hidden sm:block pointer-events-none" />
-                  <img
-                    src={ARTIST_AVATARS.camilaCabelloHero}
-                    alt="Camila Cabello Hero"
-                    className="w-full h-full object-cover object-top rounded-2xl sm:rounded-none opacity-90 filter contrast-105"
-                    onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).src =
-                        'https://thumb.wikimedia.org/wikipedia/commons/thumb/f/fe/Camila_Cabello_Sundance_2024_Cropped_%28cropped%29.jpg/960px-Camila_Cabello_Sundance_2024_Cropped_%28cropped%29.jpg';
-                    }}
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#0d111d] via-transparent to-transparent sm:hidden pointer-events-none" />
-                </div>
-              </div>
 
               {/* 2. Top Artists Ribbon (Image 2 - "also show ribbon of artist") */}
               <div className="w-full flex flex-col gap-3">
@@ -2552,304 +3029,7 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                 {/* Left Column (col-span-7) */}
                 <div className="lg:col-span-7 flex flex-col gap-6 w-full">
                   {isMusicSearchOrFilterActive || showAllMusicResults ? (
-                    /* Sound Lounge Discovery & Search Results Table */
-                    <div className="w-full flex flex-col gap-3">
-                      <div className="flex items-center justify-between pb-1 border-b border-white/5">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-cyan-600 via-purple-600 to-pink-500 flex items-center justify-center text-white shadow-md">
-                            <Sparkles className="w-3.5 h-3.5" />
-                          </div>
-                          <div>
-                            <h3 className="text-sm font-bold text-white tracking-wide uppercase flex items-center gap-2">
-                              <span>Sound Lounge Results</span>
-                              <span className="text-[10px] font-normal normal-case px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
-                                {filteredMusicTracks.length} Songs
-                              </span>
-                            </h3>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={handleShuffleDiscovery}
-                            title="Shuffle Discovery"
-                            className="px-2.5 py-1 rounded-xl bg-white/10 hover:bg-white/15 text-white/80 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
-                          >
-                            <Shuffle className="w-3.5 h-3.5" />
-                            <span className="hidden sm:inline">Shuffle Discovery</span>
-                          </button>
-                          <button
-                            onClick={() => {
-                              setIsRefreshingMusic(true);
-                              fetchLiveMusicDiscovery()
-                                .then((tracks) => {
-                                  if (tracks && tracks.length > 0) setMusicDiscoveryList(tracks);
-                                })
-                                .finally(() => setTimeout(() => setIsRefreshingMusic(false), 600));
-                            }}
-                            className="px-2.5 py-1 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
-                            title="Live Catalog Sync"
-                          >
-                            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingMusic ? 'animate-spin' : ''}`} />
-                            <span className="hidden sm:inline">Sync</span>
-                          </button>
-                          <button
-                            onClick={() => {
-                              setSelectedArtistProfile(null);
-                              setSearchQuery('');
-                              setGroovvySearch('');
-                              setSelectedMusicCategory('all');
-                              setShowAllMusicResults(false);
-                            }}
-                            className="px-2.5 py-1 rounded-xl bg-white/5 hover:bg-white/10 text-white/60 hover:text-white text-xs transition-colors cursor-pointer"
-                          >
-                            Reset
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Live Artist Loading State */}
-                      {isLoadingArtistSongs && (
-                        <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-gradient-to-r from-blue-900/30 via-indigo-900/20 to-purple-900/10 border border-blue-500/30 text-white animate-pulse">
-                          <RefreshCw className="w-4 h-4 text-cyan-400 animate-spin shrink-0" />
-                          <div className="flex flex-col min-w-0">
-                            <span className="text-xs font-bold text-cyan-300 truncate">
-                              Loading all live songs from internet for {loadingArtistName}...
-                            </span>
-                            <span className="text-[11px] text-white/50 truncate">
-                              Streaming live YouTube Music tracks with lossless audio
-                            </span>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Artist Spotlight Banner */}
-                      {selectedArtistProfile && (
-                        <div className="p-3.5 rounded-2xl bg-gradient-to-r from-blue-900/40 via-purple-900/20 to-black/40 border border-white/10 flex items-center justify-between gap-3 shadow-lg">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0 border border-white/10 shadow-md">
-                              <img
-                                src={selectedArtistProfile.imageUrl}
-                                alt={selectedArtistProfile.name}
-                                className="w-full h-full object-cover"
-                                onError={(e) => {
-                                  if (selectedArtistProfile.fallbackImageUrl) {
-                                    (e.currentTarget as HTMLImageElement).src = selectedArtistProfile.fallbackImageUrl;
-                                  }
-                                }}
-                              />
-                            </div>
-                            <div className="flex flex-col min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs sm:text-sm font-extrabold text-white truncate">
-                                  {selectedArtistProfile.name}
-                                </span>
-                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white/10 text-white/80 border border-white/10">
-                                  {selectedArtistProfile.language === 'english' && '🇺🇸 English'}
-                                  {selectedArtistProfile.language === 'hindi' && '🇮🇳 Hindi'}
-                                  {selectedArtistProfile.language === 'sinhala' && '🇱🇰 Sinhala'}
-                                </span>
-                              </div>
-                              {selectedArtistProfile.nativeName && (
-                                <span className="text-[11px] font-semibold text-white/60">
-                                  {selectedArtistProfile.nativeName}
-                                </span>
-                              )}
-                              <span className="text-[10px] text-cyan-300 font-mono">
-                                {selectedArtistProfile.genre} • {selectedArtistProfile.plays}
-                              </span>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-2 shrink-0">
-                            <button
-                              onClick={() => {
-                                if (filteredMusicTracks.length > 0) {
-                                  const first = filteredMusicTracks[0];
-                                  openMedia(first.streamUrl || first.pageUrl, `${first.title} - ${first.artist}`, true, 0, first.coverUrl, 'music');
-                                  setMusicPlayerOpen(false);
-                                }
-                              }}
-                              className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-blue-600/30 transition-all cursor-pointer"
-                            >
-                              <Play className="w-3 h-3 fill-white" />
-                              <span>Play All</span>
-                            </button>
-                            <button
-                              onClick={() => {
-                                setSelectedArtistProfile(null);
-                                setSearchQuery('');
-                                setGroovvySearch('');
-                              }}
-                              className="p-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-colors cursor-pointer"
-                              title="Clear artist filter"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Track List */}
-                      {filteredMusicTracks.length === 0 ? (
-                        <div className="p-8 rounded-2xl bg-white/5 border border-white/5 text-center flex flex-col items-center gap-2 my-2">
-                          <Music className="w-8 h-8 text-white/30" />
-                          <p className="text-xs text-white/60">No songs found matching your search</p>
-                          <button
-                            onClick={() => {
-                              setSearchQuery('');
-                              setGroovvySearch('');
-                              setSelectedMusicCategory('all');
-                              setShowAllMusicResults(false);
-                            }}
-                            className="text-xs text-[#4361ee] hover:underline cursor-pointer"
-                          >
-                            Reset Search
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex flex-col gap-2 max-h-[520px] overflow-y-auto pr-1 scrollbar-thin">
-                          {paginatedMusicTracks.map((track, idx) => {
-                            const trackIndex = (musicCurrentPage - 1) * MUSIC_PAGE_SIZE + idx + 1;
-                            const isCurrentTrack =
-                              currentTitle === `${track.title} - ${track.artist}` ||
-                              currentTitle === track.title;
-                            return (
-                              <div
-                                key={track.id || `${track.title}-${idx}`}
-                                onClick={() => {
-                                  if (isCurrentTrack) {
-                                    togglePlay();
-                                  } else {
-                                    openMedia(
-                                      track.streamUrl || track.pageUrl,
-                                      `${track.title} - ${track.artist}`,
-                                      true,
-                                      0,
-                                      track.coverUrl,
-                                      'music'
-                                    );
-                                    setMusicPlayerOpen(false);
-                                  }
-                                }}
-                                className={`flex items-center justify-between p-2.5 rounded-2xl border transition-all cursor-pointer group ${
-                                  isCurrentTrack
-                                    ? 'bg-blue-500/15 border-blue-500/30 shadow-lg shadow-blue-500/10'
-                                    : 'bg-white/5 hover:bg-white/10 border-white/5 hover:border-white/15'
-                                }`}
-                              >
-                                <div className="flex items-center gap-3.5 min-w-0">
-                                  <span
-                                    className={`text-xs font-black w-6 text-center shrink-0 ${
-                                      isCurrentTrack
-                                        ? 'text-[#4361ee]'
-                                        : 'text-white/40 group-hover:text-[#4361ee]'
-                                    }`}
-                                  >
-                                    {trackIndex < 10 ? `0${trackIndex}` : trackIndex}
-                                  </span>
-                                  <div className="w-10 h-10 rounded-xl overflow-hidden bg-black/60 shrink-0 border border-white/10 shadow-sm relative">
-                                    <img
-                                      src={track.coverUrl}
-                                      alt={track.title}
-                                      className="w-full h-full object-cover"
-                                      loading="lazy"
-                                    />
-                                    {isCurrentTrack && !isPaused && (
-                                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                                        <div className="w-2 h-2 rounded-full bg-[#4361ee] animate-ping" />
-                                      </div>
-                                    )}
-                                  </div>
-                                  <div className="flex flex-col min-w-0">
-                                    <span
-                                      className={`text-xs font-bold truncate ${
-                                        isCurrentTrack
-                                          ? 'text-blue-300'
-                                          : 'text-white group-hover:text-blue-300'
-                                      }`}
-                                    >
-                                      {track.title}
-                                    </span>
-                                    <span className="text-[11px] text-white/50 truncate">
-                                      {track.artist}
-                                    </span>
-                                  </div>
-                                </div>
-
-                                <div className="flex items-center gap-3 shrink-0">
-                                  <div className="flex items-center gap-1 text-xs font-mono text-white/40">
-                                    <Headphones className="w-3 h-3 text-white/30" />
-                                    <span>{track.duration || '3:45'}</span>
-                                  </div>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      if (isCurrentTrack) {
-                                        togglePlay();
-                                      } else {
-                                        openMedia(
-                                          track.streamUrl || track.pageUrl,
-                                          `${track.title} - ${track.artist}`,
-                                          true,
-                                          0,
-                                          track.coverUrl,
-                                          'music'
-                                        );
-                                        setMusicPlayerOpen(false);
-                                      }
-                                    }}
-                                    className={`p-2 rounded-xl text-white transition-colors shadow-sm cursor-pointer ${
-                                      isCurrentTrack
-                                        ? 'bg-[#4361ee]'
-                                        : 'bg-white/10 group-hover:bg-[#4361ee]'
-                                    }`}
-                                  >
-                                    {isCurrentTrack && !isPaused ? (
-                                      <Pause className="w-3.5 h-3.5 fill-current" />
-                                    ) : (
-                                      <Play className="w-3.5 h-3.5 fill-current" />
-                                    )}
-                                  </button>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-
-                      {/* Chunked Streaming Pagination Controls */}
-                      {filteredMusicTracks.length > MUSIC_PAGE_SIZE && (
-                        <div className="flex items-center justify-between pt-2 border-t border-white/5 mt-1">
-                          <span className="text-[11px] font-mono text-white/40">
-                            Showing {(musicCurrentPage - 1) * MUSIC_PAGE_SIZE + 1} -{' '}
-                            {Math.min(filteredMusicTracks.length, musicCurrentPage * MUSIC_PAGE_SIZE)} of{' '}
-                            {filteredMusicTracks.length} Songs (Chunked Streaming)
-                          </span>
-                          <div className="flex items-center gap-1.5">
-                            <button
-                              onClick={() => setMusicCurrentPage((p) => Math.max(1, p - 1))}
-                              disabled={musicCurrentPage <= 1}
-                              className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-xs text-white/70 disabled:opacity-30 disabled:pointer-events-none transition-all flex items-center gap-1 cursor-pointer"
-                            >
-                              <ChevronLeft className="w-3.5 h-3.5" />
-                              <span>Previous</span>
-                            </button>
-                            <span className="text-xs font-mono text-white/50 px-1">
-                              Chunk {musicCurrentPage} of {musicTotalPages}
-                            </span>
-                            <button
-                              onClick={() => setMusicCurrentPage((p) => Math.min(musicTotalPages, p + 1))}
-                              disabled={musicCurrentPage >= musicTotalPages}
-                              className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-xs text-white/70 disabled:opacity-30 disabled:pointer-events-none transition-all flex items-center gap-1 cursor-pointer"
-                            >
-                              <span>Next</span>
-                              <ChevronRight className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                    renderSoundLoungeResults(false, filteredMusicTracks)
                   ) : (
                     <>
                       {/* Genres Section */}
@@ -3153,6 +3333,8 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
                   </div>
                 </div>
               </div>
+                </>
+              )}
             </div>
           ) : effectiveSection === 'radio' ? (
             /* ============================================================ */
